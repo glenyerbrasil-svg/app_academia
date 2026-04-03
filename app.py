@@ -872,7 +872,51 @@ def login_and_registro_ui():
             with col2:
                 if st.button("Cancelar", key="cancela_verif"):
                     st.session_state.pop("esperando_verificacion", None)
-                    st.rerun()
+                    st.rerun()# --- BLOQUE DE INICIO DE SESIÓN ---
+    if login_btn:
+        if not st.session_state.get("login_user") or not st.session_state.get("login_pw"):
+            st.warning("⚠️ Por favor ingresa usuario y contraseña.")
+        else:
+            usuario = st.session_state.get("login_user").strip()
+            contrasena = st.session_state.get("login_pw").strip()
+            
+            sheet_usuarios = obtener_hoja_usuarios()
+            if not sheet_usuarios:
+                st.error("No se pudo conectar con la base de datos.")
+                return
+
+            try:
+                registros = sheet_usuarios.get_all_records()
+                # Buscamos al usuario de forma segura
+                user_row = next((r for r in registros if str(r.get("USUARIO", "")).lower() == usuario.lower()), None)
+                
+                if not user_row:
+                    st.warning("❌ Usuario no registrado.")
+                else:
+                    # Si el usuario existe, verificamos la contraseña
+                    hash_guardado = str(user_row.get("PASSWORD", "")).strip()
+                    if not check_password(contrasena, hash_guardado):
+                        st.warning("❌ Contraseña incorrecta.")
+                    else:
+                        # Verificamos estado de la cuenta
+                        estado_cmp = str(user_row.get("ESTADO", "")).strip().upper()
+                        if estado_cmp == "INACTIVO":
+                            st.warning("⚠️ Tu cuenta está pendiente de activación por el administrador.")
+                        else:
+                            # ✅ SI TODO ESTÁ BIEN, DEFINIMOS LAS VARIABLES DE SESIÓN
+                            st.session_state.usuario_logueado = True
+                            st.session_state.datos_usuario = user_row
+                            st.session_state.user_role = user_row.get("ROL", "Alumno")
+                            
+                            # Ahora sí es seguro leer el nivel porque user_row existe
+                            nivel_val = user_row.get("NIVEL", "")
+                            st.session_state.nivel_txt = get_nivel_db(nivel_val)
+                            
+                            st.success(f"¡Bienvenido de nuevo, {user_row.get('NOMBRE', usuario)}!")
+                            time.sleep(1)
+                            st.rerun()
+            except Exception as e:
+                st.error(f"Error crítico en el login: {e}")
 
         nivel_txt = get_nivel_db(user_row.get("NIVEL", ""))
         icon_rango, _ = mostrar_rango(nivel_txt)
