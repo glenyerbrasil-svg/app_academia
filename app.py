@@ -41,15 +41,14 @@ SCOPE = [
     "https://spreadsheets.google.com/feeds",
     "https://www.googleapis.com/auth/drive"
 ]
-# Así debe quedar tu bloque de conexión (Línea 44 en adelante)
+# --- CONEXIÓN A GOOGLE SHEETS ---
 if "google_sheets" in st.secrets:
-    # Si está en la nube, usa los Secretos
+    # Si está en la nube (Streamlit Cloud)
     credentials_dict = dict(st.secrets["google_sheets"])
     gc = gspread.service_account_from_dict(credentials_dict)
 else:
-    # Si estás en tu PC (Local), usa el archivo .json
+    # Si estás en tu PC local
     gc = gspread.service_account(filename="credenciales.json")
-
 
 SHEET_BITACORA = "Bitacora_Academia1"
 SHEET_BITACORA = "Bitacora_Academia1"
