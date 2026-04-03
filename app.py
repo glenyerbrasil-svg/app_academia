@@ -634,16 +634,28 @@ def login_and_registro_ui():
             st.session_state.reg_password = reg_password
             st.session_state.reg_fecha_nac = reg_fecha_nac
 
-            campos_completos = all([
-                reg_nombre.strip(),
-                reg_usuario.strip(),
-                reg_email.strip(),
-                reg_telefono.strip(),
-                reg_pais.strip(),
-                reg_password,
-                reg_fecha_nac
-            ])
+            # Creamos una lista de los campos que realmente están vacíos
+        campos_a_revisar = {
+            "Nombre": reg_nombre,
+            "Usuario": reg_usuario,
+            "Email": reg_email,
+            "Teléfono": reg_telefono,
+            "País": reg_pais,
+            "Password": reg_password
+        }
+        
+        faltantes = [nombre for nombre, valor in campos_a_revisar.items() if not str(valor).strip()]
+        
+        # La fecha la revisamos aparte porque es un objeto, no un texto
+        if not reg_fecha_nac:
+            faltantes.append("Fecha de Nacimiento")
 
+        if faltantes:
+            st.warning(f"⚠️ Por favor completa: {', '.join(faltantes)}")
+        else:
+            # Si llegamos aquí, todo está bien.
+            st.success("✅ ¡Campos validados! Procesando registro...")
+            # Aquí sigue tu lógica de registro (bcrypt, etc.)
             if not campos_completos:
                 st.warning("❗Completa todos los campos para registrar tu cuenta.")
             elif not is_valid_email(reg_email):
