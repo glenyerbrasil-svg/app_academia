@@ -656,11 +656,17 @@ def login_and_registro_ui():
             # Si llegamos aquí, todo está bien.
             st.success("✅ ¡Campos validados! Procesando registro...")
             # Aquí sigue tu lógica de registro (bcrypt, etc.)
-            if not campos_completos:
-                st.warning("❗Completa todos los campos para registrar tu cuenta.")
-            elif not is_valid_email(reg_email):
-                st.warning("❗Ingresa un correo válido (ejemplo: nombre@dominio.com).")
-            else:
+            
+            if faltantes:
+            st.warning(f"⚠️ Por favor completa: {', '.join(faltantes)}")
+        elif not is_valid_email(reg_email): # <--- Esta validación es buena mantenerla
+            st.warning("⚠️ Ingresa un correo válido.")
+        else:
+            # Aquí empieza lo que ya tienes en la línea 665 en adelante
+            hoja = obtener_hoja_usuarios()
+            if not hoja:
+                return
+            # ... resto del código ...
                 hoja = obtener_hoja_usuarios()
                 if not hoja:
                     return
