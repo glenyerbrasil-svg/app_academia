@@ -634,64 +634,70 @@ def login_and_registro_ui():
             st.session_state.reg_password = reg_password
             st.session_state.reg_fecha_nac = reg_fecha_nac
 
-            # Creamos una lista de los campos que realmente están vacíos
-        campos_a_revisar = {
-            "Nombre": reg_nombre,
-            "Usuario": reg_usuario,
-            "Email": reg_email,
-            "Teléfono": reg_telefono,
-            "País": reg_pais,
-            "Password": reg_password
-        }
-        
-        faltantes = [nombre for nombre, valor in campos_a_revisar.items() if not str(valor).strip()]
-        
-        # La fecha la revisamos aparte porque es un objeto, no un texto
-        if not reg_fecha_nac:
-            faltantes.append("Fecha de Nacimiento")
-
-        if faltantes:
-            st.warning(f"⚠️ Por favor completa: {', '.join(faltantes)}")
-        else:
-            # Si llegamos aquí, todo está bien.
-            st.success("✅ ¡Campos validados! Procesando registro...")
-            # Aquí sigue tu lógica de registro (bcrypt, etc.)
             
+# --- NUEVO SISTEMA DE VALIDACIÓN ---
+            campos_a_revisar = {
+                "Nombre": reg_nombre,
+                "Usuario": reg_usuario,
+                "Email": reg_email,
+                "Teléfono": reg_telefono,
+                "País": reg_pais,
+                "Contraseña": reg_password
+            }
+            
+            # Detectamos qué campos están realmente vacíos
+            faltantes = [nombre for nombre, valor in campos_a_revisar.items() if not str(valor).strip()]
+            
+            # La fecha se revisa aparte por ser un objeto
+            if not reg_fecha_nac:
+                faltantes.append("Fecha de Nacimiento")
+
             if faltantes:
-            st.warning(f"⚠️ Por favor completa: {', '.join(faltantes)}")
-        elif not is_valid_email(reg_email): # <--- Esta validación es buena mantenerla
-            st.warning("⚠️ Ingresa un correo válido.")
-        else:
-            # Aquí empieza lo que ya tienes en la línea 665 en adelante
-            hoja = obtener_hoja_usuarios()
-            if not hoja:
-                return
-            # ... resto del código ...
+                st.warning(f"⚠️ Por favor completa: {', '.join(faltantes)}")
+            elif not is_valid_email(reg_email):
+                st.warning("⚠️ Ingresa un correo válido (ejemplo: nombre@dominio.com).")
+            else:
+                # --- AQUÍ EMPIEZA LA LÓGICA DE GOOGLE SHEETS ---
                 hoja = obtener_hoja_usuarios()
                 if not hoja:
+                    st.error("No se pudo conectar con la base de datos.")
                     return
+                
                 registros = hoja.get_all_records()
                 email_lower = reg_email.strip().lower()
                 ya_email = any(str(r.get("EMAIL", "")).strip().lower() == email_lower for r in registros)
                 ya_usuario = any(str(r.get("USUARIO", "")).strip().lower() == reg_usuario.strip().lower() for r in registros)
+                
                 if ya_email:
-                    st.error("⚠️ Este correo ya está registrado. Intenta iniciar sesión o recuperar tu cuenta.")
+                    st.error("⚠️ Este correo ya está registrado. Intenta iniciar sesión.")
                 elif ya_usuario:
-                    st.error("Ese usuario ya existe, elige otro.")
+                    st.error("⚠️ Ese usuario ya existe, elige otro.")
                 else:
+                    # Generar código de verificación
                     code = '{:06d}'.format(random.randint(0, 999999))
                     enviado, err = enviar_email_codigo(reg_email.strip(), code, motivo="registro")
                     if enviado:
                         st.session_state.esperando_verificacion = True
                         st.session_state.codigo_verificacion_env = code
-                        st.info("📧 Hemos enviado un código de verificación a tu correo. Revisa SPAM si no lo encuentras.")
+                        # Guardamos los datos temporalmente para usarlos tras verificar el mail
+                        st.session_state.reg_nombre = reg_nombre
+                        st.session_state.reg_usuario = reg_usuario
+                        st.session_state.reg_email = reg_email
+                        st.session_state.reg_telefono = reg_telefono
+                        st.session_state.reg_pais = reg_pais
+                        st.session_state.reg_password = reg_password
+                        st.session_state.reg_fecha_nac = reg_fecha_nac
+                        
+                        st.info("📧 Hemos enviado un código de verificación a tu correo. Revisa SPAM.")
                     else:
                         st.error(f"No se pudo enviar el correo de verificación: {err}")
 
+        # --- SECCIÓN DE VERIFICACIÓN ---
         if st.session_state.get("esperando_verificacion"):
             st.markdown("### Verifica tu email")
             codigo_ingresado = st.text_input("Código de verificación (6 dígitos)", key="codigo_verificacion_input")
             btn_final_reg = st.button("Confirmar y Crear Cuenta", key="confirmar_cuenta_btn")
+            
             if btn_final_reg:
                 if not codigo_ingresado or codigo_ingresado.strip() != st.session_state.get("codigo_verificacion_env", ""):
                     st.warning("Código incorrecto. Revisa el correo recibido.")
@@ -699,11 +705,15 @@ def login_and_registro_ui():
                     hoja = obtener_hoja_usuarios()
                     data = hoja.get_all_records() if hoja else []
                     hoy = date.today()
+                    
+                    # Generar ID automático
                     id_next = 1
                     if data:
                         ids = [int(r.get("ID_USUARIO", 0)) for r in data if str(r.get("ID_USUARIO", "")).isdigit()]
                         if ids:
                             id_next = max(ids) + 1
+                    
+                    # Configuración de cuenta nueva
                     rol = "Alumno"
                     nivel = "Joven Padawan"
                     estado = "DEMO"
@@ -717,8 +727,11 @@ def login_and_registro_ui():
                     dispositivos_activos = ""
                     ultima_conexion = ""
                     estado_pago = ""
+                    
+                    # Recuperar datos del session_state
                     fecha_cumple = st.session_state.reg_fecha_nac.strftime("%Y-%m-%d")
                     hashed_pw = hash_password(st.session_state.reg_password.strip())
+                    
                     nueva_fila = [
                         id_next,
                         st.session_state.reg_usuario.strip(),
@@ -727,83 +740,27 @@ def login_and_registro_ui():
                         st.session_state.reg_telefono.strip(),
                         hashed_pw,
                         st.session_state.reg_pais.strip(),
-                        rol,
-                        nivel,
-                        estado,
-                        fecha_cumple,
-                        regalo,
-                        ultimo_pago,
-                        prox_vto,
-                        fecha_gracia,
-                        comprobante_pago,
-                        fecha_registro,
-                        dispositivos_activos,
-                        correo_verificado,
-                        ultima_conexion,
-                        estado_pago,
+                        rol, nivel, estado, fecha_cumple, regalo,
+                        ultimo_pago, prox_vto, fecha_gracia, comprobante_pago,
+                        fecha_registro, dispositivos_activos, correo_verificado,
+                        ultima_conexion, estado_pago
                     ]
+                    
                     try:
                         hoja.append_row(nueva_fila)
-                        try: st.cache_data.clear()
-                        except Exception: pass
-                        for k in [ "reg_usuario", "reg_nombre", "reg_email", "reg_telefono", "reg_pais", "reg_password", "reg_fecha_nac", "esperando_verificacion", "codigo_verificacion_env", "codigo_verificacion_input"]:
+                        st.success("✅ ¡Registro exitoso! Tienes 5 días de acceso demo.")
+                        # Limpiar sesión
+                        for k in ["reg_usuario", "reg_nombre", "reg_email", "reg_telefono", "reg_pais", "reg_password", "reg_fecha_nac", "esperando_verificacion", "codigo_verificacion_env"]:
                             if k in st.session_state: st.session_state.pop(k)
-                        st.success(
-                            "✅ ¡Registro exitoso! Tienes 5 días de acceso demo. "
-                            "Sube tu comprobante de pago desde tu perfil cuando corresponda."
-                        )
                         time.sleep(2)
                         st.rerun()
                     except Exception as e:
-                        st.warning(f"Error al registrar: {e}")
+                        st.error(f"Error al guardar en la base de datos: {e}")
+
             if st.button("Cancelar registro", key="cancela_verif"):
-                for k in [ "reg_usuario", "reg_nombre", "reg_email", "reg_telefono", "reg_pais", "reg_password", "reg_fecha_nac", "esperando_verificacion", "codigo_verificacion_env", "codigo_verificacion_input"]:
+                for k in ["esperando_verificacion", "codigo_verificacion_env"]:
                     if k in st.session_state: st.session_state.pop(k)
                 st.rerun()
-
-    if login_btn and st.session_state.get("login_user") and st.session_state.get("login_pw"):
-        usuario = st.session_state.get("login_user")
-        contrasena = st.session_state.get("login_pw")
-        sheet_usuarios = obtener_hoja_usuarios()
-        if not sheet_usuarios:
-            return
-        try:
-            registros = sheet_usuarios.get_all_records()
-        except Exception:
-            st.warning("No se pudo conectar con la base de datos.")
-            return
-
-        if not registros or not isinstance(registros, list):
-            st.warning("No se pueden recuperar datos de usuarios.")
-            return
-        user_row = None
-        for row in registros:
-            if str(row.get("USUARIO", "")).strip().lower() == usuario.strip().lower():
-                user_row = row
-                break
-        if not user_row:
-            st.warning("❌ Usuario no registrado.")
-            return
-        hash_guardado = str(user_row.get("PASSWORD", "")).strip()
-        if not check_password(contrasena, hash_guardado):
-            st.warning("❌ Contraseña incorrecta.")
-            return
-
-        estado_cmp = str(user_row.get("ESTADO", "")).strip().lower()
-        if estado_cmp == "inactivo":
-            st.warning(
-                "⚠️ Tu cuenta está pendiente de activación por el administrador. "
-                "Contacta al administrador para el acceso."
-            )
-            return
-
-        sub_codigo, dias_main, dias_grace = evaluar_suscripcion_usuario(user_row)
-        if sub_codigo == "INACTIVO":
-            st.error(
-                "🚫 Tu acceso está suspendido: finalizó el periodo de gracia. "
-                "Contacta al Administrador para reactivar tu cuenta."
-            )
-            return
 
         nivel_txt = get_nivel_db(user_row.get("NIVEL", ""))
         icon_rango, _ = mostrar_rango(nivel_txt)
