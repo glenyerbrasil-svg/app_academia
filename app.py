@@ -2,17 +2,11 @@ import streamlit as st
 from datetime import datetime, timedelta, date
 import pandas as pd
 import gspread
-from oauth2client.service_account import ServiceAccountCredentials
 import bcrypt
 import re
 import time
 import random
-import smtplib
-from email.mime.text import MIMEText
 import plotly.express as px
-import io
-import requests
-import os
 import cloudinary
 import cloudinary.uploader
 
@@ -31,22 +25,37 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# ==== CONEXIÓN A GOOGLE SHEETS ====
-def obtener_hoja_usuarios():
+# ==== CONEXIÓN ROBUSTA A GOOGLE SHEETS (CORREGIDA) ====
+@st.cache_resource(ttl=600) # Mantiene la conexión viva por 10 min
+def obtener_cliente_gspread():
     try:
         if "google_sheets" in st.secrets:
+            # Formato para Streamlit Cloud
             creds_dict = dict(st.secrets["google_sheets"])
-            gc = gspread.service_account_from_dict(creds_dict)
+            return gspread.service_account_from_dict(creds_dict)
         else:
-            gc = gspread.service_account(filename="credenciales.json")
-            
-        sh = gc.open("Bitacora_Academia1")
-        return sh.worksheet("usuarios")
+            # Formato para Local
+            return gspread.service_account(filename="credenciales.json")
     except Exception as e:
-        st.error(f"Error de conexión a la base de datos: {e}")
+        st.error(f"Error de autenticación: {e}")
         return None
 
-# ==== FUNCIONES DE APOYO ====
+def obtener_hoja_usuarios():
+    cliente = obtener_cliente_gspread()
+    if not cliente:
+        return None
+    
+    # Intentamos conectar hasta 3 veces para evitar micro-caídas
+    for intento in range(3):
+        try:
+            sh = cliente.open("Bitacora_Academia1")
+            return sh.worksheet("usuarios")
+        except Exception:
+            time.sleep(1) # Espera un segundo antes de reintentar
+            continue
+    return None
+
+# ==== FUNCIONES DE SEGURIDAD ====
 def is_valid_email(email):
     return re.match(r"[^@]+@[^@]+\.[^@]+", email)
 
@@ -59,51 +68,40 @@ def check_password(password, hashed):
     except:
         return False
 
-# ==== INTERFAZ PRINCIPAL DEL ALUMNO (CORREGIDA) ====
+# ==== INTERFAZ PRINCIPAL DEL ALUMNO ====
 def main_interface():
     user_data = st.session_state.get("USUARIO")
-    
     if not user_data:
         st.rerun()
         return
 
     nombre_trader = user_data.get("NOMBRE", "Trader")
-    nivel_trader = user_data.get("NIVEL", "Joven Padawan")
-
-    st.title(f"🚀 Panel de Control: {nombre_trader}")
-    st.sidebar.title(f"Hola, {nombre_trader}")
-    st.sidebar.write(f"Nivel: {nivel_trader}")
     
+    st.sidebar.title(f"⭐ {nombre_trader}")
     if st.sidebar.button("Cerrar Sesión"):
-        for key in list(st.session_state.keys()):
-            del st.session_state[key]
+        st.session_state.clear()
         st.rerun()
 
-    TABS = st.tabs(["📊 Mi Bitácora", "📚 Academia", "🎥 Clases", "🛡️ Mi Perfil"])
+    st.title(f"🚀 Academia: {nombre_trader}")
+    
+    tabs = st.tabs(["📊 Bitácora", "📚 Academia", "🛡️ Mi Perfil"])
+    
+    with tabs[0]:
+        st.info("Próximamente: Registra aquí tus operaciones diarias.")
+    
+    with tabs[1]:
+        st.subheader("Cursos Disponibles")
+        st.write("📖 Estrategia FlipX")
+        st.video("https://www.youtube.com/watch?v=dQw4w9WgXcQ") # Link de prueba
 
-    with TABS[0]:
-        st.subheader("Tu Registro de Operaciones")
-        st.info("Aquí podrás registrar y ver tus trades pronto.")
-        # Aquí puedes añadir tus gráficos de Plotly más adelante
-
-    with TABS[1]:
-        st.subheader("Material de Estudio")
-        st.write("📖 Guía de Gestión de Riesgo")
-        st.write("📖 Estrategia FlipX 5")
-
-    with TABS[2]:
-        st.subheader("Clases en Vivo")
-        st.video("https://www.youtube.com/watch?v=dQw4w9WgXcQ") # Ejemplo
-
-    with TABS[3]:
-        st.subheader("Configuración de Perfil")
+    with tabs[2]:
         st.write(f"**Usuario:** {user_data.get('USUARIO')}")
-        st.write(f"**WhatsApp:** {user_data.get('TELEFONO')}")
-        st.write(f"**Estado de Cuenta:** {user_data.get('ESTADO', 'DEMO')}")
+        st.write(f"**Email:** {user_data.get('EMAIL')}")
+        st.write(f"**Nivel:** {user_data.get('NIVEL', 'Joven Padawan')}")
 
 # ==== INTERFAZ DE LOGIN Y REGISTRO ====
 def login_and_registro_ui():
-    st.title("🛡️ Academia de Trading")
+    st.title("🛡️ Sistema de Acceso Academia")
     tab_login, tab_reg = st.tabs(["Inicia Sesión", "Regístrate"])
 
     with tab_login:
@@ -115,23 +113,22 @@ def login_and_registro_ui():
                 registros = hoja.get_all_records()
                 user_row = next((r for r in registros if str(r.get("USUARIO","")).lower() == u_log.strip().lower()), None)
                 
-                if user_row:
-                    if check_password(p_log, str(user_row.get("PASSWORD",""))):
-                        st.session_state.USUARIO = user_row # Guardamos TODO el diccionario del usuario
-                        st.success(f"¡Bienvenido {user_row.get('NOMBRE')}!")
-                        time.sleep(1)
-                        st.rerun()
-                    else:
-                        st.error("❌ Contraseña incorrecta")
+                if user_row and check_password(p_log, str(user_row.get("PASSWORD",""))):
+                    st.session_state.USUARIO = user_row
+                    st.success("Acceso concedido...")
+                    time.sleep(1)
+                    st.rerun()
                 else:
-                    st.error("❌ Usuario no encontrado")
+                    st.error("Credenciales incorrectas")
+            else:
+                st.error("No se pudo conectar a la base de datos.")
 
     with tab_reg:
         col1, col2 = st.columns(2)
         with col1:
             r_nom = st.text_input("Nombre Completo")
-            r_usu = st.text_input("Nombre de Usuario")
-            r_email = st.text_input("Correo Electrónico")
+            r_usu = st.text_input("Usuario")
+            r_email = st.text_input("Email")
         with col2:
             r_tel = st.text_input("WhatsApp")
             r_pais = st.text_input("País")
@@ -140,70 +137,41 @@ def login_and_registro_ui():
         r_fec = st.date_input("Fecha de Nacimiento", value=date(2000, 1, 1))
 
         if st.button("Registrar Cuenta", use_container_width=True):
-            faltantes = []
-            if not r_nom: faltantes.append("Nombre")
-            if not r_usu: faltantes.append("Usuario")
-            if not r_email: faltantes.append("Email")
-            if not r_pass: faltantes.append("Contraseña")
-            
-            if faltantes:
-                st.warning(f"⚠️ Por favor completa: {', '.join(faltantes)}")
+            if not all([r_nom, r_usu, r_email, r_pass]):
+                st.warning("⚠️ Completa los campos obligatorios.")
             elif not is_valid_email(r_email):
-                st.error("❌ El formato del correo no es válido.")
+                st.error("Email inválido")
             else:
-                with st.spinner("Conectando con la base de datos..."):
+                with st.spinner("Guardando en base de datos..."):
                     hoja = obtener_hoja_usuarios()
                     if hoja:
                         try:
                             registros = hoja.get_all_records()
-                            # Verificar si el usuario o email ya existen
-                            ya_usuario = any(str(r.get("USUARIO","")).lower() == r_usu.lower() for r in registros)
-                            ya_email = any(str(r.get("EMAIL","")).lower() == r_email.lower() for r in registros)
-                            
-                            if ya_usuario:
-                                st.error("❌ Este nombre de usuario ya está tomado.")
-                            elif ya_email:
-                                st.error("❌ Este correo ya está registrado.")
+                            if any(str(r.get("USUARIO","")).lower() == r_usu.lower() for r in registros):
+                                st.error("El usuario ya existe.")
                             else:
-                                # Preparamos la fila exactamente con 21 columnas
                                 hoy = date.today().strftime("%Y-%m-%d")
                                 prox_vto = (date.today() + timedelta(days=5)).strftime("%Y-%m-%d")
                                 
+                                # Fila completa de 21 columnas
                                 nueva_fila = [
-                                    len(registros) + 1,        # ID_USUARIO
-                                    r_usu.strip(),             # USUARIO
-                                    r_nom.strip(),             # NOMBRE
-                                    r_email.strip().lower(),   # EMAIL
-                                    r_tel.strip(),             # TELEFONO
-                                    hash_password(r_pass),     # PASSWORD
-                                    r_pais.strip(),            # PAIS
-                                    "Alumno",                  # ROL
-                                    "Joven Padawan",           # NIVEL
-                                    "DEMO",                    # ESTADO
-                                    str(r_fec),                # FECHA_NAC
-                                    "No",                      # REGALO
-                                    "",                        # ULTIMO_PAGO
-                                    prox_vto,                  # PROX_VTO
-                                    "",                        # FECHA_GRACIA
-                                    "",                        # COMPROBANTE_PAGO
-                                    hoy,                       # FECHA_REGISTRO
-                                    "",                        # DISPOSITIVOS_ACTIVOS
-                                    "Sí",                      # CORREO_VERIFICADO
-                                    "",                        # ULTIMA_CONEXION
-                                    "Pendiente"                # ESTADO_PAGO
+                                    len(registros) + 1, r_usu.strip(), r_nom.strip(), 
+                                    r_email.strip().lower(), r_tel.strip(), hash_password(r_pass), 
+                                    r_pais.strip(), "Alumno", "Joven Padawan", "DEMO", 
+                                    str(r_fec), "No", "", prox_vto, "", "", hoy, "", "Sí", "", "Pendiente"
                                 ]
                                 
                                 hoja.append_row(nueva_fila)
-                                st.success("✅ ¡Registro exitoso! Ya puedes ir a 'Inicia Sesión'.")
+                                st.success("✅ Registro exitoso. ¡Inicia sesión!")
                                 time.sleep(2)
-                                st.rerun() 
                         except Exception as e:
-                            st.error(f"❌ Error al guardar datos: {e}")
+                            st.error(f"Error técnico: {e}")
                     else:
-                        st.error("❌ Error de conexión. Revisa tus Secrets en Streamlit.")
+                        st.error("Error de conexión persistente.")
 
 # ==== FLUJO DE EJECUCIÓN ====
 if "USUARIO" not in st.session_state:
     login_and_registro_ui()
 else:
     main_interface()
+
