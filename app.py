@@ -149,27 +149,58 @@ def login_and_registro_ui():
             if faltantes:
                 st.warning(f"⚠️ Por favor completa: {', '.join(faltantes)}")
             elif not is_valid_email(r_email):
-                st.error("Email inválido")
+                st.error("❌ El formato del correo no es válido.")
             else:
-                hoja = obtener_hoja_usuarios()
-                if hoja:
-                    registros = hoja.get_all_records()
-                    ya_existe = any(str(r.get("USUARIO","")).lower() == r_usu.lower() for r in registros)
-                    if ya_existe:
-                        st.error("Ese usuario ya existe.")
-                    else:
-                        # Registro simplificado para demo
-                        nueva_fila = [
-                            len(registros) + 1, r_usu, r_nom, r_email, r_tel, 
-                            hash_password(r_pass), r_pais, "Alumno", "Joven Padawan", 
-                            "DEMO", str(r_fec), "No", "", "", "", "", 
-                            date.today().strftime("%Y-%m-%d"), "", "Sí", "", ""
-                        ]
+                with st.spinner("Conectando con la base de datos..."):
+                    hoja = obtener_hoja_usuarios()
+                    if hoja:
                         try:
-                            hoja.append_row(nueva_fila)
-                            st.success("✅ ¡Registro exitoso! Ya puedes iniciar sesión.")
+                            registros = hoja.get_all_records()
+                            # Verificar si el usuario o email ya existen
+                            ya_usuario = any(str(r.get("USUARIO","")).lower() == r_usu.lower() for r in registros)
+                            ya_email = any(str(r.get("EMAIL","")).lower() == r_email.lower() for r in registros)
+                            
+                            if ya_usuario:
+                                st.error("❌ Este nombre de usuario ya está tomado.")
+                            elif ya_email:
+                                st.error("❌ Este correo ya está registrado.")
+                            else:
+                                # Preparamos la fila exactamente con 21 columnas
+                                hoy = date.today().strftime("%Y-%m-%d")
+                                prox_vto = (date.today() + timedelta(days=5)).strftime("%Y-%m-%d")
+                                
+                                nueva_fila = [
+                                    len(registros) + 1,        # ID_USUARIO
+                                    r_usu.strip(),             # USUARIO
+                                    r_nom.strip(),             # NOMBRE
+                                    r_email.strip().lower(),   # EMAIL
+                                    r_tel.strip(),             # TELEFONO
+                                    hash_password(r_pass),     # PASSWORD
+                                    r_pais.strip(),            # PAIS
+                                    "Alumno",                  # ROL
+                                    "Joven Padawan",           # NIVEL
+                                    "DEMO",                    # ESTADO
+                                    str(r_fec),                # FECHA_NAC
+                                    "No",                      # REGALO
+                                    "",                        # ULTIMO_PAGO
+                                    prox_vto,                  # PROX_VTO
+                                    "",                        # FECHA_GRACIA
+                                    "",                        # COMPROBANTE_PAGO
+                                    hoy,                       # FECHA_REGISTRO
+                                    "",                        # DISPOSITIVOS_ACTIVOS
+                                    "Sí",                      # CORREO_VERIFICADO
+                                    "",                        # ULTIMA_CONEXION
+                                    "Pendiente"                # ESTADO_PAGO
+                                ]
+                                
+                                hoja.append_row(nueva_fila)
+                                st.success("✅ ¡Registro exitoso! Ya puedes ir a 'Inicia Sesión'.")
+                                time.sleep(2)
+                                st.rerun() 
                         except Exception as e:
-                            st.error(f"Error al guardar: {e}")
+                            st.error(f"❌ Error al guardar datos: {e}")
+                    else:
+                        st.error("❌ Error de conexión. Revisa tus Secrets en Streamlit.")
 
 # ==== FLUJO DE EJECUCIÓN ====
 if "USUARIO" not in st.session_state:
