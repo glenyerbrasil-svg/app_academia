@@ -4,3 +4,4 @@ gspread
 google-auth
 cloudinary
 oauth2client
+bcrypt
