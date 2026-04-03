@@ -900,7 +900,7 @@ def main_app():
 
     with TABS[0]:
         st.title("🚀 Primer Paso en la Academia")
-        st.video("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
+        st.video("https://youtube.com/shorts/z6TquA-pF2k")
         st.markdown(f"¡Bienvenido/a, {nombre_usuario}! Antes de comenzar, revisa nuestro reglamento y filosofía Jedi.")
 
        
