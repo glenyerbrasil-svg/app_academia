@@ -760,7 +760,119 @@ def login_and_registro_ui():
             if st.button("Cancelar registro", key="cancela_verif"):
                 for k in ["esperando_verificacion", "codigo_verificacion_env"]:
                     if k in st.session_state: st.session_state.pop(k)
-                st.rerun()
+                st.rerun()# --- 1. VALIDACIÓN DETALLADA DE CAMPOS ---
+            campos_a_revisar = {
+                "Nombre": reg_nombre,
+                "Usuario": reg_usuario,
+                "Email": reg_email,
+                "Teléfono": reg_telefono,
+                "País": reg_pais,
+                "Contraseña": reg_password
+            }
+            
+            # Detectamos qué campos están realmente vacíos
+            faltantes = [nombre for nombre, valor in campos_a_revisar.items() if not str(valor).strip()]
+            
+            # La fecha se revisa aparte por ser un objeto de tipo date
+            if not reg_fecha_nac:
+                faltantes.append("Fecha de Nacimiento")
+
+            if faltantes:
+                st.warning(f"⚠️ Por favor completa: {', '.join(faltantes)}")
+            elif not is_valid_email(reg_email):
+                st.warning("⚠️ Ingresa un correo válido (ejemplo: nombre@dominio.com).")
+            else:
+                # --- 2. VALIDACIÓN CONTRA GOOGLE SHEETS ---
+                hoja = obtener_hoja_usuarios()
+                if not hoja:
+                    st.error("No se pudo conectar con la base de datos.")
+                    return
+                
+                registros = hoja.get_all_records()
+                email_lower = reg_email.strip().lower()
+                ya_email = any(str(r.get("EMAIL", "")).strip().lower() == email_lower for r in registros)
+                ya_usuario = any(str(r.get("USUARIO", "")).strip().lower() == reg_usuario.strip().lower() for r in registros)
+                
+                if ya_email:
+                    st.error("⚠️ Este correo ya está registrado. Intenta iniciar sesión.")
+                elif ya_usuario:
+                    st.error("⚠️ Ese usuario ya existe, elige otro.")
+                else:
+                    # --- 3. PROCESO DE VERIFICACIÓN POR EMAIL ---
+                    code = '{:06d}'.format(random.randint(0, 999999))
+                    enviado, err = enviar_email_codigo(reg_email.strip(), code, motivo="registro")
+                    if enviado:
+                        st.session_state.esperando_verificacion = True
+                        st.session_state.codigo_verificacion_env = code
+                        # Guardamos datos en sesión para el paso final
+                        st.session_state.reg_nombre = reg_nombre
+                        st.session_state.reg_usuario = reg_usuario
+                        st.session_state.reg_email = reg_email
+                        st.session_state.reg_telefono = reg_telefono
+                        st.session_state.reg_pais = reg_pais
+                        st.session_state.reg_password = reg_password
+                        st.session_state.reg_fecha_nac = reg_fecha_nac
+                        
+                        st.info("📧 Hemos enviado un código de verificación a tu correo. Revisa SPAM.")
+                    else:
+                        st.error(f"No se pudo enviar el correo de verificación: {err}")
+
+        # --- 4. INTERFAZ DE CÓDIGO DE VERIFICACIÓN (FUERA DEL BOTÓN DE REGISTRO) ---
+        if st.session_state.get("esperando_verificacion"):
+            st.markdown("---")
+            st.markdown("### 🛡️ Verifica tu identidad")
+            codigo_ingresado = st.text_input("Ingresa el código de 6 dígitos", key="codigo_verificacion_input")
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("Confirmar y Crear Cuenta", key="confirmar_cuenta_btn"):
+                    if not codigo_ingresado or codigo_ingresado.strip() != st.session_state.get("codigo_verificacion_env", ""):
+                        st.warning("Código incorrecto. Revisa el correo recibido.")
+                    else:
+                        # PROCESO FINAL DE GUARDADO
+                        hoja = obtener_hoja_usuarios()
+                        data = hoja.get_all_records() if hoja else []
+                        hoy = date.today()
+                        
+                        # Generar ID
+                        id_next = 1
+                        if data:
+                            ids = [int(r.get("ID_USUARIO", 0)) for r in data if str(r.get("ID_USUARIO", "")).isdigit()]
+                            if ids: id_next = max(ids) + 1
+                        
+                        # Hashear contraseña
+                        hashed_pw = hash_password(st.session_state.reg_password.strip())
+                        
+                        nueva_fila = [
+                            id_next,
+                            st.session_state.reg_usuario.strip(),
+                            st.session_state.reg_nombre.strip(),
+                            st.session_state.reg_email.strip(),
+                            st.session_state.reg_telefono.strip(),
+                            hashed_pw,
+                            st.session_state.reg_pais.strip(),
+                            "Alumno", "Joven Padawan", "DEMO", 
+                            st.session_state.reg_fecha_nac.strftime("%Y-%m-%d"),
+                            "No", "", (hoy + timedelta(days=5)).strftime("%Y-%m-%d"),
+                            (hoy + timedelta(days=12)).strftime("%Y-%m-%d"),
+                            "", hoy.strftime("%Y-%m-%d"), "", "Sí", "", ""
+                        ]
+                        
+                        try:
+                            hoja.append_row(nueva_fila)
+                            st.success("✅ ¡Registro exitoso! Tienes 5 días de acceso demo.")
+                            # Limpiar variables de registro
+                            for k in ["reg_usuario", "reg_nombre", "reg_email", "reg_telefono", "reg_pais", "reg_password", "reg_fecha_nac", "esperando_verificacion", "codigo_verificacion_env"]:
+                                if k in st.session_state: st.session_state.pop(k)
+                            time.sleep(2)
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Error al guardar: {e}")
+            
+            with col2:
+                if st.button("Cancelar", key="cancela_verif"):
+                    st.session_state.pop("esperando_verificacion", None)
+                    st.rerun()
 
         nivel_txt = get_nivel_db(user_row.get("NIVEL", ""))
         icon_rango, _ = mostrar_rango(nivel_txt)
