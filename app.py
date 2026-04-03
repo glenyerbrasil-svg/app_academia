@@ -29,14 +29,29 @@ cloudinary.config(
     secure=True
 )
 
-st.set_page_config(page_title="Academia de Trading", page_icon=":milky_way:", layout="wide")
+st.set_page_config(
+    page_title="Academia de Trading", # El nombre que saldrá en la pestaña
+    page_icon="📈", 
+    layout="wide", # Clave para que use todo el ancho del móvil
+    initial_sidebar_state="collapsed" # Importante: el menú aparecerá oculto al inicio
+)
 
 # ==== GOOGLE SHEETS CONFIG (Estructuras Finales) ====
 SCOPE = [
     "https://spreadsheets.google.com/feeds",
     "https://www.googleapis.com/auth/drive"
 ]
-CREDENTIALS_FILE = "credenciales.json"
+# Así debe quedar tu bloque de conexión (Línea 44 en adelante)
+if "google_sheets" in st.secrets:
+    # Si está en la nube, usa los Secretos
+    credentials_dict = dict(st.secrets["google_sheets"])
+    gc = gspread.service_account_from_dict(credentials_dict)
+else:
+    # Si estás en tu PC (Local), usa el archivo .json
+    gc = gspread.service_account(filename="credenciales.json")
+
+
+SHEET_BITACORA = "Bitacora_Academia1"
 SHEET_BITACORA = "Bitacora_Academia1"
 SHEET_BACKTEST = "Backtesting"
 SHEET_USERS = "Bitacora_Academia1"
