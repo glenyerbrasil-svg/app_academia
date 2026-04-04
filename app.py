@@ -11,6 +11,7 @@ import cloudinary
 import cloudinary.uploader
 
 # ==== CONFIGURACIÓN CLOUDINARY ====
+# Se recomienda usar st.secrets["cloudinary"] para no exponer estas llaves
 cloudinary.config(
     cloud_name="dqur2fztq",
     api_key="694985462176285",
@@ -26,123 +27,84 @@ st.set_page_config(
 )
 
 # ==== CONEXIÓN ROBUSTA A GOOGLE SHEETS (CORREGIDA) ====
-@st.cache_resource(ttl=600) # Mantiene la conexión viva por 10 min
+@st.cache_resource(ttl=600)
 def obtener_cliente_gspread():
     try:
         if "google_sheets" in st.secrets:
             # Formato para Streamlit Cloud
             creds_dict = dict(st.secrets["google_sheets"])
+            
+            # CORRECCIÓN CRÍTICA: Convertir los \n de texto a saltos de línea reales
+            if "private_key" in creds_dict:
+                creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
+            
             return gspread.service_account_from_dict(creds_dict)
         else:
-            # Formato para Local
+            # Formato para Local (asegúrate de que el archivo existe en tu PC)
             return gspread.service_account(filename="credenciales.json")
     except Exception as e:
-        st.error(f"Error de autenticación: {e}")
+        st.error(f"Error de conexión con Google Sheets: {e}")
         return None
 
 def obtener_hoja_usuarios():
-    cliente = obtener_cliente_gspread()
-    if not cliente:
-        return None
-    
-    # Intentamos conectar hasta 3 veces para evitar micro-caídas
-    for intento in range(3):
+    client = obtener_cliente_gspread()
+    if client:
         try:
-            sh = cliente.open("Bitacora_Academia1")
-            return sh.worksheet("usuarios")
-        except Exception:
-            time.sleep(1) # Espera un segundo antes de reintentar
-            continue
+            sh = client.open("Bitacora_Academia1")
+            return sh.worksheet("USUARIOS")
+        except Exception as e:
+            st.error(f"No se pudo abrir la hoja 'USUARIOS': {e}")
     return None
 
 # ==== FUNCIONES DE SEGURIDAD ====
-def is_valid_email(email):
-    return re.match(r"[^@]+@[^@]+\.[^@]+", email)
-
 def hash_password(password):
     return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
 def check_password(password, hashed):
-    try:
-        return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
-    except:
-        return False
+    return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
 
-# ==== INTERFAZ PRINCIPAL DEL ALUMNO ====
-def main_interface():
-    user_data = st.session_state.get("USUARIO")
-    if not user_data:
-        st.rerun()
-        return
-
-    nombre_trader = user_data.get("NOMBRE", "Trader")
-    
-    st.sidebar.title(f"⭐ {nombre_trader}")
-    if st.sidebar.button("Cerrar Sesión"):
-        st.session_state.clear()
-        st.rerun()
-
-    st.title(f"🚀 Academia: {nombre_trader}")
-    
-    tabs = st.tabs(["📊 Bitácora", "📚 Academia", "🛡️ Mi Perfil"])
-    
-    with tabs[0]:
-        st.info("Próximamente: Registra aquí tus operaciones diarias.")
-    
-    with tabs[1]:
-        st.subheader("Cursos Disponibles")
-        st.write("📖 Estrategia FlipX")
-        st.video("https://www.youtube.com/watch?v=dQw4w9WgXcQ") # Link de prueba
-
-    with tabs[2]:
-        st.write(f"**Usuario:** {user_data.get('USUARIO')}")
-        st.write(f"**Email:** {user_data.get('EMAIL')}")
-        st.write(f"**Nivel:** {user_data.get('NIVEL', 'Joven Padawan')}")
-
-# ==== INTERFAZ DE LOGIN Y REGISTRO ====
+# ==== INTERFAZ DE USUARIO (LOGIN / REGISTRO) ====
 def login_and_registro_ui():
-    st.title("🛡️ Sistema de Acceso Academia")
-    tab_login, tab_reg = st.tabs(["Inicia Sesión", "Regístrate"])
+    st.title("📈 Academia de Trading")
+    
+    tab1, tab2 = st.tabs(["Inicia Sesión", "Regístrate"])
+    
+    with tab1:
+        with st.form("login_form"):
+            usuario = st.text_input("Usuario")
+            clave = st.text_input("Contraseña", type="password")
+            boton_login = st.form_submit_button("Entrar")
+            
+            if boton_login:
+                hoja = obtener_hoja_usuarios()
+                if hoja:
+                    registros = hoja.get_all_records()
+                    user_data = next((r for r in registros if str(r.get("USUARIO","")) == usuario), None)
+                    
+                    if user_data and check_password(clave, user_data.get("PASSWORD","")):
+                        st.session_state["USUARIO"] = user_data
+                        st.success(f"Bienvenido {user_data['NOMBRE']}")
+                        time.sleep(1)
+                        st.rerun()
+                    else:
+                        st.error("Usuario o contraseña incorrectos")
 
-    with tab_login:
-        u_log = st.text_input("Usuario", key="l_user")
-        p_log = st.text_input("Contraseña", type="password", key="l_pass")
-        if st.button("Entrar", use_container_width=True):
-            hoja = obtener_hoja_usuarios()
-            if hoja:
-                registros = hoja.get_all_records()
-                user_row = next((r for r in registros if str(r.get("USUARIO","")).lower() == u_log.strip().lower()), None)
-                
-                if user_row and check_password(p_log, str(user_row.get("PASSWORD",""))):
-                    st.session_state.USUARIO = user_row
-                    st.success("Acceso concedido...")
-                    time.sleep(1)
-                    st.rerun()
-                else:
-                    st.error("Credenciales incorrectas")
-            else:
-                st.error("No se pudo conectar a la base de datos.")
-
-    with tab_reg:
-        col1, col2 = st.columns(2)
-        with col1:
+    with tab2:
+        with st.form("registro_form"):
+            r_usu = st.text_input("Crea un Usuario")
             r_nom = st.text_input("Nombre Completo")
-            r_usu = st.text_input("Usuario")
-            r_email = st.text_input("Email")
-        with col2:
-            r_tel = st.text_input("WhatsApp")
-            r_pais = st.text_input("País")
+            r_email = st.text_input("Correo Electrónico")
+            r_tel = st.text_input("WhatsApp (ej: +55...)")
             r_pass = st.text_input("Contraseña", type="password")
-        
-        r_fec = st.date_input("Fecha de Nacimiento", value=date(2000, 1, 1))
-
-        if st.button("Registrar Cuenta", use_container_width=True):
-            if not all([r_nom, r_usu, r_email, r_pass]):
-                st.warning("⚠️ Completa los campos obligatorios.")
-            elif not is_valid_email(r_email):
-                st.error("Email inválido")
-            else:
-                with st.spinner("Guardando en base de datos..."):
+            r_pais = st.selectbox("País", ["Brasil", "Colombia", "México", "Argentina", "Otro"])
+            r_fec = st.date_input("Fecha de Nacimiento", min_value=date(1950,1,1))
+            
+            submit_reg = st.form_submit_button("Crear Cuenta")
+            
+            if submit_reg:
+                if not all([r_usu, r_nom, r_email, r_pass]):
+                    st.warning("Por favor completa los campos obligatorios.")
+                else:
                     hoja = obtener_hoja_usuarios()
                     if hoja:
                         try:
@@ -153,25 +115,51 @@ def login_and_registro_ui():
                                 hoy = date.today().strftime("%Y-%m-%d")
                                 prox_vto = (date.today() + timedelta(days=5)).strftime("%Y-%m-%d")
                                 
-                                # Fila completa de 21 columnas
+                                # Fila completa de 21 columnas según tu estructura
                                 nueva_fila = [
-                                    len(registros) + 1, r_usu.strip(), r_nom.strip(), 
-                                    r_email.strip().lower(), r_tel.strip(), hash_password(r_pass), 
-                                    r_pais.strip(), "Alumno", "Joven Padawan", "DEMO", 
-                                    str(r_fec), "No", "", prox_vto, "", "", hoy, "", "Sí", "", "Pendiente"
+                                    len(registros) + 1, # ID
+                                    r_usu.strip(), # USUARIO
+                                    r_nom.strip(), # NOMBRE
+                                    r_email.strip().lower(), # EMAIL
+                                    r_tel.strip(), # TELEFONO
+                                    hash_password(r_pass), # PASSWORD
+                                    r_pais.strip(), # PAIS
+                                    "Alumno", # ROL
+                                    "Joven Padawan", # RANGO
+                                    "DEMO", # PLAN
+                                    str(r_fec), # FECHA_NAC
+                                    "No", # REGALO
+                                    "", # ULTIMO_PAGO
+                                    prox_vto, # PROX_VTO
+                                    "", # FECHA_GRACIA
+                                    "", # COMPROBANTE_PAGO
+                                    hoy, # FECHA_REGISTRO
+                                    "", # DISPOSITIVOS_ACTIVOS
+                                    "Sí", # CORREO_VERIFICADO
+                                    "", # ULTIMA_CONEXION
+                                    "Pendiente" # ESTADO_PAGO
                                 ]
                                 
                                 hoja.append_row(nueva_fila)
-                                st.success("✅ Registro exitoso. ¡Inicia sesión!")
+                                st.success("✅ Registro exitoso. ¡Ya puedes iniciar sesión!")
                                 time.sleep(2)
+                                st.rerun()
                         except Exception as e:
-                            st.error(f"Error técnico: {e}")
+                            st.error(f"Error técnico al guardar: {e}")
                     else:
-                        st.error("Error de conexión persistente.")
+                        st.error("Error de conexión persistente. Revisa los Secrets.")
+
+def main_interface():
+    st.sidebar.title(f"Hola, {st.session_state['USUARIO']['NOMBRE']}")
+    if st.sidebar.button("Cerrar Sesión"):
+        del st.session_state["USUARIO"]
+        st.rerun()
+    
+    st.write("# Panel de Control de la Academia")
+    st.info("Aquí irá el contenido principal de tu bitácora y trading.")
 
 # ==== FLUJO DE EJECUCIÓN ====
 if "USUARIO" not in st.session_state:
     login_and_registro_ui()
 else:
     main_interface()
-
