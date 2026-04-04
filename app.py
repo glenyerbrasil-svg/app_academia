@@ -75,4 +75,3 @@ else:
     
     st.header(f"Bienvenido al panel, {st.session_state['USUARIO']['NOMBRE']}")
     st.write("Tu sistema está conectado correctamente a Google Sheets.")
-    
