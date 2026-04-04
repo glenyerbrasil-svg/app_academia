@@ -6,112 +6,93 @@ import random
 import os
 import time
 import smtplib
+import re
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 # =========================================================
-# 1. CONFIGURACIÓN DE CREDENCIALES (GMAIL)
+# 1. CONFIGURACIÓN DE EMAIL
 # =========================================================
 EMAIL_EMISOR = "glenyerbrasil@gmail.com"
 EMAIL_PASSWORD = "tpnk mizj ccul vfuv" 
 
 # =========================================================
-# 2. FUNCIONES DE APOYO (EMAIL Y SEGURIDAD)
+# 2. FUNCIONES DE SEGURIDAD Y LIMPIEZA
 # =========================================================
 
-def enviar_email_verificacion(destinatario, codigo):
-    try:
-        msg = MIMEMultipart()
-        msg['From'] = EMAIL_EMISOR
-        msg['To'] = destinatario
-        msg['Subject'] = f"{codigo} es tu código de verificación - Academia"
-        cuerpo = f"""
-        <html>
-            <body style="font-family: Arial, sans-serif; padding: 20px;">
-                <h2 style="color: #2E7D32;">¡Bienvenido a la Academia!</h2>
-                <p>Tu código de verificación es:</p>
-                <div style="background-color: #f9f9f9; padding: 20px; text-align: center; font-size: 32px; font-weight: bold; color: #1565C0; border: 2px dashed #1565C0;">
-                    {codigo}
-                </div>
-            </body>
-        </html>
-        """
-        msg.attach(MIMEText(cuerpo, 'html'))
-        server = smtplib.SMTP('smtp.gmail.com', 587)
-        server.starttls()
-        server.login(EMAIL_EMISOR, EMAIL_PASSWORD)
-        server.sendmail(EMAIL_EMISOR, destinatario, msg.as_string())
-        server.quit()
-        return True
-    except Exception as e:
-        st.error(f"Error al enviar email: {e}")
-        return False
+def limpiar_llave_maestra(pk):
+    """Limpia profundamente la llave para evitar errores de Padding/Length."""
+    if not pk: return pk
+    # Eliminar espacios y comillas accidentales
+    pk = pk.strip().strip("'").strip('"')
+    # Normalizar saltos de línea
+    pk = pk.replace("\\n", "\n")
+    # Si la llave viene en una sola línea, intentar reconstruirla (casos extremos)
+    if "-----BEGIN PRIVATE KEY-----" in pk and "\n" not in pk[30:-30]:
+        cuerpo = pk.replace("-----BEGIN PRIVATE KEY-----", "").replace("-----END PRIVATE KEY-----", "").replace(" ", "")
+        lineas = [cuerpo[i:i+64] for i in range(0, len(cuerpo), 64)]
+        pk = "-----BEGIN PRIVATE KEY-----\n" + "\n".join(lineas) + "\n-----END PRIVATE KEY-----"
+    return pk
 
 def check_password(password, hashed):
-    try:
-        return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
-    except:
-        return False
+    try: return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
+    except: return False
 
 def hash_password(password):
     return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
 # =========================================================
-# 3. CONEXIÓN A GOOGLE SHEETS (CON LIMPIEZA DE LLAVE)
+# 3. CONEXIÓN ROBUSTA A GOOGLE SHEETS
 # =========================================================
-
-def limpiar_llave(pk):
-    """Limpia la llave privada de posibles errores de formato en Secrets."""
-    if not pk: return pk
-    # Quitar comillas accidentales y espacios
-    pk = pk.strip().strip("'").strip('"')
-    # Convertir \n literales en saltos de línea reales
-    pk = pk.replace("\\n", "\n")
-    # Asegurar encabezado y pie de página correctos
-    if "-----BEGIN PRIVATE KEY-----" not in pk:
-        pk = "-----BEGIN PRIVATE KEY-----\n" + pk
-    if "-----END PRIVATE KEY-----" not in pk:
-        pk = pk + "\n-----END PRIVATE KEY-----"
-    # Eliminar saltos de línea dobles accidentales
-    return pk.replace("\n\n", "\n")
 
 @st.cache_resource(ttl=600)
 def obtener_cliente_gspread():
     try:
         if "google_sheets" in st.secrets:
-            creds_dict = dict(st.secrets["google_sheets"])
-            if "private_key" in creds_dict:
-                creds_dict["private_key"] = limpiar_llave(creds_dict["private_key"])
-            return gspread.service_account_from_dict(creds_dict)
+            creds = dict(st.secrets["google_sheets"])
+            if "private_key" in creds:
+                creds["private_key"] = limpiar_llave_maestra(creds["private_key"])
+            return gspread.service_account_from_dict(creds)
         else:
-            ruta_local = os.path.join(os.path.dirname(__file__), "credenciales.json")
-            return gspread.service_account(filename=ruta_local) if os.path.exists(ruta_local) else None
+            ruta = os.path.join(os.path.dirname(__file__), "credenciales.json")
+            return gspread.service_account(filename=ruta) if os.path.exists(ruta) else None
     except Exception as e:
-        st.error(f"Error de conexión Sheets: {e}")
+        st.error(f"Error crítico de conexión: {e}")
         return None
 
 def obtener_hoja_usuarios():
     client = obtener_cliente_gspread()
     if client:
-        try:
-            return client.open("Bitacora_Academia1").worksheet("usuarios")
-        except Exception as e:
-            st.error(f"Error al acceder a la hoja: {e}")
+        try: return client.open("Bitacora_Academia1").worksheet("usuarios")
+        except: return None
     return None
 
 # =========================================================
-# 4. INTERFAZ DE LOGIN / REGISTRO
+# 4. INTERFAZ DE ACCESO
 # =========================================================
 
 st.set_page_config(page_title="Academia de Trading", page_icon="📈", layout="wide")
 
-def login_and_registro_ui():
-    st.title("📈 Academia de Trading")
-    t1, t2 = st.tabs(["Iniciar Sesión", "Registrar Cuenta"])
+def enviar_verificacion(dest, cod):
+    try:
+        msg = MIMEMultipart()
+        msg['Subject'] = f"{cod} es tu código Academia"
+        msg.attach(MIMEText(f"Tu código de verificación es: {cod}", 'plain'))
+        s = smtplib.SMTP('smtp.gmail.com', 587)
+        s.starttls()
+        s.login(EMAIL_EMISOR, EMAIL_PASSWORD)
+        s.sendmail(EMAIL_EMISOR, dest, msg.as_string())
+        s.quit()
+        return True
+    except: return False
 
+def login_ui():
+    st.title("📈 Academia de Trading")
+    t1, t2 = st.tabs(["Entrar", "Registrarse"])
+    
     with t1:
-        with st.form("login_form"):
-            u, p = st.text_input("Usuario"), st.text_input("Contraseña", type="password")
+        with st.form("l"):
+            u, p = st.text_input("Usuario"), st.text_input("Clave", type="password")
             if st.form_submit_button("Entrar"):
                 hoja = obtener_hoja_usuarios()
                 if hoja:
@@ -120,61 +101,58 @@ def login_and_registro_ui():
                     if user and check_password(p, user.get("PASSWORD", "")):
                         st.session_state["USUARIO"] = user
                         st.rerun()
-                    else: st.error("Usuario o contraseña incorrectos.")
+                    else: st.error("Acceso denegado.")
 
     with t2:
-        if "registro_pendiente" not in st.session_state:
-            with st.form("registro_form"):
-                c1, c2 = st.columns(2)
-                with c1:
-                    r_u, r_n, r_p = st.text_input("Usuario *"), st.text_input("Nombre *"), st.text_input("Clave *", type="password")
-                with c2:
-                    r_e, r_t = st.text_input("Email *"), st.text_input("WhatsApp")
-                    pa = st.selectbox("País", ["Brasil", "Colombia", "Venezuela", "México", "Argentina", "Chile", "Perú", "Otro"])
-                r_f = st.date_input("Nacimiento", value=date(2000, 1, 1), format="DD/MM/YYYY")
+        if "reg_pend" not in st.session_state:
+            with st.form("r"):
+                col1, col2 = st.columns(2)
+                r_u = col1.text_input("Usuario*")
+                r_n = col1.text_input("Nombre*")
+                r_e = col2.text_input("Email*")
+                r_p = col2.text_input("Clave*", type="password")
                 if st.form_submit_button("Enviar Código"):
                     if all([r_u, r_n, r_e, r_p]):
                         cod = str(random.randint(100000, 999999))
-                        if enviar_email_verificacion(r_e, cod):
-                            st.session_state["registro_pendiente"] = {"datos": [r_u, r_n, r_e, r_t, r_p, pa, r_f], "codigo": cod}
+                        if enviar_verificacion(r_e, cod):
+                            st.session_state["reg_pend"] = {"d": [r_u, r_n, r_e, r_p], "c": cod}
                             st.rerun()
-                    else: st.warning("Completa los campos obligatorios.")
         else:
-            st.info(f"Código enviado a: {st.session_state['registro_pendiente']['datos'][2]}")
-            ingreso = st.text_input("Código de 6 dígitos", max_chars=6)
-            if st.button("Confirmar Registro"):
-                if ingreso == st.session_state["registro_pendiente"]["codigo"]:
+            c_in = st.text_input("Código de 6 dígitos")
+            if st.button("Validar"):
+                if c_in == st.session_state["reg_pend"]["c"]:
                     hoja = obtener_hoja_usuarios()
                     if hoja:
-                        d = st.session_state["registro_pendiente"]["datos"]
-                        hoy, vto = date.today().strftime("%Y-%m-%d"), (date.today() + timedelta(days=5)).strftime("%Y-%m-%d")
-                        fila = [len(hoja.get_all_records()) + 1, d[0], d[1], d[2].lower(), d[3], hash_password(d[4]), d[5], "Alumno", "Joven Padawan", "DEMO", str(d[6]), "No", "", vto, "", "", hoy, "", "Sí", "", "Pendiente"]
+                        d = st.session_state["reg_pend"]["d"]
+                        fila = [len(hoja.get_all_records())+1, d[0], d[1], d[2], "", hash_password(d[3]), "Brasil", "Alumno", "Padawan", "DEMO", "2000-01-01", "No", "", "", "", "", "", "", "Sí", "", "Pendiente"]
                         hoja.append_row(fila)
-                        st.success("✅ ¡Registro completado!")
-                        del st.session_state["registro_pendiente"]
+                        st.success("¡Listo! Ya puedes entrar.")
+                        del st.session_state["reg_pend"]
                         time.sleep(2); st.rerun()
-                else: st.error("Código incorrecto.")
 
 # =========================================================
-# 5. PANEL PRINCIPAL (REINTEGRACIÓN)
+# 5. PANEL DE CONTROL (CONTENIDO)
 # =========================================================
 
-def main_interface():
+def main_ui():
     st.sidebar.title(f"Hola, {st.session_state['USUARIO']['NOMBRE']}")
-    op = st.sidebar.radio("Menú", ["🏠 Bienvenida", "📝 Bitácora", "📊 Backtesting", "💰 Finanzas", "🎓 Escuela", "💬 Forum"])
-    if st.sidebar.button("Cerrar Sesión"):
+    menu = st.sidebar.radio("Navegación", ["🏠 Inicio", "📝 Bitácora", "📊 Backtesting", "🎓 Escuela"])
+    
+    if st.sidebar.button("Salir"):
         del st.session_state["USUARIO"]; st.rerun()
 
-    if op == "🏠 Bienvenida":
-        st.header("Panel de la Academia")
-        st.write("Selecciona una opción a la izquierda.")
-    elif op == "📝 Bitácora": st.header("Bitácora")
-    elif op == "📊 Backtesting": st.header("Backtesting")
-    elif op == "💰 Finanzas": st.header("Finanzas")
-    elif op == "🎓 Escuela": st.header("Escuela")
-    elif op == "💬 Forum": st.header("Comunidad")
+    if menu == "🏠 Inicio":
+        st.subheader("Bienvenido al Panel Central")
+        st.write("Selecciona una herramienta en el menú de la izquierda para comenzar.")
+    elif menu == "📝 Bitácora":
+        st.header("Tu Bitácora Personal")
+        st.info("Registra tus trades aquí (Módulo en carga).")
+    elif menu == "📊 Backtesting":
+        st.header("Análisis de Estrategia")
+    elif menu == "🎓 Escuela":
+        st.header("Material Educativo")
 
 if "USUARIO" not in st.session_state:
-    login_and_registro_ui()
+    login_ui()
 else:
-    main_interface()
+    main_ui()
