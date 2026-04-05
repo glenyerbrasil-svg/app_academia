@@ -130,19 +130,61 @@ if "USUARIO" not in st.session_state:
                         try:
                             hoja = cliente.open("Bitacora_Academia1").worksheet("Usuarios")
                             d = st.session_state["verificando_email"]["datos"]
-                            # Cálculos de fechas
+                            
                             hoy = date.today()
                             vence = hoy + timedelta(days=7)
                             
-                            # Nueva fila según tus columnas exactas
+                            # MAPEO EXACTO DE LAS 23 COLUMNAS QUE ME ENVIASTE:
+                            # 1. ID_USUARIO
+                            # 2. USUARIO
+                            # 3. NOMBRE
+                            # 4. EMAIL
+                            # 5. TELEFONO
+                            # 6. PASSWORD
+                            # 7. PAIS
+                            # 8. ROL
+                            # 9. NIVEL
+                            # 10. ESTADO
+                            # 11. FECHA_REGISTRO
+                            # 12. FECHA_CUMPLEANOS
+                            # 13. REGALO_CUMPLE_RECLAMADO
+                            # 14. ULTIMO_PAGO
+                            # 15. PROXIMO_VENCIMIENTO
+                            # 16. FECHA_GRACIA
+                            # 17. COMPROBANTE_PAGO
+                            # 18. TIPO_PLANDISPOSITIVOS_ACTIVOS (Las enviaste juntas, entiendo que son TIPO_PLAN y DISPOSITIVOS_ACTIVOS)
+                            # 19. DISPOSITIVOS_ACTIVOS
+                            # 20. CORREO_VERIFICADO
+                            # 21. ULTIMA_CONEXION
+                            # 22. ESTADO_PAGO
+                            # 23. MONTO_ULTIMO_PAGO
+
                             nueva_fila = [
                                 len(hoja.get_all_records()) + 1, # ID_USUARIO
-                                d[0], d[1], d[2], d[3], d[4], d[5], 
-                                "Alumno", "Padawan", "DEMO", 
-                                str(hoy), d[6], "No", "", 
-                                str(vence), # PROXIMO_VENCIMIENTO (7 días después)
-                                "", "", "", "DEMO", "1", "Sí", str(hoy), "Pendiente", "0"
+                                d[0],            # USUARIO
+                                d[1],            # NOMBRE
+                                d[2],            # EMAIL
+                                d[3],            # TELEFONO
+                                d[4],            # PASSWORD
+                                d[5],            # PAIS
+                                "Alumno",        # ROL
+                                "Padawan",       # NIVEL
+                                "Activo",        # ESTADO
+                                str(hoy),        # FECHA_REGISTRO
+                                d[6],            # FECHA_CUMPLEANOS
+                                "No",            # REGALO_CUMPLE_RECLAMADO
+                                "",              # ULTIMO_PAGO
+                                str(vence),      # PROXIMO_VENCIMIENTO
+                                "",              # FECHA_GRACIA
+                                "",              # COMPROBANTE_PAGO
+                                "DEMO",          # TIPO_PLAN
+                                "1",             # DISPOSITIVOS_ACTIVOS
+                                "Sí",            # CORREO_VERIFICADO
+                                str(hoy),        # ULTIMA_CONEXION
+                                "Pendiente",     # ESTADO_PAGO
+                                "0"              # MONTO_ULTIMO_PAGO
                             ]
+                            
                             hoja.append_row(nueva_fila)
                             st.success("¡Registro exitoso! Ya puedes iniciar sesión.")
                             del st.session_state["verificando_email"]
@@ -156,7 +198,7 @@ if "USUARIO" not in st.session_state:
                 del st.session_state["verificando_email"]
                 st.rerun()
 
-    # 3. RECUPERAR CONTRASEÑA (Espacio reservado)
+    # 3. RECUPERAR CONTRASEÑA
     elif opcion == "Recuperar Contraseña":
         st.subheader("Recuperar cuenta")
         email_recup = st.text_input("Introduce tu correo electrónico")
