@@ -67,7 +67,6 @@ def login_v2():
         st.error("Error: No se encontró la pestaña 'Usuarios' en el Excel.")
         return
 
-    # --- INGRESAR ---
     if menu_acceso == "Ingresar":
         with st.form("login_f"):
             u = st.text_input("Usuario")
@@ -80,7 +79,6 @@ def login_v2():
                     st.rerun()
                 else: st.error("Usuario o contraseña incorrectos.")
 
-    # --- REGISTRARSE ---
     elif menu_acceso == "Registrarse":
         if "reg_codigo" not in st.session_state:
             with st.form("reg_f"):
@@ -134,7 +132,6 @@ def login_v2():
                     st.rerun()
                 else: st.error("Código incorrecto.")
 
-    # --- RECUPERAR CLAVE ---
     elif menu_acceso == "Recuperar Clave":
         st.subheader("Recuperación de Acceso")
         email_rec = st.text_input("Email registrado")
@@ -143,19 +140,19 @@ def login_v2():
             idx = next((i for i, r in enumerate(datos) if str(r.get("EMAIL")).lower() == email_rec.lower()), None)
             if idx is not None:
                 nueva_p = str(random.randint(1000, 9999)) + "temp"
-                # LÍNEA CORREGIDA AQUÍ ABAJO:
                 hoja_u.update_cell(idx + 2, 6, hash_pass(nueva_p)) 
                 enviar_correo(email_rec, "Clave Temporal", f"Tu nueva clave es: <b>{nueva_p}</b>")
                 st.success("✅ Clave temporal enviada al correo.")
             else: st.error("Email no encontrado.")
 
 # =========================================================
-# 3. PANEL PRINCIPAL
+# 3. PANEL PRINCIPAL (REORDENADO)
 # =========================================================
 
 def main_app():
     user = st.session_state["USUARIO"]
     
+    # Configuración de logos
     logos_rango = {
         "Joven Padawan": "assets/joven_padawan.png",
         "Jedi": "assets/jedi.png",
@@ -164,21 +161,31 @@ def main_app():
     rango_actual = user.get("RANGO", "Joven Padawan")
     ruta_logo = logos_rango.get(rango_actual, "assets/joven_padawan.png")
 
+    # --- BARRA LATERAL (SIDEBAR) REORDENADA ---
     st.sidebar.title(f"Hola, {user['NOMBRE']}")
-    if st.sidebar.button("Cerrar Sesión"):
-        del st.session_state["USUARIO"]
-        st.rerun()
+    st.sidebar.markdown("---")
+
+    # 1. NAVEGACIÓN (Prioridad alta)
+    st.sidebar.subheader("Navegación")
+    menu = st.sidebar.radio("Ir a:", ["🏠 Bienvenida", "🎓 Escuela", "📝 Bitácora", "📊 Backtesting", "📈 Mis Estadísticas", "💰 Finanzas", "💬 Forum"])
     
     st.sidebar.markdown("---")
+
+    # 2. INSIGNIA DE RANGO (Reconocimiento visual)
     try:
         st.sidebar.image(ruta_logo, use_container_width=True)
     except:
         st.sidebar.caption("✨ Cargando insignia...")
-    st.sidebar.caption(f"<div style='text-align: center'><b>{rango_actual}</b></div>", unsafe_allow_html=True)
+    st.sidebar.caption(f"<div style='text-align: center'>Rango: <b>{rango_actual}</b></div>", unsafe_allow_html=True)
+    
     st.sidebar.markdown("---")
 
-    menu = st.sidebar.radio("Navegación", ["🏠 Bienvenida", "🎓 Escuela", "📝 Bitácora", "📊 Backtesting", "📈 Mis Estadísticas", "💰 Finanzas", "💬 Forum"])
+    # 3. CERRAR SESIÓN (Al final para no estorbar)
+    if st.sidebar.button("Cerrar Sesión"):
+        del st.session_state["USUARIO"]
+        st.rerun()
 
+    # --- CONTENIDO CENTRAL ---
     if menu == "🏠 Bienvenida":
         st.header("🌌 Centro de Mando")
         st.markdown("---")
