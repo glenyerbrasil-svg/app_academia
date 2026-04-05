@@ -159,19 +159,18 @@ def main_app():
         st.write(f"Tu camino como **{rango_actual}** comienza aquí. Disciplina y estudio son tus herramientas.")
         st.info("💡 Dirígete a la sección Escuela para comenzar tu entrenamiento.")
 
-    # --- MÓDULO: ESCUELA (CON BLOQUEO POR RANGO) ---
+    # --- MÓDULO: ESCUELA ---
     elif menu == "🎓 Escuela":
         st.header("🎓 Centro de Formación Holocron")
         st.subheader("Entra en tu área correspondiente según tu rango actual")
         st.write("---")
 
-        # Definimos niveles de acceso (Jerarquía)
         niveles = ["Joven Padawan", "Jedi", "Maestro Jedi"]
         rango_index = niveles.index(rango_actual) if rango_actual in niveles else 0
 
         col1, col2, col3 = st.columns(3)
 
-        # --- COLUMNA 1: PADAWAN ---
+        # COLUMNA 1: PADAWAN
         with col1:
             st.image("assets/joven_padawan.png", width=150)
             if rango_index >= 0:
@@ -180,9 +179,9 @@ def main_app():
                     st.video("https://youtube.com/shorts/z6TquA-pF2k?feature=share")
                     st.caption("Video 1: Introducción a la Disciplina")
             else:
-                st.error("Bloqueado")
+                st.warning("🔒 Bloqueado")
 
-        # --- COLUMNA 2: JEDI ---
+        # COLUMNA 2: JEDI
         with col2:
             st.image("assets/jedi.png", width=150)
             if rango_index >= 1:
@@ -190,10 +189,10 @@ def main_app():
                     st.write("**Estrategias Avanzadas**")
                     st.info("Contenido en preparación para Caballeros Jedi.")
             else:
-                st.lock(" Módulo Bloqueado")
+                st.error("🔒 Módulo Bloqueado")
                 st.caption("Requiere rango: **Jedi**")
 
-        # --- COLUMNA 3: MAESTRO JEDI ---
+        # COLUMNA 3: MAESTRO JEDI
         with col3:
             st.image("assets/maestro_jedi.png", width=150)
             if rango_index >= 2:
@@ -201,7 +200,7 @@ def main_app():
                     st.write("**Dominio del Mercado**")
                     st.success("Bienvenido, Maestro. Aquí reside la sabiduría superior.")
             else:
-                st.lock(" Cámara Sellada")
+                st.error("🔒 Cámara Sellada")
                 st.caption("Requiere rango: **Maestro Jedi**")
 
     else:
