@@ -48,7 +48,7 @@ def enviar_correo(dest, asunto, cuerpo):
     except: return False
 
 # =========================================================
-# 2. INTERFAZ DE ACCESO (LOGIN, REGISTRO, RECUPERACIÓN)
+# 2. INTERFAZ DE ACCESO
 # =========================================================
 
 st.set_page_config(page_title="Academia de Trading", layout="wide")
@@ -62,7 +62,7 @@ def login_v2():
 
     try:
         doc = cliente.open("Bitacora_Academia1")
-        hoja_u = doc.worksheet("Usuarios") # U mayúscula confirmada
+        hoja_u = doc.worksheet("Usuarios") 
     except:
         st.error("Error: No se encontró la pestaña 'Usuarios' en el Excel.")
         return
@@ -85,7 +85,6 @@ def login_v2():
         if "reg_codigo" not in st.session_state:
             with st.form("reg_f"):
                 st.subheader("Crear Nueva Cuenta")
-                
                 c1, col_e = st.columns(2)
                 r_n = c1.text_input("Nombre Completo *")
                 r_e = col_e.text_input("Email *")
@@ -144,4 +143,63 @@ def login_v2():
             idx = next((i for i, r in enumerate(datos) if str(r.get("EMAIL")).lower() == email_rec.lower()), None)
             if idx is not None:
                 nueva_p = str(random.randint(1000, 9999)) + "temp"
-                hoja_u.update_cell(idx + 2, 6, hash_
+                # LÍNEA CORREGIDA AQUÍ ABAJO:
+                hoja_u.update_cell(idx + 2, 6, hash_pass(nueva_p)) 
+                enviar_correo(email_rec, "Clave Temporal", f"Tu nueva clave es: <b>{nueva_p}</b>")
+                st.success("✅ Clave temporal enviada al correo.")
+            else: st.error("Email no encontrado.")
+
+# =========================================================
+# 3. PANEL PRINCIPAL
+# =========================================================
+
+def main_app():
+    user = st.session_state["USUARIO"]
+    
+    logos_rango = {
+        "Joven Padawan": "assets/joven_padawan.png",
+        "Jedi": "assets/jedi.png",
+        "Maestro Jedi": "assets/maestro_jedi.png"
+    }
+    rango_actual = user.get("RANGO", "Joven Padawan")
+    ruta_logo = logos_rango.get(rango_actual, "assets/joven_padawan.png")
+
+    st.sidebar.title(f"Hola, {user['NOMBRE']}")
+    if st.sidebar.button("Cerrar Sesión"):
+        del st.session_state["USUARIO"]
+        st.rerun()
+    
+    st.sidebar.markdown("---")
+    try:
+        st.sidebar.image(ruta_logo, use_container_width=True)
+    except:
+        st.sidebar.caption("✨ Cargando insignia...")
+    st.sidebar.caption(f"<div style='text-align: center'><b>{rango_actual}</b></div>", unsafe_allow_html=True)
+    st.sidebar.markdown("---")
+
+    menu = st.sidebar.radio("Navegación", ["🏠 Bienvenida", "🎓 Escuela", "📝 Bitácora", "📊 Backtesting", "📈 Mis Estadísticas", "💰 Finanzas", "💬 Forum"])
+
+    if menu == "🏠 Bienvenida":
+        st.header("🌌 Centro de Mando")
+        st.markdown("---")
+        nombre_format = user['NOMBRE'].split()[0]
+        st.markdown(f"""
+        ### ¡Bienvenido, {nombre_format}!
+        
+        El camino hacia la maestría ha comenzado. Hoy entras como **{rango_actual}**, 
+        pero tu destino es la grandeza. En este mundo, el conocimiento es tu **sable de luz** y la disciplina tu **armadura**. 
+        
+        Si logras dominar tus emociones y estudiar con devoción, pronto dejarás atrás 
+        las sombras de la duda para ser un **Maestro Jedi del trading**. 
+        
+        El arte de las inversiones ahora fluye en ti.
+        """)
+        st.info("💡 Tu entrenamiento comienza en el módulo **Escuela**.")
+    else:
+        st.header(menu)
+        st.info("Módulo en desarrollo. Mantén la disciplina.")
+
+if "USUARIO" not in st.session_state:
+    login_v2()
+else:
+    main_app()
