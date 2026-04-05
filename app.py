@@ -1,27 +1,21 @@
 import streamlit as st
 import gspread
+import pandas as pd
 import bcrypt
 import random
-import smtplib
 import time
 import cloudinary
 import cloudinary.uploader
 from datetime import datetime, date
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 
 # =========================================================
-# 1. CONFIGURACIÓN DE APIS Y SEGURIDAD
+# 1. CONFIGURACIÓN DE APIS
 # =========================================================
-# Cloudinary (Gestión de Imágenes de Análisis)
 cloudinary.config(
     cloud_name = "dlr7idm80",
     api_key = "694985462176285",
     api_secret = "8iJE0G6CM6qE0zu9IKPsjzP6BNU"
 )
-
-EMAIL_EMISOR = "glenyerbrasil@gmail.com"
-EMAIL_PASSWORD = "tpnk mizj ccul vfuv" 
 
 def format_key(key):
     return key.replace("\\n", "\n")
@@ -38,25 +32,26 @@ def conectar_google():
         st.error(f"Error de conexión: {e}")
         return None
 
-def hash_pass(p): return bcrypt.hashpw(p.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 def check_pass(p, h): 
     try: return bcrypt.checkpw(p.encode('utf-8'), h.encode('utf-8'))
     except: return False
 
 # =========================================================
-# 2. FUNCIONES DE APOYO (FINANZAS Y MULTIMEDIA)
+# 2. FUNCIONES DE LÓGICA (FINANZAS Y SUBIDA)
 # =========================================================
 
-def obtener_saldo_usuario(hoja_finanzas, id_usuario):
+def obtener_ultimo_saldo(hoja_f, id_user):
     try:
-        datos = hoja_finanzas.get_all_records()
-        movimientos = [r for r in datos if str(r.get("ID_USUARIO")) == str(id_usuario)]
-        if not movimientos: return 0.0
-        return float(movimientos[-1].get("SALDO_FINAL", 0))
+        data = hoja_f.get_all_records()
+        if not data: return 0.0
+        df = pd.DataFrame(data)
+        user_df = df[df['ID_USUARIO'] == id_user]
+        if user_df.empty: return 0.0
+        return float(user_df.iloc[-1]['SALDO_FINAL'])
     except: return 0.0
 
 def subir_a_cloudinary(archivo):
-    if archivo is not None:
+    if archivo:
         try:
             res = cloudinary.uploader.upload(archivo)
             return res["secure_url"]
@@ -67,7 +62,6 @@ def subir_a_cloudinary(archivo):
 def reproducir_video(url, titulo):
     st.write(f"### {titulo}")
     st.video(url)
-    st.caption("Presiona el icono de pantalla completa en el reproductor para ver mejor.")
 
 # =========================================================
 # 3. INTERFAZ DE ACCESO
@@ -76,7 +70,6 @@ st.set_page_config(page_title="Academia de Trading", layout="wide")
 
 def login_v2():
     st.title("📈 Academia de Trading")
-    menu_acceso = st.radio("Menú", ["Ingresar", "Registrarse", "Recuperar Clave"], horizontal=True)
     cliente = conectar_google()
     if not cliente: return
     try:
@@ -86,21 +79,19 @@ def login_v2():
         st.error("Error: Estructura de base de datos no encontrada.")
         return
 
-    if menu_acceso == "Ingresar":
-        with st.form("login_f"):
-            u = st.text_input("Usuario")
-            p = st.text_input("Contraseña", type="password")
-            if st.form_submit_button("Entrar"):
-                datos = hoja_u.get_all_records()
-                user = next((r for r in datos if str(r.get("USUARIO")) == u), None)
-                if user and check_pass(p, str(user.get("PASSWORD"))):
-                    st.session_state["USUARIO"] = user
-                    st.rerun()
-                else: st.error("Acceso denegado.")
-    # (Registro y Recuperación se mantienen en el Excel para no alargar el código aquí)
+    with st.form("login_f"):
+        u = st.text_input("Usuario")
+        p = st.text_input("Contraseña", type="password")
+        if st.form_submit_button("Entrar al Sistema"):
+            datos = hoja_u.get_all_records()
+            user = next((r for r in datos if str(r.get("USUARIO")) == u), None)
+            if user and check_pass(p, str(user.get("PASSWORD"))):
+                st.session_state["USUARIO"] = user
+                st.rerun()
+            else: st.error("Acceso denegado.")
 
 # =========================================================
-# 4. PANEL PRINCIPAL (DASHBOARD)
+# 4. PANEL PRINCIPAL
 # =========================================================
 def main_app():
     user = st.session_state["USUARIO"]
@@ -112,93 +103,88 @@ def main_app():
     st.sidebar.title(f"Maestro {user['NOMBRE'].split()[0]}")
     menu = st.sidebar.radio("Secciones", ["🏠 Bienvenida", "🎓 Escuela", "📝 Bitácora", "📊 Backtesting", "💰 Finanzas"])
     
-    st.sidebar.image(f"assets/{rango.lower().replace(' ', '_')}.png", use_container_width=True)
-    st.sidebar.caption(f"<center>Rango Actual: <b>{rango}</b></center>", unsafe_allow_html=True)
-    
     if st.sidebar.button("Cerrar Sesión"):
         del st.session_state["USUARIO"]; st.rerun()
 
-    # --- MÓDULO BIENVENIDA ---
-    if menu == "🏠 Bienvenida":
-        st.header("🌌 Centro de Mando")
-        st.write(f"### Bienvenido al camino de la rentabilidad, {user['NOMBRE']}.")
-        st.info("💡 RECUERDA: La disciplina le gana al mercado el 100% de las veces.")
-
-    # --- MÓDULO ESCUELA ---
-    elif menu == "🎓 Escuela":
-        st.header("🎓 Escuela de Trading")
-        niveles = ["Joven Padawan", "Jedi", "Maestro Jedi"]
-        u_idx = niveles.index(rango) if rango in niveles else 0
+    # --- SECCIÓN FINANZAS ---
+    if menu == "💰 Finanzas":
+        st.header("💰 Gestión de Capital")
+        hoja_f = doc.worksheet("Finanzas")
+        saldo_actual = obtener_ultimo_saldo(hoja_f, user["ID_USUARIO"])
         
-        c1, c2, c3 = st.columns(3)
-        with c1:
-            st.image("assets/joven_padawan.png", width=100)
-            if st.button("▶ Clase 1: Fundamentos"):
-                reproducir_video("https://www.youtube.com/watch?v=z6TquA-pF2k", "Lección: La Disciplina del Trader")
-        with c2:
-            st.image("assets/jedi.png", width=100)
-            if u_idx >= 1:
-                if st.button("▶ Clase 2: Avanzado"): reproducir_video("URL", "Lección Jedi")
-            else: st.error("Bloqueado")
-        with c3:
-            st.image("assets/maestro_jedi.png", width=100)
-            if u_idx >= 2:
-                if st.button("▶ Clase 3: Maestría"): reproducir_video("URL", "Lección Maestro")
-            else: st.error("Bloqueado")
+        st.metric(label="Saldo en Bóveda", value=f"$ {saldo_actual:.2f}")
+        
+        tab1, tab2 = st.tabs(["📥 Nuevo Movimiento", "📜 Historial"])
+        
+        with tab1:
+            with st.form("f_fin", clear_on_submit=True):
+                tipo = st.selectbox("Tipo", ["DEPOSITO", "RETIRO"])
+                monto = st.number_input("Monto ($)", min_value=0.01)
+                nota = st.text_input("Nota")
+                if st.form_submit_button("Registrar"):
+                    if tipo == "RETIRO" and monto > saldo_actual:
+                        st.error("Saldo insuficiente.")
+                    else:
+                        nuevo_saldo = saldo_actual + monto if tipo == "DEPOSITO" else saldo_actual - monto
+                        depo = monto if tipo == "DEPOSITO" else 0
+                        reti = monto if tipo == "RETIRO" else 0
+                        hoja_f.append_row([len(hoja_f.get_all_records())+1, str(date.today()), user["ID_USUARIO"], tipo, saldo_actual, depo, reti, nuevo_saldo, nota])
+                        st.success("Sincronizado."); time.sleep(1); st.rerun()
+        
+        with tab2:
+            df_f = pd.DataFrame(hoja_f.get_all_records())
+            st.dataframe(df_f[df_f['ID_USUARIO'] == user["ID_USUARIO"]], use_container_width=True)
 
-    # --- MÓDULO BITÁCORA (LA JOYA DE LA CORONA) ---
+    # --- SECCIÓN BITÁCORA ---
     elif menu == "📝 Bitácora":
-        st.header("📝 Registro de Operaciones")
-        h_bit = doc.worksheet("Bitacora")
-        h_fin = doc.worksheet("Finanzas")
-        
-        saldo = obtener_saldo_usuario(h_fin, user["ID_USUARIO"])
+        st.header("📝 Bitácora de Operaciones")
+        hoja_b = doc.worksheet("Bitacora")
+        hoja_f = doc.worksheet("Finanzas")
+        saldo = obtener_ultimo_saldo(hoja_f, user["ID_USUARIO"])
         
         if saldo <= 0:
-            st.error(f"❌ SALDO INSUFICIENTE ($ {saldo}). No se permite operar sin capital en 'Finanzas'.")
+            st.warning("⚠️ Debes registrar un DEPÓSITO en Finanzas antes de operar.")
         else:
-            st.success(f"💰 Capital Gestionable: $ {saldo}")
-            with st.form("form_op", clear_on_submit=True):
-                col_i, col_a, col_b = st.columns(3)
-                ins = col_i.selectbox("Instrumento", ["FLIPX1", "FLIPX2", "FLIPX3", "FLIPX4", "FLIPX5", "FXVOL20", "FXVOL40", "FXVOL60", "FXVOL80", "FXVOL99", "SFXVOL20", "SFXVOL40", "SFXVOL60", "SFXVOL80", "SFXVOL99"])
-                acc = col_a.selectbox("Acción", ["COMPRA", "VENTA"])
-                bala = col_b.number_input("Valor de la Bala ($)", min_value=0.1, value=6.48)
-                
+            st.info(f"💰 Saldo Disponible: $ {saldo}")
+            with st.form("f_bit"):
                 c1, c2, c3 = st.columns(3)
-                p_ent = c1.number_input("Precio Entrada", format="%.2f")
-                p_sl = c2.number_input("Precio SL", format="%.2f")
-                ratio = c3.number_input("Margen (Ratio 1:X)", min_value=1.0, value=2.0)
+                ins = c1.selectbox("Instrumento", ["FLIPX1", "FLIPX2", "FLIPX3", "FLIPX4", "FLIPX5", "FXVOL20", "FXVOL40", "FXVOL60", "FXVOL80", "FXVOL99", "SFXVOL20", "SFXVOL40", "SFXVOL60", "SFXVOL80", "SFXVOL99"])
+                acc = c2.selectbox("Acción", ["COMPRA", "VENTA"])
+                bala = c3.number_input("Valor Bala ($)", value=6.48)
                 
-                # CÁLCULOS BLINDADOS (Dígitos 2, Contract Size 1)
-                distancia = abs(p_ent - p_sl)
-                if distancia > 0:
-                    lote = bala / distancia
-                    tp = p_ent + (distancia * ratio) if acc == "COMPRA" else p_ent - (distancia * ratio)
-                    st.warning(f"🎯 **CÁLCULO JEDI:** Lotaje a colocar: `{lote:.2f}` | TP Sugerido: `{tp:.2f}`")
+                c4, c5, c6 = st.columns(3)
+                p_ent = c4.number_input("Precio Entrada", format="%.2f")
+                p_sl = c5.number_input("Precio SL", format="%.2f")
+                ratio = c6.number_input("Ratio 1:X", value=2.0)
                 
-                st.markdown("---")
-                col_an1, col_an2 = st.columns(2)
-                dir_m = col_an1.selectbox("Tendencia Mayor", ["ALCISTA", "BAJISTA", "LATERAL"])
-                img_m = col_an2.file_uploader("Captura H4/H1", type=['jpg','png'])
+                dist = abs(p_ent - p_sl)
+                if dist > 0:
+                    lote = bala / dist
+                    tp = p_ent + (dist * ratio) if acc == "COMPRA" else p_ent - (dist * ratio)
+                    st.success(f"✅ **LOTES A PONER: {lote:.2f}** | TP: {tp:.2f}")
                 
-                obs = st.text_area("Observaciones del Análisis")
+                img = st.file_uploader("Análisis (H4/H1)", type=['png','jpg'])
+                obs = st.text_area("Observaciones")
                 emocion = st.select_slider("Estado Emocional", options=["ROJO - REVANCHA", "AMARILLO - ANSIEDAD", "VERDE - TRANQUILO"])
 
-                if st.form_submit_button("Sincronizar con Holocrón"):
-                    with st.spinner("Subiendo datos a la nube..."):
-                        url_img = subir_a_cloudinary(img_m)
-                        nueva_fila = [
-                            len(h_bit.get_all_records())+1, user["ID_USUARIO"], str(date.today()),
-                            ins, acc, bala, p_ent, p_sl, tp, lote, f"1:{ratio}",
-                            "", "", "", dir_m, url_img, "", "", "", "", "Pendiente", 0, "NO", "0%", "", obs, emocion
-                        ]
-                        h_bit.append_row(nueva_fila)
-                        st.balloons()
-                        st.success("Operación guardada. ¡Disciplina es libertad!")
+                if st.form_submit_button("Guardar Operación"):
+                    url = subir_a_cloudinary(img)
+                    nueva_op = [len(hoja_b.get_all_records())+1, user["ID_USUARIO"], str(date.today()), ins, acc, bala, p_ent, p_sl, tp, lote, f"1:{ratio}", "", "", "", "", url, "", "", "", "", "Pendiente", 0, "NO", "0%", "", obs, emocion]
+                    hoja_b.append_row(nueva_op)
+                    st.balloons(); st.success("¡Operación registrada!")
 
-    else:
-        st.header(menu)
-        st.info("Módulo en construcción.")
+    # --- SECCIÓN ESCUELA ---
+    elif menu == "🎓 Escuela":
+        st.header("🎓 Holocron de Aprendizaje")
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            if st.button("▶ Clase Padawan"): reproducir_video("https://www.youtube.com/watch?v=z6TquA-pF2k", "Fundamentos")
+        # Aquí puedes agregar más botones siguiendo la misma lógica
+
+    elif menu == "🏠 Bienvenida":
+        st.header("🌌 Centro de Mando")
+        st.write(f"### Bienvenido, Maestro {user['NOMBRE']}.")
+        st.write("Tu flota está lista para el mercado.")
 
 if "USUARIO" not in st.session_state:
     login_v2()
