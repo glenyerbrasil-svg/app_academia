@@ -128,7 +128,17 @@ def login_v2():
                 st.success("✅ Clave enviada.")
 
 # =========================================================
-# 3. PANEL PRINCIPAL
+# 3. FUNCIONES DE APOYO (MODALES)
+# =========================================================
+
+@st.dialog("Reproductor Holocrón", width="large")
+def reproducir_video(url, titulo):
+    st.write(f"### {titulo}")
+    st.video(url)
+    st.caption("Usa el botón de pantalla completa en la esquina del video para ampliar aún más.")
+
+# =========================================================
+# 4. PANEL PRINCIPAL
 # =========================================================
 def main_app():
     user = st.session_state["USUARIO"]
@@ -140,45 +150,32 @@ def main_app():
         "Maestro Jedi": "assets/maestro_jedi.png"
     }
 
-    # --- SIDEBAR (BARRA LATERAL) ---
+    # --- SIDEBAR ---
     st.sidebar.title(f"Hola, {user['NOMBRE']}")
     st.sidebar.markdown("---")
-    
-    # 1. NAVEGACIÓN
     st.sidebar.subheader("Navegación")
     menu = st.sidebar.radio("Ir a:", ["🏠 Bienvenida", "🎓 Escuela", "📝 Bitácora", "📊 Backtesting", "📈 Mis Estadísticas", "💰 Finanzas", "💬 Forum"])
     st.sidebar.markdown("---")
-    
-    # 2. INSIGNIA
     st.sidebar.image(logos.get(rango_actual, "assets/joven_padawan.png"), use_container_width=True)
     st.sidebar.caption(f"<div style='text-align: center'>Rango: <b>{rango_actual}</b></div>", unsafe_allow_html=True)
     st.sidebar.markdown("---")
-    
-    # 3. CERRAR SESIÓN
     if st.sidebar.button("Cerrar Sesión"):
         del st.session_state["USUARIO"]; st.rerun()
 
-    # --- CONTENIDO CENTRAL ---
+    # --- BIENVENIDA ---
     if menu == "🏠 Bienvenida":
         st.header("🌌 Centro de Mando")
         st.markdown("---")
         nombre_format = user['NOMBRE'].split()[0]
         st.markdown(f"""
         ### ¡Bienvenido, {nombre_format}!
-        
-        El camino hacia la maestría ha comenzado. Hoy entras como **{rango_actual}**, 
-        pero tu destino es la grandeza. En este mundo, el conocimiento es tu **sable de luz** y la disciplina tu **armadura**. 
-        
-        Si logras dominar tus emociones y estudiar con devoción, pronto dejarás atrás 
-        las sombras de la duda para ser un **Maestro Jedi del trading**. 
-        
-        El arte de las inversiones ahora fluye en ti.
+        El camino hacia la maestría ha comenzado... (Mensaje Jedi completo)
         """)
-        st.info("💡 Tu entrenamiento comienza en el módulo **Escuela**.")
 
+    # --- ESCUELA (CON VENTANA EMERGENTE) ---
     elif menu == "🎓 Escuela":
         st.header("🎓 Centro de Formación Holocron")
-        st.subheader("Entra en tu área correspondiente según tu rango actual")
+        st.subheader("Selecciona una lección para proyectarla en el centro de mando")
         st.write("---")
 
         niveles = ["Joven Padawan", "Jedi", "Maestro Jedi"]
@@ -186,42 +183,35 @@ def main_app():
 
         col1, col2, col3 = st.columns(3)
 
-        # MÓDULO PADAWAN
         with col1:
-            st.image("assets/joven_padawan.png", width=150)
-            with st.expander("🔓 Acceder a Módulo Padawan", expanded=(rango_index == 0)):
-                st.write("**Fundamentos del Trading**")
-                # Enlace corregido para reproducirse correctamente
-                st.video("https://www.youtube.com/watch?v=z6TquA-pF2k")
-                st.caption("Video 1: Introducción a la Disciplina")
+            st.image("assets/joven_padawan.png", width=120)
+            st.markdown("### ÁREA PADAWAN")
+            if st.button("▶ Ver Lección 1: Disciplina"):
+                reproducir_video("https://www.youtube.com/watch?v=z6TquA-pF2k", "Clase 1: La Disciplina del Trader")
+            st.caption("Fundamentos básicos")
 
-        # MÓDULO JEDI
         with col2:
-            st.image("assets/jedi.png", width=150)
+            st.image("assets/jedi.png", width=120)
+            st.markdown("### ÁREA JEDI")
             if rango_index >= 1:
-                with st.expander("🔓 Acceder a Módulo Jedi"):
-                    st.write("**Estrategias Avanzadas**")
-                    st.info("Contenido exclusivo para Caballeros Jedi.")
+                if st.button("▶ Ver Estrategias Avanzadas"):
+                    reproducir_video("URL_AQUI", "Estrategias de Caballero Jedi")
             else:
-                st.error("🔒 Módulo Bloqueado")
-                st.caption("Requiere rango: **Jedi**")
+                st.error("🔒 Bloqueado para Padawans")
 
-        # MÓDULO MAESTRO JEDI
         with col3:
-            st.image("assets/maestro_jedi.png", width=150)
+            st.image("assets/maestro_jedi.png", width=120)
+            st.markdown("### CÁMARA MAESTRO")
             if rango_index >= 2:
-                with st.expander("🔓 Acceder a Cámara del Maestro"):
-                    st.write("**Dominio del Mercado**")
-                    st.success("Bienvenido, Maestro. Aquí reside la sabiduría superior.")
+                if st.button("▶ Ver Secretos del Mercado"):
+                    reproducir_video("URL_AQUI", "Maestría Absoluta")
             else:
-                st.error("🔒 Cámara Sellada")
-                st.caption("Requiere rango: **Maestro Jedi**")
+                st.error("🔒 Acceso Restringido")
 
     else:
         st.header(menu)
-        st.info("Módulo en desarrollo. Mantén la disciplina.")
+        st.info("Módulo en desarrollo.")
 
-# Ejecución Inicial
 if "USUARIO" not in st.session_state:
     login_v2()
 else:
