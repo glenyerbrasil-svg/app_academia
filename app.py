@@ -8,7 +8,7 @@ from datetime import datetime, date
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
-# --- CONFIGURACIÓN DE CORREO ---
+# --- CONFIGURACIÓN ---
 EMAIL_EMISOR = "glenyerbrasil@gmail.com"
 EMAIL_PASSWORD = "tpnk mizj ccul vfuv" 
 
@@ -57,12 +57,11 @@ def login_v2():
 
     try:
         doc = cliente.open("Bitacora_Academia1")
-        hoja_u = doc.worksheet("Usuarios") # U mayúscula confirmada
-    except Exception as e:
-        st.error(f"Error: No se encontró la pestaña 'Usuarios'.")
+        hoja_u = doc.worksheet("Usuarios") # U mayúscula
+    except:
+        st.error("Error: No se encontró la pestaña 'Usuarios'.")
         return
 
-    # --- SECCIÓN: INGRESAR ---
     if menu_acceso == "Ingresar":
         with st.form("login_f"):
             u = st.text_input("Usuario")
@@ -75,7 +74,6 @@ def login_v2():
                     st.rerun()
                 else: st.error("Usuario o contraseña incorrectos.")
 
-    # --- SECCIÓN: REGISTRARSE ---
     elif menu_acceso == "Registrarse":
         if "reg_codigo" not in st.session_state:
             with st.form("reg_f"):
@@ -86,12 +84,16 @@ def login_v2():
                 r_n = col1.text_input("Nombre Completo *")
                 r_e = col2.text_input("Email *")
                 
-                # Fila 2: Usuario y Contacto
+                # Fila 2: Usuario y WhatsApp
                 col3, col4 = st.columns(2)
                 r_u = col3.text_input("Nombre de Usuario *")
-                r_w = col4.text_input("WhatsApp *")
+                r_w = col4.text_input("WhatsApp (con código de país) *")
                 
-                # Fila 3: Contraseñas JUNTAS para mejor flujo
+                # Fila 3: País (Menú Desplegable)
+                países = ["Brasil", "Venezuela", "Colombia", "México", "Argentina", "Chile", "Perú", "Ecuador", "España", "Estados Unidos", "Otro"]
+                r_pa = st.selectbox("País de Residencia *", países)
+                
+                # Fila 4: Contraseñas JUNTAS
                 st.markdown("---")
                 col5, col6 = st.columns(2)
                 r_p1 = col5.text_input("Contraseña *", type="password")
@@ -102,15 +104,15 @@ def login_v2():
                         st.error("¡Las contraseñas no coinciden!")
                     elif all([r_u, r_n, r_e, r_p1, r_w]):
                         datos = hoja_u.get_all_records()
-                        # VALIDACIÓN DE CORREO DUPLICADO CON MENSAJE PERSONALIZADO
+                        # Validación de correo duplicado
                         if any(str(r.get("EMAIL")).lower() == r_e.lower() for r in datos):
                             st.warning("⚠️ Correo ya registrado. Para recuperar su ingreso, diríjase a la sección 'Recuperar Clave'.")
                         elif any(str(r.get("USUARIO")) == r_u for r in datos):
                             st.error("Este nombre de usuario ya está tomado.")
                         else:
                             cod = str(random.randint(100000, 999999))
-                            if enviar_correo(r_e, "Código Academia", f"Tu código es: <b>{cod}</b>"):
-                                st.session_state["reg_pend"] = [r_u, r_n, r_e, r_w, r_p1]
+                            if enviar_correo(r_e, "Código de Verificación Academia", f"Tu código es: <b>{cod}</b>"):
+                                st.session_state["reg_pend"] = [r_u, r_n, r_e, r_w, r_p1, r_pa]
                                 st.session_state["reg_codigo"] = cod
                                 st.success("Código enviado. Revisa tu email.")
                                 time.sleep(1)
@@ -123,9 +125,10 @@ def login_v2():
             if col_res.button("Confirmar Registro"):
                 if code_in == st.session_state["reg_codigo"]:
                     d = st.session_state["reg_pend"]
-                    nueva_fila = [len(hoja_u.get_all_records())+1, d[0], d[1], d[2], d[3], hash_pass(d[4]), "Brasil", "Alumno", "Padawan", "DEMO", str(date.today()), "No", "", "", "", "", str(date.today()), "", "Sí", "", "Pendiente"]
+                    # Estructura de fila: ID, Usuario, Nombre, Email, Tel, Pass, Pais...
+                    nueva_fila = [len(hoja_u.get_all_records())+1, d[0], d[1], d[2], d[3], hash_pass(d[4]), d[5], "Alumno", "Padawan", "DEMO", str(date.today()), "No", "", "", "", "", str(date.today()), "", "Sí", "", "Pendiente"]
                     hoja_u.append_row(nueva_fila)
-                    st.success("🎉 ¡Cuenta creada! Ya puedes ingresar.")
+                    st.success("🎉 ¡Cuenta creada con éxito!")
                     del st.session_state["reg_codigo"]
                     del st.session_state["reg_pend"]
                     time.sleep(2)
@@ -135,7 +138,6 @@ def login_v2():
                 del st.session_state["reg_codigo"]
                 st.rerun()
 
-    # --- SECCIÓN: RECUPERAR CLAVE ---
     elif menu_acceso == "Recuperar Clave":
         st.subheader("Recuperación de Acceso")
         email_rec = st.text_input("Introduce tu email registrado")
@@ -146,22 +148,17 @@ def login_v2():
                 nueva_p = str(random.randint(1000, 9999)) + "temp"
                 hoja_u.update_cell(idx + 2, 6, hash_pass(nueva_p)) 
                 enviar_correo(email_rec, "Clave Temporal", f"Tu nueva clave es: <b>{nueva_p}</b>")
-                st.success("✅ Clave temporal enviada. Revisa tu bandeja de entrada.")
-            else: st.error("El correo no está registrado en nuestro sistema.")
+                st.success("✅ Clave temporal enviada al correo.")
+            else: st.error("Email no encontrado.")
 
-# --- PANEL PRINCIPAL ---
 def main_app():
     user = st.session_state["USUARIO"]
     st.sidebar.title(f"Hola, {user['NOMBRE']}")
     menu = st.sidebar.radio("Navegación", ["🏠 Bienvenida", "🎓 Escuela", "📝 Bitácora", "📊 Backtesting", "📈 Mis Estadísticas", "💰 Finanzas", "💬 Forum"])
-    
     if st.sidebar.button("Cerrar Sesión"):
         del st.session_state["USUARIO"]
         st.rerun()
-
     st.header(menu)
-    if menu == "🏠 Bienvenida":
-        st.write(f"Bienvenido a la Academia, **{user['NOMBRE']}**.")
 
 if "USUARIO" not in st.session_state:
     login_v2()
