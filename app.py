@@ -140,26 +140,42 @@ def main_app():
         "Maestro Jedi": "assets/maestro_jedi.png"
     }
 
-    # --- SIDEBAR REORDENADO ---
+    # --- SIDEBAR (BARRA LATERAL) ---
     st.sidebar.title(f"Hola, {user['NOMBRE']}")
     st.sidebar.markdown("---")
+    
+    # 1. NAVEGACIÓN
     st.sidebar.subheader("Navegación")
     menu = st.sidebar.radio("Ir a:", ["🏠 Bienvenida", "🎓 Escuela", "📝 Bitácora", "📊 Backtesting", "📈 Mis Estadísticas", "💰 Finanzas", "💬 Forum"])
     st.sidebar.markdown("---")
+    
+    # 2. INSIGNIA
     st.sidebar.image(logos.get(rango_actual, "assets/joven_padawan.png"), use_container_width=True)
     st.sidebar.caption(f"<div style='text-align: center'>Rango: <b>{rango_actual}</b></div>", unsafe_allow_html=True)
     st.sidebar.markdown("---")
+    
+    # 3. CERRAR SESIÓN
     if st.sidebar.button("Cerrar Sesión"):
         del st.session_state["USUARIO"]; st.rerun()
 
-    # --- MÓDULO: BIENVENIDA ---
+    # --- CONTENIDO CENTRAL ---
     if menu == "🏠 Bienvenida":
         st.header("🌌 Centro de Mando")
-        st.markdown(f"### ¡Bienvenido, {user['NOMBRE'].split()[0]}!")
-        st.write(f"Tu camino como **{rango_actual}** comienza aquí. Disciplina y estudio son tus herramientas.")
-        st.info("💡 Dirígete a la sección Escuela para comenzar tu entrenamiento.")
+        st.markdown("---")
+        nombre_format = user['NOMBRE'].split()[0]
+        st.markdown(f"""
+        ### ¡Bienvenido, {nombre_format}!
+        
+        El camino hacia la maestría ha comenzado. Hoy entras como **{rango_actual}**, 
+        pero tu destino es la grandeza. En este mundo, el conocimiento es tu **sable de luz** y la disciplina tu **armadura**. 
+        
+        Si logras dominar tus emociones y estudiar con devoción, pronto dejarás atrás 
+        las sombras de la duda para ser un **Maestro Jedi del trading**. 
+        
+        El arte de las inversiones ahora fluye en ti.
+        """)
+        st.info("💡 Tu entrenamiento comienza en el módulo **Escuela**.")
 
-    # --- MÓDULO: ESCUELA ---
     elif menu == "🎓 Escuela":
         st.header("🎓 Centro de Formación Holocron")
         st.subheader("Entra en tu área correspondiente según tu rango actual")
@@ -170,29 +186,27 @@ def main_app():
 
         col1, col2, col3 = st.columns(3)
 
-        # COLUMNA 1: PADAWAN
+        # MÓDULO PADAWAN
         with col1:
             st.image("assets/joven_padawan.png", width=150)
-            if rango_index >= 0:
-                with st.expander("🔓 Acceder a Módulo Padawan", expanded=True):
-                    st.write("**Fundamentos del Trading**")
-                    st.video("https://youtube.com/shorts/z6TquA-pF2k?feature=share")
-                    st.caption("Video 1: Introducción a la Disciplina")
-            else:
-                st.warning("🔒 Bloqueado")
+            with st.expander("🔓 Acceder a Módulo Padawan", expanded=(rango_index == 0)):
+                st.write("**Fundamentos del Trading**")
+                # Enlace corregido para reproducirse correctamente
+                st.video("https://www.youtube.com/watch?v=z6TquA-pF2k")
+                st.caption("Video 1: Introducción a la Disciplina")
 
-        # COLUMNA 2: JEDI
+        # MÓDULO JEDI
         with col2:
             st.image("assets/jedi.png", width=150)
             if rango_index >= 1:
                 with st.expander("🔓 Acceder a Módulo Jedi"):
                     st.write("**Estrategias Avanzadas**")
-                    st.info("Contenido en preparación para Caballeros Jedi.")
+                    st.info("Contenido exclusivo para Caballeros Jedi.")
             else:
                 st.error("🔒 Módulo Bloqueado")
                 st.caption("Requiere rango: **Jedi**")
 
-        # COLUMNA 3: MAESTRO JEDI
+        # MÓDULO MAESTRO JEDI
         with col3:
             st.image("assets/maestro_jedi.png", width=150)
             if rango_index >= 2:
@@ -205,8 +219,9 @@ def main_app():
 
     else:
         st.header(menu)
-        st.info("Módulo en desarrollo.")
+        st.info("Módulo en desarrollo. Mantén la disciplina.")
 
+# Ejecución Inicial
 if "USUARIO" not in st.session_state:
     login_v2()
 else:
