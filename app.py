@@ -8,7 +8,9 @@ from datetime import datetime, date
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
-# --- CONFIGURACIÓN ---
+# =========================================================
+# 1. CONFIGURACIÓN DE SEGURIDAD Y CORREO
+# =========================================================
 EMAIL_EMISOR = "glenyerbrasil@gmail.com"
 EMAIL_PASSWORD = "tpnk mizj ccul vfuv" 
 
@@ -45,7 +47,10 @@ def enviar_correo(dest, asunto, cuerpo):
         return True
     except: return False
 
-# --- INTERFAZ ---
+# =========================================================
+# 2. INTERFAZ DE ACCESO (LOGIN, REGISTRO, RECUPERACIÓN)
+# =========================================================
+
 st.set_page_config(page_title="Academia de Trading", layout="wide")
 
 def login_v2():
@@ -57,11 +62,12 @@ def login_v2():
 
     try:
         doc = cliente.open("Bitacora_Academia1")
-        hoja_u = doc.worksheet("Usuarios") # U mayúscula
+        hoja_u = doc.worksheet("Usuarios") # U mayúscula confirmada
     except:
-        st.error("Error: No se encontró la pestaña 'Usuarios'.")
+        st.error("Error: No se encontró la pestaña 'Usuarios' en el Excel.")
         return
 
+    # --- INGRESAR ---
     if menu_acceso == "Ingresar":
         with st.form("login_f"):
             u = st.text_input("Usuario")
@@ -74,37 +80,33 @@ def login_v2():
                     st.rerun()
                 else: st.error("Usuario o contraseña incorrectos.")
 
+    # --- REGISTRARSE ---
     elif menu_acceso == "Registrarse":
         if "reg_codigo" not in st.session_state:
             with st.form("reg_f"):
                 st.subheader("Crear Nueva Cuenta")
                 
-                # Fila 1: Datos Personales
-                col1, col2 = st.columns(2)
-                r_n = col1.text_input("Nombre Completo *")
-                r_e = col2.text_input("Email *")
+                c1, col_e = st.columns(2)
+                r_n = c1.text_input("Nombre Completo *")
+                r_e = col_e.text_input("Email *")
                 
-                # Fila 2: Usuario y WhatsApp
-                col3, col4 = st.columns(2)
-                r_u = col3.text_input("Nombre de Usuario *")
-                r_w = col4.text_input("WhatsApp (con código de país) *")
+                c3, c4 = st.columns(2)
+                r_u = c3.text_input("Nombre de Usuario *")
+                r_w = c4.text_input("WhatsApp (con código de país) *")
                 
-                # Fila 3: País (Menú Desplegable)
-                países = ["Brasil", "Venezuela", "Colombia", "México", "Argentina", "Chile", "Perú", "Ecuador", "España", "Estados Unidos", "Otro"]
+                países = ["Brasil", "Venezuela", "Colombia", "México", "Argentina", "Chile", "Perú", "Ecuador", "España", "Otro"]
                 r_pa = st.selectbox("País de Residencia *", países)
                 
-                # Fila 4: Contraseñas JUNTAS
                 st.markdown("---")
-                col5, col6 = st.columns(2)
-                r_p1 = col5.text_input("Contraseña *", type="password")
-                r_p2 = col6.text_input("Repetir Contraseña *", type="password")
+                c5, c6 = st.columns(2)
+                r_p1 = c5.text_input("Contraseña *", type="password")
+                r_p2 = c6.text_input("Repetir Contraseña *", type="password")
                 
                 if st.form_submit_button("Obtener Código"):
                     if r_p1 != r_p2:
                         st.error("¡Las contraseñas no coinciden!")
                     elif all([r_u, r_n, r_e, r_p1, r_w]):
                         datos = hoja_u.get_all_records()
-                        # Validación de correo duplicado
                         if any(str(r.get("EMAIL")).lower() == r_e.lower() for r in datos):
                             st.warning("⚠️ Correo ya registrado. Para recuperar su ingreso, diríjase a la sección 'Recuperar Clave'.")
                         elif any(str(r.get("USUARIO")) == r_u for r in datos):
@@ -117,50 +119,29 @@ def login_v2():
                                 st.success("Código enviado. Revisa tu email.")
                                 time.sleep(1)
                                 st.rerun()
-                    else: st.warning("Completa todos los campos obligatorios (*).")
+                    else: st.warning("Por favor, completa los campos obligatorios.")
         else:
-            st.info(f"Ingresa el código enviado a: {st.session_state['reg_pend'][2]}")
-            code_in = st.text_input("Código de Verificación")
-            col_res, col_can = st.columns(2)
-            if col_res.button("Confirmar Registro"):
+            st.info(f"Código enviado a: {st.session_state['reg_pend'][2]}")
+            code_in = st.text_input("Introduce el código")
+            if st.button("Confirmar y Registrar"):
                 if code_in == st.session_state["reg_codigo"]:
                     d = st.session_state["reg_pend"]
-                    # Estructura de fila: ID, Usuario, Nombre, Email, Tel, Pass, Pais...
-                    nueva_fila = [len(hoja_u.get_all_records())+1, d[0], d[1], d[2], d[3], hash_pass(d[4]), d[5], "Alumno", "Padawan", "DEMO", str(date.today()), "No", "", "", "", "", str(date.today()), "", "Sí", "", "Pendiente"]
+                    nueva_fila = [len(hoja_u.get_all_records())+1, d[0], d[1], d[2], d[3], hash_pass(d[4]), d[5], "Alumno", "Joven Padawan", "DEMO", str(date.today()), "No", "", "", "", "", str(date.today()), "", "Sí", "", "Pendiente"]
                     hoja_u.append_row(nueva_fila)
-                    st.success("🎉 ¡Cuenta creada con éxito!")
+                    st.success("🎉 ¡Cuenta creada! Ya puedes ingresar.")
                     del st.session_state["reg_codigo"]
                     del st.session_state["reg_pend"]
                     time.sleep(2)
                     st.rerun()
-                else: st.error("Código inválido.")
-            if col_can.button("Cancelar"):
-                del st.session_state["reg_codigo"]
-                st.rerun()
+                else: st.error("Código incorrecto.")
 
+    # --- RECUPERAR CLAVE ---
     elif menu_acceso == "Recuperar Clave":
         st.subheader("Recuperación de Acceso")
-        email_rec = st.text_input("Introduce tu email registrado")
+        email_rec = st.text_input("Email registrado")
         if st.button("Enviar Clave Temporal"):
             datos = hoja_u.get_all_records()
             idx = next((i for i, r in enumerate(datos) if str(r.get("EMAIL")).lower() == email_rec.lower()), None)
             if idx is not None:
                 nueva_p = str(random.randint(1000, 9999)) + "temp"
-                hoja_u.update_cell(idx + 2, 6, hash_pass(nueva_p)) 
-                enviar_correo(email_rec, "Clave Temporal", f"Tu nueva clave es: <b>{nueva_p}</b>")
-                st.success("✅ Clave temporal enviada al correo.")
-            else: st.error("Email no encontrado.")
-
-def main_app():
-    user = st.session_state["USUARIO"]
-    st.sidebar.title(f"Hola, {user['NOMBRE']}")
-    menu = st.sidebar.radio("Navegación", ["🏠 Bienvenida", "🎓 Escuela", "📝 Bitácora", "📊 Backtesting", "📈 Mis Estadísticas", "💰 Finanzas", "💬 Forum"])
-    if st.sidebar.button("Cerrar Sesión"):
-        del st.session_state["USUARIO"]
-        st.rerun()
-    st.header(menu)
-
-if "USUARIO" not in st.session_state:
-    login_v2()
-else:
-    main_app()
+                hoja_u.update_cell(idx + 2, 6, hash_
