@@ -1,12 +1,18 @@
 import streamlit as st
 import gspread
 import bcrypt
-import pandas as pd
-import plotly.express as px
-from datetime import datetime, date, timedelta
+import random
+import smtplib
 import time
+from datetime import datetime, date, timedelta
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
-# --- CONFIGURACIÓN DE CONEXIÓN ---
+# --- CONFIGURACIÓN DE CORREO (Tus datos socio) ---
+EMAIL_EMISOR = "glenyerbrasil@gmail.com"
+EMAIL_PASSWORD = "tpnk mizj ccul vfuv" 
+
+# --- FUNCIONES DE SEGURIDAD Y CONEXIÓN ---
 def format_key(key):
     return key.replace("\\n", "\n").strip().strip("'").strip('"')
 
@@ -23,110 +29,147 @@ def conectar_google():
         st.error(f"Error de conexión: {e}")
         return None
 
+def hash_password(password):
+    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+
 def check_password(password, hashed):
     try: return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
     except: return False
 
-# --- INTERFAZ ---
-st.set_page_config(page_title="Academia de Trading", layout="wide", page_icon="📈")
+def enviar_codigo_email(correo_destino, codigo):
+    try:
+        msg = MIMEMultipart()
+        msg['Subject'] = f"Código de Verificación Academia: {codigo}"
+        msg['From'] = EMAIL_EMISOR
+        msg['To'] = correo_destino
+        cuerpo = f"Bienvenido a la Academia de Trading. Tu código de seguridad es: {codigo}"
+        msg.attach(MIMEText(cuerpo, 'plain'))
+        
+        server = smtplib.SMTP('smtp.gmail.com', 587)
+        server.starttls()
+        server.login(EMAIL_EMISOR, EMAIL_PASSWORD)
+        server.sendmail(EMAIL_EMISOR, correo_destino, msg.as_string())
+        server.quit()
+        return True
+    except Exception as e:
+        st.error(f"Error al enviar correo: {e}")
+        return False
+
+# --- INTERFAZ PRINCIPAL ---
+st.set_page_config(page_title="Academia de Trading", layout="centered", page_icon="📈")
+
+cliente = conectar_google()
 
 if "USUARIO" not in st.session_state:
     st.title("📈 Academia de Trading")
-    col1, col2 = st.columns([1, 1])
     
-    with col1:
-        st.subheader("Acceso Interno")
+    opcion = st.radio("Selecciona una opción", ["Iniciar Sesión", "Registrarse", "Recuperar Contraseña"], horizontal=True)
+
+    # 1. LOGICA DE INICIO DE SESIÓN
+    if opcion == "Iniciar Sesión":
         with st.form("login_form"):
             u = st.text_input("Usuario")
             p = st.text_input("Contraseña", type="password")
             if st.form_submit_button("Entrar"):
-                cliente = conectar_google()
                 if cliente:
                     try:
-                        hoja = cliente.open("Bitacora_Academia1").worksheet("Usuarios")
+                        libro = cliente.open("Bitacora_Academia1")
+                        hoja = libro.worksheet("Usuarios")
                         datos = hoja.get_all_records()
-                        user = next((r for r in datos if str(r.get("USUARIO")) == u), None)
+                        user = next((r for r in datos if str(r.get("USUARIO")).strip() == u.strip()), None)
                         
-                        if user and check_password(p, str(user.get("PASSWORD"))):
-                            st.session_state["USUARIO"] = user
-                            st.rerun()
+                        if user:
+                            # Verificamos si está bloqueado por vencimiento de DEMO
+                            vencimiento = datetime.strptime(str(user['PROXIMO_VENCIMIENTO']), "%Y-%m-%d").date()
+                            if date.today() > vencimiento and user['ESTADO_PAGO'] == 'Pendiente':
+                                st.error("Tu periodo DEMO ha vencido. Realiza un pago para continuar.")
+                            elif check_password(p, str(user.get("PASSWORD"))):
+                                st.session_state["USUARIO"] = user
+                                st.rerun()
+                            else:
+                                st.error("Contraseña incorrecta")
                         else:
-                            st.error("Credenciales incorrectas")
+                            st.error("Usuario no encontrado")
                     except Exception as e:
-                        st.error(f"Error en la base de datos: {e}")
-    with col2:
-        st.info("Bienvenido al sistema. Controla tu operativa con disciplina.")
+                        st.error(f"Error: {e}")
+
+    # 2. LOGICA DE REGISTRO
+    elif opcion == "Registrarse":
+        if "verificando_email" not in st.session_state:
+            with st.form("registro_form"):
+                st.subheader("Crear nueva cuenta (7 días DEMO)")
+                nom = st.text_input("Nombre Completo *")
+                usu = st.text_input("Nombre de Usuario *")
+                fec = st.date_input("Fecha de Nacimiento", value=date(2000, 1, 1))
+                tel = st.text_input("Teléfono/WhatsApp *")
+                pais = st.selectbox("País", ["Brasil", "Colombia", "Venezuela", "México", "Argentina", "Chile", "Perú", "Otro"])
+                ema = st.text_input("Correo Electrónico *")
+                pass1 = st.text_input("Contraseña *", type="password")
+                pass2 = st.text_input("Repite la Contraseña *", type="password")
+                
+                if st.form_submit_button("Registrarme"):
+                    if pass1 != pass2:
+                        st.error("Las contraseñas no coinciden.")
+                    elif not all([nom, usu, ema, tel, pass1]):
+                        st.warning("Por favor rellena todos los campos obligatorios (*).")
+                    else:
+                        codigo_gen = str(random.randint(100000, 999999))
+                        if enviar_codigo_email(ema, codigo_gen):
+                            st.session_state["verificando_email"] = {
+                                "codigo": codigo_gen,
+                                "datos": [usu, nom, ema, tel, hash_password(pass1), pais, str(fec)]
+                            }
+                            st.rerun()
+        else:
+            # Pantalla de verificación de código
+            st.info(f"Hemos enviado un código a {st.session_state['verificando_email']['datos'][2]}")
+            cod_ingresado = st.text_input("Introduce el código de 6 dígitos")
+            if st.button("Confirmar Registro"):
+                if cod_ingresado == st.session_state["verificando_email"]["codigo"]:
+                    if cliente:
+                        try:
+                            hoja = cliente.open("Bitacora_Academia1").worksheet("Usuarios")
+                            d = st.session_state["verificando_email"]["datos"]
+                            # Cálculos de fechas
+                            hoy = date.today()
+                            vence = hoy + timedelta(days=7)
+                            
+                            # Nueva fila según tus columnas exactas
+                            nueva_fila = [
+                                len(hoja.get_all_records()) + 1, # ID_USUARIO
+                                d[0], d[1], d[2], d[3], d[4], d[5], 
+                                "Alumno", "Padawan", "DEMO", 
+                                str(hoy), d[6], "No", "", 
+                                str(vence), # PROXIMO_VENCIMIENTO (7 días después)
+                                "", "", "", "DEMO", "1", "Sí", str(hoy), "Pendiente", "0"
+                            ]
+                            hoja.append_row(nueva_fila)
+                            st.success("¡Registro exitoso! Ya puedes iniciar sesión.")
+                            del st.session_state["verificando_email"]
+                            time.sleep(2)
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Error al guardar: {e}")
+                else:
+                    st.error("Código incorrecto.")
+            if st.button("Cancelar"):
+                del st.session_state["verificando_email"]
+                st.rerun()
+
+    # 3. RECUPERAR CONTRASEÑA (Espacio reservado)
+    elif opcion == "Recuperar Contraseña":
+        st.subheader("Recuperar cuenta")
+        email_recup = st.text_input("Introduce tu correo electrónico")
+        if st.button("Enviar instrucciones"):
+            st.info("Función en desarrollo. Pronto recibirás un enlace de recuperación.")
 
 else:
-    # --- BARRA LATERAL ---
+    # --- PANEL INTERNO (Solo se ve al entrar) ---
     st.sidebar.title(f"Socio: {st.session_state['USUARIO']['NOMBRE']}")
-    
-    menu = st.sidebar.radio("Navegación", [
-        "🏠 Inicio", 
-        "📝 Bitácora", 
-        "📊 Mis Estadísticas",
-        "🧪 Backtesting", 
-        "💰 Finanzas",
-        "🎓 Escuela"
-    ])
-
     if st.sidebar.button("Cerrar Sesión"):
         del st.session_state["USUARIO"]
         st.rerun()
-
-    cliente = conectar_google()
-
-    # --- SECCIONES ---
-    if menu == "🏠 Inicio":
-        st.header("Resumen General")
-        st.write(f"Nivel actual: **{st.session_state['USUARIO']['NIVEL']}**")
-        st.write(f"Estado de cuenta: **{st.session_state['USUARIO']['ESTADO_PAGO']}**")
-        
-    elif menu == "📝 Bitácora":
-        st.header("Registro de Operaciones")
-        st.write("Aquí puedes registrar tus trades diarios.")
-
-    elif menu == "📊 Mis Estadísticas":
-        st.header("📈 Análisis de Rendimiento")
-        
-        if cliente:
-            try:
-                # Cargamos los datos de la hoja Bitacora
-                hoja_bit = cliente.open("Bitacora_Academia1").worksheet("Bitacora")
-                df = pd.DataFrame(hoja_bit.get_all_records())
-                
-                if not df.empty:
-                    # Filtramos por el ID del usuario actual
-                    id_user = st.session_state['USUARIO']['ID_USUARIO']
-                    df_user = df[df['ID_USUARIO'] == id_user]
-                    
-                    if not df_user.empty:
-                        col1, col2, col3 = st.columns(3)
-                        # Cálculo rápido de métricas
-                        total_trades = len(df_user)
-                        wins = len(df_user[df_user['RESULTADO'] == 'Win']) # Asumiendo que el campo es RESULTADO
-                        win_rate = (wins / total_trades) * 100 if total_trades > 0 else 0
-                        
-                        col1.metric("Total Trades", total_trades)
-                        col2.metric("Win Rate %", f"{win_rate:.2f}%")
-                        col3.metric("Instrumento Favorito", df_user['INSTRUMENTO'].mode()[0])
-                        
-                        # Gráfico por Instrumento
-                        st.subheader("Rendimiento por Instrumento")
-                        fig = px.bar(df_user, x='INSTRUMENTO', y='RESULTADO_DINERO', color='RESULTADO', barmode='group')
-                        st.plotly_chart(fig, use_container_width=True)
-                    else:
-                        st.warning("Aún no tienes trades registrados en la bitácora.")
-                else:
-                    st.info("La bitácora está vacía.")
-            except Exception as e:
-                st.error(f"Error cargando estadísticas: {e}")
-
-    elif menu == "🧪 Backtesting":
-        st.header("Laboratorio de Estrategias")
-
-    elif menu == "💰 Finanzas":
-        st.header("Gestión de Capital")
-
-    elif menu == "🎓 Escuela":
-        st.header("Contenido Educativo")
+    
+    st.write(f"### Bienvenido, {st.session_state['USUARIO']['NOMBRE']}")
+    st.write(f"Estado: **{st.session_state['USUARIO']['ESTADO']}** | Rango: **{st.session_state['USUARIO']['NIVEL']}**")
+    st.warning(f"Tu periodo de prueba vence el: {st.session_state['USUARIO']['PROXIMO_VENCIMIENTO']}")
