@@ -4,13 +4,11 @@ import bcrypt
 import random
 import smtplib
 import time
-from datetime import datetime, date, timedelta
+from datetime import datetime, date
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
-# =========================================================
-# 1. CONFIGURACIÓN Y SEGURIDAD
-# =========================================================
+# --- CONFIGURACIÓN DE CORREO ---
 EMAIL_EMISOR = "glenyerbrasil@gmail.com"
 EMAIL_PASSWORD = "tpnk mizj ccul vfuv" 
 
@@ -47,121 +45,124 @@ def enviar_correo(dest, asunto, cuerpo):
         return True
     except: return False
 
-# =========================================================
-# 2. INTERFAZ DE ACCESO (LOGIN, REGISTRO, RECUPERACIÓN)
-# =========================================================
-
+# --- INTERFAZ ---
 st.set_page_config(page_title="Academia de Trading", layout="wide")
 
 def login_v2():
     st.title("📈 Academia de Trading")
-    
-    # Selector de Menú (Ingresar / Registrarse / Recuperar)
-    menu_acceso = st.radio("Menú", ["Ingresar", "Registrarse", "Recuperar Clave"], horizontal=True, label_visibility="collapsed")
+    menu_acceso = st.radio("Menú", ["Ingresar", "Registrarse", "Recuperar Clave"], horizontal=True)
 
-    # --- MÓDULO: INGRESAR ---
+    cliente = conectar_google()
+    if not cliente:
+        st.error("Error técnico: No hay conexión con el servidor de datos.")
+        return
+
+    # INTENTO DE CONEXIÓN A LA PESTAÑA "Usuarios"
+    try:
+        doc = cliente.open("Bitacora_Academia1")
+        hoja_u = doc.worksheet("Usuarios") # <--- CORREGIDO CON 'U' MAYÚSCULA
+    except Exception as e:
+        st.error(f"Error: No se encontró la pestaña 'Usuarios'. Verifica el nombre en Excel.")
+        return
+
+    # --- SECCIÓN: INGRESAR ---
     if menu_acceso == "Ingresar":
         with st.form("login_f"):
             u = st.text_input("Usuario")
             p = st.text_input("Contraseña", type="password")
             if st.form_submit_button("Entrar"):
-                cliente = conectar_google()
-                if cliente:
-                    hoja = cliente.open("Bitacora_Academia1").worksheet("usuarios")
-                    datos = hoja.get_all_records()
-                    user = next((r for r in datos if str(r.get("USUARIO")) == u), None)
-                    if user and check_pass(p, str(user.get("PASSWORD"))):
-                        st.session_state["USUARIO"] = user
-                        st.rerun()
-                    else: st.error("Credenciales incorrectas")
+                datos = hoja_u.get_all_records()
+                user = next((r for r in datos if str(r.get("USUARIO")) == u), None)
+                if user and check_pass(p, str(user.get("PASSWORD"))):
+                    st.session_state["USUARIO"] = user
+                    st.rerun()
+                else: st.error("Usuario o contraseña incorrectos.")
 
-    # --- MÓDULO: REGISTRARSE ---
+    # --- SECCIÓN: REGISTRARSE ---
     elif menu_acceso == "Registrarse":
         if "reg_codigo" not in st.session_state:
             with st.form("reg_f"):
-                st.subheader("Nuevo Miembro (Prueba 7 días)")
+                st.subheader("Crear Nueva Cuenta")
                 c1, c2 = st.columns(2)
                 r_n = c1.text_input("Nombre Completo *")
                 r_u = c1.text_input("Nombre de Usuario *")
-                r_f = c1.date_input("Fecha de Nacimiento", value=date(2000, 1, 1))
-                r_w = c2.text_input("WhatsApp (con código de país) *")
                 r_e = c2.text_input("Email *")
-                r_p = c2.text_input("Contraseña *", type="password")
-                pa = st.selectbox("País", ["Brasil", "Venezuela", "Colombia", "México", "Otro"])
+                r_w = c2.text_input("WhatsApp *")
+                r_p1 = c1.text_input("Contraseña *", type="password")
+                r_p2 = c2.text_input("Repetir Contraseña *", type="password")
                 
-                if st.form_submit_button("Solicitar Acceso"):
-                    if all([r_u, r_n, r_e, r_p, r_w]):
-                        cod = str(random.randint(100000, 999999))
-                        cuerpo = f"<h3>Tu código de registro: {cod}</h3>"
-                        if enviar_correo(r_e, "Código de Verificación Academia", cuerpo):
-                            st.session_state["reg_pend"] = [r_u, r_n, r_e, r_w, r_p, pa, str(r_f)]
-                            st.session_state["reg_codigo"] = cod
-                            st.success(f"Código enviado a {r_e}")
-                            st.rerun()
-                    else: st.warning("Completa todos los campos obligatorios (*).")
+                if st.form_submit_button("Obtener Código"):
+                    if r_p1 != r_p2:
+                        st.error("¡Las contraseñas no coinciden!")
+                    elif all([r_u, r_n, r_e, r_p1, r_w]):
+                        # VALIDACIÓN DE DUPLICADOS EN TIEMPO REAL
+                        datos = hoja_u.get_all_records()
+                        if any(str(r.get("EMAIL")).lower() == r_e.lower() for r in datos):
+                            st.error("Este correo ya está en uso.")
+                        elif any(str(r.get("USUARIO")) == r_u for r in datos):
+                            st.error("Este nombre de usuario ya está tomado.")
+                        else:
+                            cod = str(random.randint(100000, 999999))
+                            if enviar_correo(r_e, "Código Academia", f"Tu código de acceso es: <b>{cod}</b>"):
+                                st.session_state["reg_pend"] = [r_u, r_n, r_e, r_w, r_p1]
+                                st.session_state["reg_codigo"] = cod
+                                st.success("Código enviado. Revisa tu bandeja de entrada.")
+                                time.sleep(1)
+                                st.rerun()
+                    else: st.warning("Rellena todos los campos marcados con *.")
         else:
-            st.info(f"Introduce el código enviado a: {st.session_state['reg_pend'][2]}")
-            code_in = st.text_input("Código de 6 dígitos")
-            col_a, col_b = st.columns(2)
-            if col_a.button("Confirmar Registro"):
+            st.info(f"Ingresa el código enviado a: {st.session_state['reg_pend'][2]}")
+            code_in = st.text_input("Código de Verificación")
+            col_res, col_can = st.columns(2)
+            if col_res.button("Confirmar Registro"):
                 if code_in == st.session_state["reg_codigo"]:
-                    cliente = conectar_google()
-                    hoja = cliente.open("Bitacora_Academia1").worksheet("usuarios")
                     d = st.session_state["reg_pend"]
-                    # Fila: ID, USUARIO, NOMBRE, EMAIL, TEL, PASSWORD...
-                    nueva = [len(hoja.get_all_records())+1, d[0], d[1], d[2], d[3], hash_pass(d[4]), d[5], "Alumno", "Padawan", "DEMO", d[6], "No", "", "", "", "", str(date.today()), "", "Sí", "", "Pendiente"]
-                    hoja.append_row(nueva)
-                    st.success("✅ Cuenta creada con éxito.")
-                    # LIMPIEZA DE SESIÓN PARA REDIRIGIR AL LOGIN
+                    # Estructura de fila según tu Excel
+                    nueva_fila = [len(hoja_u.get_all_records())+1, d[0], d[1], d[2], d[3], hash_pass(d[4]), "Brasil", "Alumno", "Padawan", "DEMO", str(date.today()), "No", "", "", "", "", str(date.today()), "", "Sí", "", "Pendiente"]
+                    hoja_u.append_row(nueva_fila)
+                    st.success("🎉 ¡Cuenta creada con éxito!")
+                    # LIMPIEZA TOTAL PARA REDIRIGIR AL LOGIN
                     del st.session_state["reg_codigo"]
                     del st.session_state["reg_pend"]
                     time.sleep(2)
-                    st.rerun() # Esto recargará la página y caerá en "Ingresar" por defecto
-                else: st.error("Código incorrecto.")
-            if col_b.button("Cancelar"):
+                    st.rerun()
+                else: st.error("Código inválido.")
+            if col_can.button("Cancelar"):
                 del st.session_state["reg_codigo"]
                 st.rerun()
 
-    # --- MÓDULO: RECUPERAR CLAVE ---
+    # --- SECCIÓN: RECUPERAR CLAVE ---
     elif menu_acceso == "Recuperar Clave":
-        st.subheader("Recuperación de Cuenta")
-        email_rec = st.text_input("Introduce tu correo electrónico")
-        if st.button("Enviar nueva clave temporal"):
-            cliente = conectar_google()
-            hoja = cliente.open("Bitacora_Academia1").worksheet("usuarios")
-            datos = hoja.get_all_records()
-            user = next((r for r in datos if str(r.get("EMAIL")).lower() == email_rec.lower()), None)
-            
-            if user:
+        st.subheader("Recuperación por Email")
+        email_rec = st.text_input("Email registrado")
+        if st.button("Enviar Clave Temporal"):
+            datos = hoja_u.get_all_records()
+            idx = next((i for i, r in enumerate(datos) if str(r.get("EMAIL")).lower() == email_rec.lower()), None)
+            if idx is not None:
                 nueva_p = str(random.randint(1000, 9999)) + "temp"
-                hashed_p = hash_pass(nueva_p)
-                # Actualizar en Excel (buscamos la fila)
-                idx = next((i for i, r in enumerate(datos) if str(r.get("EMAIL")).lower() == email_rec.lower()), None)
-                if idx is not None:
-                    # En gspread las filas empiezan en 1 y hay encabezado, así que es idx + 2
-                    hoja.update_cell(idx + 2, 6, hashed_p) 
-                    enviar_correo(email_rec, "Recuperación de Clave", f"Tu nueva clave temporal es: <b>{nueva_p}</b><br>Cámbiala al ingresar.")
-                    st.success("Se ha enviado una clave temporal a tu correo.")
-            else:
-                st.error("Correo no encontrado en nuestra base de datos.")
+                hoja_u.update_cell(idx + 2, 6, hash_pass(nueva_p)) # Columna 6 es PASSWORD
+                enviar_correo(email_rec, "Clave Temporal", f"Tu nueva clave de acceso es: <b>{nueva_p}</b>")
+                st.success("Revisa tu correo, te hemos enviado una clave temporal.")
+            else: st.error("El correo no existe en nuestra base de datos.")
 
-# =========================================================
-# 3. PANEL INTERNO (MISMA ESTRUCTURA)
-# =========================================================
-
+# --- PANEL PRINCIPAL ---
 def main_app():
     user = st.session_state["USUARIO"]
-    st.sidebar.title(f"Hola, {user['NOMBRE']}")
+    st.sidebar.title(f"Bienvenido, {user['NOMBRE']}")
+    # Lista de módulos solicitados
     menu = st.sidebar.radio("Navegación", ["🏠 Bienvenida", "🎓 Escuela", "📝 Bitácora", "📊 Backtesting", "📈 Mis Estadísticas", "💰 Finanzas", "💬 Forum"])
     
     if st.sidebar.button("Cerrar Sesión"):
         del st.session_state["USUARIO"]
         st.rerun()
 
+    # Contenido de los módulos (ejemplos base)
     if menu == "🏠 Bienvenida":
-        st.header(f"Bienvenido, {user['NOMBRE']}")
-        st.info(f"Rango: {user['RANGO']} | Plan: {user['PLAN']}")
-    # ... Resto de módulos (puedes ir llenándolos poco a poco)
+        st.header("Academia de Trading")
+        st.write(f"Hola **{user['USUARIO']}**, qué bueno tenerte de vuelta.")
+    else:
+        st.header(menu)
+        st.info("Módulo en desarrollo. Pronto estará disponible toda la información.")
 
 if "USUARIO" not in st.session_state:
     login_v2()
