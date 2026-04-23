@@ -54,21 +54,32 @@ def subir_a_cloudinary(archivo):
     return ""
 
 # =========================================================
-# # SECCION 2: INTERFAZ DE ACCESO (CON VERIFICACIÓN DE EMAIL)
+# # SECCION 2: INTERFAZ DE ACCESO (REGISTRO Y VERIFICACIÓN)
 # =========================================================
 
 def enviar_verificacion(email_destino, codigo):
     """Envía el código de seguridad al correo del nuevo padawan."""
+    import smtplib # Refuerzo de importación
     msg = MIMEMultipart()
     msg['From'] = EMAIL_EMISOR
     msg['To'] = email_destino
-    msg['Subject'] = f"🛡️ Código de Verificación: {codigo}"
+    msg['Subject'] = f"🛡️ Código de Verificación Academia: {codigo}"
     
     cuerpo = f"""
-    <h2>¡Bienvenido a la Academia de Trading, Socio!</h2>
-    <p>Para activar tu cuenta y comenzar tu entrenamiento, usa el siguiente código:</p>
-    <h1 style='color: #007bff;'>{codigo}</h1>
-    <p>Este código vencerá pronto. Si no solicitaste esto, ignora este correo.</p>
+    <html>
+        <body style="font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px;">
+            <div style="max-width: 600px; margin: auto; background: white; padding: 20px; border-radius: 10px; border: 1px solid #ddd;">
+                <h2 style="color: #007bff; text-align: center;">¡Bienvenido a la Academia, Socio!</h2>
+                <p>Estás a un paso de comenzar tu entrenamiento. Usa este código para verificar tu cuenta:</p>
+                <div style="background: #e9ecef; padding: 15px; text-align: center; font-size: 24px; font-weight: bold; letter-spacing: 5px; border-radius: 5px;">
+                    {codigo}
+                </div>
+                <p style="font-size: 12px; color: #777; text-align: center; margin-top: 20px;">
+                    Si no solicitaste este registro, puedes ignorar este correo con seguridad.
+                </p>
+            </div>
+        </body>
+    </html>
     """
     msg.attach(MIMEText(cuerpo, 'html'))
     
@@ -80,24 +91,25 @@ def enviar_verificacion(email_destino, codigo):
         server.quit()
         return True
     except Exception as e:
-        st.error(f"Error enviando correo: {e}")
+        st.error(f"Error crítico de envío: {e}")
         return False
 
 def login_v2():
     st.title("📈 Academia de Trading")
     
-    # Manejo de estados de registro (Paso 1: Datos, Paso 2: Verificación)
+    # Inicialización de estados de registro
     if "PASO_REGISTRO" not in st.session_state:
         st.session_state["PASO_REGISTRO"] = 1
 
     menu_acceso = st.radio("Menú", ["Ingresar", "Registrarse", "Recuperar Clave"], horizontal=True)
+    
     cliente = conectar_google()
     if not cliente: return
     try:
         doc = cliente.open("Bitacora_Academia1")
         hoja_u = doc.worksheet("Usuarios") 
     except:
-        st.error("Error: No se encontró la pestaña 'Usuarios'.")
+        st.error("Error: No se encontró la pestaña 'Usuarios' en el Google Sheets.")
         return
 
     # --- SUBSECCIÓN: INGRESAR ---
@@ -108,45 +120,51 @@ def login_v2():
             if st.form_submit_button("Entrar"):
                 datos = hoja_u.get_all_records()
                 user = next((r for r in datos if str(r.get("USUARIO")) == u), None)
+                
                 if user:
                     if str(user.get("CORREO_VERIFICADO")) == "NO":
-                        st.warning("⚠️ Tu correo no ha sido verificado. Revisa tu bandeja de entrada.")
+                        st.warning("⚠️ Tu cuenta aún no ha sido verificada por correo.")
                     elif check_pass(p, str(user.get("PASSWORD"))):
                         st.session_state["USUARIO"] = user
                         st.rerun()
                     else: st.error("Contraseña incorrecta.")
-                else: st.error("Usuario no encontrado.")
+                else: st.error("El usuario no existe.")
 
-    # --- SUBSECCIÓN: REGISTRARSE (CON DOBLE PASO) ---
+    # --- SUBSECCIÓN: REGISTRARSE (CON VERIFICACIÓN ACTIVA) ---
     elif menu_acceso == "Registrarse":
         if st.session_state["PASO_REGISTRO"] == 1:
             with st.form("registro_f"):
                 n_nombre = st.text_input("Nombre Completo")
-                n_user = st.text_input("Nombre de Usuario")
+                n_user = st.text_input("Nombre de Usuario (Login)")
                 n_email = st.text_input("Correo Electrónico")
                 
-                col_pais, col_cel = st.columns([1, 2])
-                paises_dict = {"Brasil (+55)": "+55", "Venezuela (+58)": "+58", "Colombia (+57)": "+57", "España (+34)": "+34"}
-                p_sel = col_pais.selectbox("País", list(paises_dict.keys()))
-                n_cel_num = col_cel.text_input("Número de Celular")
+                c1, c2 = st.columns([1, 2])
+                paises = {"Brasil (+55)": "+55", "Venezuela (+58)": "+58", "Colombia (+57)": "+57", "España (+34)": "+34"}
+                p_sel = c1.selectbox("País", list(paises.keys()))
+                n_cel_num = c2.text_input("Número de Celular")
                 n_nacimiento = st.date_input("Fecha de Nacimiento", min_value=date(1940, 1, 1))
                 
                 n_pass = st.text_input("Contraseña", type="password")
                 c_pass = st.text_input("Confirmar Contraseña", type="password")
                 
-                if st.form_submit_button("Enviar Código de Verificación"):
+                if st.form_submit_button("Validar y Enviar Código"):
                     datos = hoja_u.get_all_records()
+                    
+                    # Verificación de duplicidad antes de enviar correo
                     if any(str(r.get("EMAIL")).lower() == n_email.lower() for r in datos):
-                        st.warning("⚠️ Email ya registrado.")
+                        st.warning("⚠️ Este correo ya está registrado. Ve a 'Recuperar Clave'.")
+                    elif any(str(r.get("USUARIO")).lower() == n_user.lower() for r in datos):
+                        st.error("❌ El nombre de usuario ya está en uso.")
+                    elif not n_email or not n_pass or not n_nombre or not n_cel_num:
+                        st.error("Socio, no dejes campos vacíos.")
                     elif n_pass != c_pass:
                         st.error("Las contraseñas no coinciden.")
                     else:
-                        # Generamos código y guardamos datos temporalmente
                         codigo_gen = str(random.randint(100000, 999999))
                         if enviar_verificacion(n_email, codigo_gen):
                             st.session_state["TEMP_USER"] = {
-                                "nombre": n_nombre, "user": n_user, "email": n_email,
-                                "tel": f"{paises_dict[p_sel]}{n_cel_num}", "pass": hash_pass(n_pass),
+                                "user": n_user, "nombre": n_nombre, "email": n_email,
+                                "tel": f"{paises[p_sel]}{n_cel_num}", "pass": hash_pass(n_pass),
                                 "pais": p_sel.split(" (")[0], "nacimiento": str(n_nacimiento),
                                 "codigo": codigo_gen
                             }
@@ -154,36 +172,48 @@ def login_v2():
                             st.rerun()
 
         elif st.session_state["PASO_REGISTRO"] == 2:
-            st.info(f"Escaneando transmisiones... Enviamos un código a: {st.session_state['TEMP_USER']['email']}")
-            cod_ingresado = st.text_input("Introduce el código de 6 dígitos")
+            st.info(f"📩 Código enviado a **{st.session_state['TEMP_USER']['email']}**")
+            cod_ingresado = st.text_input("Ingresa el código de 6 dígitos", help="Revisa tu carpeta de Spam si no lo ves.")
             
-            if st.button("Verificar y Finalizar"):
+            col_v1, col_v2 = st.columns(2)
+            
+            if col_v1.button("Verificar y Finalizar"):
                 if cod_ingresado == st.session_state["TEMP_USER"]["codigo"]:
-                    # Guardar en Google Sheets (Mismo orden de 23 columnas que definimos antes)
                     t = st.session_state["TEMP_USER"]
                     f_hoy = date.today()
-                    f_vence = f_hoy + timedelta(days=7)
+                    f_vence = f_hoy + timedelta(days=7) # Política Demo
                     
                     datos = hoja_u.get_all_records()
+                    # Mapeo exacto de tus 23 columnas
                     nueva_fila = [
                         len(datos)+1, t['user'], t['nombre'], t['email'], t['tel'], t['pass'], t['pais'],
                         "DEMO", "Padawan", "ACTIVO", str(f_hoy), t['nacimiento'],
                         "NO", "N/A", str(f_vence), str(f_vence + timedelta(days=2)), 
                         "N/A", "PRUEBA", 1, "SI", str(datetime.now()), "PENDIENTE", 0
                     ]
-                    hoja_u.append_row(nueva_fila)
                     
-                    st.success("¡Correo verificado con éxito! Ya puedes ingresar.")
-                    st.session_state["PASO_REGISTRO"] = 1
-                    time.sleep(2)
-                    st.rerun()
+                    try:
+                        hoja_u.append_row(nueva_fila)
+                        st.success("✨ ¡Cuenta verificada! Ya eres un Padawan oficial.")
+                        st.session_state["PASO_REGISTRO"] = 1 # Reset para el próximo
+                        time.sleep(2)
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Error al escribir en la base de datos: {e}")
                 else:
-                    st.error("Código incorrecto. Inténtalo de nuevo.")
+                    st.error("Código incorrecto socio, verifica bien.")
             
-            if st.button("Volver a intentar registro"):
+            if col_v2.button("Cancelar / Volver"):
                 st.session_state["PASO_REGISTRO"] = 1
                 st.rerun()
-# =========================================================
+
+    # --- SUBSECCIÓN: RECUPERAR CLAVE ---
+    elif menu_acceso == "Recuperar Clave":
+        email_rec = st.text_input("Ingresa tu email registrado")
+        if st.button("Enviar Clave Temporal"):
+            # Lógica de recuperación...
+            st.info("Simulando envío de clave temporal...")# =========================================================
+
 # # SECCION 3: REPRODUCTOR Y MODALES
 # =========================================================
 @st.dialog("Reproductor Holocrón", width="large")
