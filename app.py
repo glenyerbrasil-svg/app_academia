@@ -274,12 +274,39 @@ def main_app():
 
     # --- LÓGICA DE RENDERIZADO POR SECCIÓN ---
 
-    # # SECCION 5: HOME
-    if menu == "🏠 Home":
-        st.header("🌌 Centro de Mando")
-        st.subheader(f"Bienvenido de nuevo, {user['NOMBRE']}")
-        st.write(f"Tu estado actual es: **{user.get('ESTADO', 'ACTIVO')}**")
-        st.write(f"Próximo vencimiento: `{user.get('PROXIMO_VENCIMIENTO', 'N/A')}`")
+   # --- SECCION 5: HOME (Lógica de Mensajes) ---
+if menu == "🏠 Home":
+    st.header("🌌 Centro de Mando")
+    
+    # Configuración de los mensajes según el RANGO/NIVEL
+    mensajes_rango = {
+        "Padawan": {
+            "titulo": "¡Bienvenido, Joven Padawan!",
+            "mensaje": "Tu camino en el trading apenas comienza. La disciplina es tu mejor aliada y la bitácora tu sable de luz. No busques el dinero, busca la maestría y el capital te seguirá.",
+            "color": "#A9A9A9" # Gris
+        },
+        "Jedi": {
+            "titulo": "Saludos, Caballero Jedi",
+            "mensaje": "Has demostrado consistencia y control emocional. El mercado ya no es un caos para ti, sino un flujo de oportunidades. Mantén la humildad y sigue protegiendo tu capital.",
+            "color": "#2E8B57" # Verde
+        },
+        "Maestro Jedi": {
+            "titulo": "Respetos, Maestro Jedi",
+            "mensaje": "La Fuerza es intensa en tu operativa. Tu nivel de lectura es superior y tu gestión es impecable. Eres un ejemplo para la academia; que tus trades sigan iluminando el camino.",
+            "color": "#FFD700" # Dorado
+        }
+    }
+
+    # Obtenemos la info según el nivel que viene del Excel
+    info = mensajes_rango.get(nivel_user, mensajes_rango["Padawan"])
+
+    # Cuadro estético de bienvenida
+    st.markdown(f"""
+        <div style="background-color: #1e1e1e; padding: 25px; border-radius: 15px; border-left: 10px solid {info['color']};">
+            <h1 style="color: {info['color']}; margin-top: 0;">{info['titulo']}</h1>
+            <p style="font-size: 18px; line-height: 1.6; color: #e0e0e0;">{info['mensaje']}</p>
+        </div>
+    """, unsafe_allow_html=True)
 
     # # SECCION 6: ESCUELA
     elif menu == "🎓 Escuela":
