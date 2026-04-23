@@ -306,42 +306,42 @@ def main_app():
             </div>
         """, unsafe_allow_html=True)
 
-# --- SECCION 6: ESCUELA (JERARQUÍA DE ACCESO) ---
+# --- SECCION 6: ESCUELA (JERARQUÍA DE ACCESO CORREGIDA) ---
     elif menu == "🎓 Escuela":
         st.header("🎓 Holocrón de Entrenamiento")
         
-        # Definimos los niveles en orden jerárquico
         niveles_jerarquia = ["Padawan", "Jedi", "Maestro Jedi"]
         
-        # Buscamos la posición del usuario en la jerarquía
+        # Obtenemos el índice del rango del usuario
         try:
             rango_index = niveles_jerarquia.index(nivel_user)
         except ValueError:
-            rango_index = 0  # Por defecto si hay error es Padawan
+            rango_index = 0
             
-        # --- BLOQUE 1: CONTENIDO PADAWAN ---
-        # Todos tienen acceso a este bloque
+        # --- BLOQUE 1: PADAWAN ---
         with st.expander("🛡️ Módulo 1: Iniciación (Nivel Padawan)", expanded=(nivel_user == "Padawan")):
             st.info("Fundamentos, psicología básica y manejo de la Bitácora.")
-            st.write("*(Aquí cargaremos los videos y guías para principiantes)*")
+            st.write("*(Contenido disponible para todos)*")
 
-        # --- BLOQUE 2: CONTENIDO JEDI ---
-        # Solo visible para Jedi y Maestro Jedi
+        st.divider()
+
+        # --- BLOQUE 2: JEDI ---
         if rango_index >= 1:
             with st.expander("⚔️ Módulo 2: Caballero (Nivel Jedi)", expanded=(nivel_user == "Jedi")):
-                st.info("Estrategias avanzadas, gestión de riesgo profesional y confluencias.")
-                st.write("*(Aquí cargaremos el contenido de nivel intermedio)*")
+                st.info("Estrategias avanzadas y gestión de riesgo profesional.")
+                st.write("*(Contenido desbloqueado)*")
         else:
-            st.lock("Módulo 2: Contenido restringido. Sigue entrenando para alcanzar el rango de Jedi.")
+            st.warning("🔒 **Módulo restringido.** Debes alcanzar el rango de **Jedi** para visualizar este contenido.")
 
-        # --- BLOQUE 3: CONTENIDO MAESTRO JEDI ---
-        # Solo visible para el Maestro Jedi
+        st.divider()
+
+        # --- BLOQUE 3: MAESTRO JEDI ---
         if rango_index >= 2:
             with st.expander("🌌 Módulo 3: Maestría (Nivel Maestro Jedi)", expanded=(nivel_user == "Maestro Jedi")):
-                st.info("Lectura institucional, entradas de alta precisión y mentoría.")
-                st.write("*(Aquí cargaremos el contenido de nivel experto)*")
+                st.info("Lectura institucional y entradas de alta precisión.")
+                st.write("*(Contenido de máxima jerarquía desbloqueado)*")
         else:
-            st.lock("Módulo 3: Contenido restringido. Solo accesible para Maestros Jedi.")
+            st.error("🚫 **Acceso denegado.** Este conocimiento está reservado únicamente para **Maestros Jedi**.")
 
     # # SECCION 7: BITÁCORA
     elif menu == "📝 Bitácora":
