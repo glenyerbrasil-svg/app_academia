@@ -219,89 +219,89 @@ def reproducir_video(url, titulo):
     st.video(url)
 
 # =========================================================
-# # SECCION 4: PANEL PRINCIPAL Y LÓGICA DE NEGOCIO
+# # SECCION 4: PANEL PRINCIPAL Y NAVEGACIÓN (CON ASSETS)
 # =========================================================
 def main_app():
     user = st.session_state["USUARIO"]
     cliente = conectar_google()
     doc = cliente.open("Bitacora_Academia1")
     
-    # Verificación de Vencimiento Demo
-    f_vence_str = str(user.get("VENCIMIENTO", date.today()))
-    f_vence = datetime.strptime(f_vence_str, "%Y-%m-%d").date()
+    # --- CONFIGURACIÓN DE RANGOS E IMÁGENES (GitHub Raw) ---
+    # Convertimos tus links a formato raw para que Streamlit los lea
+    URL_BASE = "https://raw.githubusercontent.com/glenyerbrasil-svg/app_academia/main/assets/"
     
-    st.sidebar.title(f"Hola, {user['NOMBRE']}")
-    st.sidebar.info(f"Rango: {user.get('RANGO', 'DEMO')}")
+    # Mapeo exacto basado en tu columna "NIVEL"
+    rangos_config = {
+        "Padawan": {
+            "img": f"{URL_BASE}joven_padawan.png",
+            "color": "#A9A9A9",
+            "label": "Joven Padawan"
+        },
+        "Jedi": {
+            "img": f"{URL_BASE}jedi.png",
+            "color": "#2E8B57",
+            "label": "Caballero Jedi"
+        },
+        "Maestro Jedi": {
+            "img": f"{URL_BASE}maestro_jedi.png",
+            "color": "#FFD700",
+            "label": "Maestro Jedi"
+        }
+    }
     
-    # CANDADO DE SEGURIDAD PARA CUENTAS VENCIDAS
-    if user.get("RANGO") == "DEMO" and date.today() > f_vence:
-        st.error("🚨 Tu periodo de prueba ha finalizado. Contacta al soporte para activar tu cuenta.")
-        if st.sidebar.button("Cerrar Sesión"):
-            del st.session_state["USUARIO"]; st.rerun()
-        return
+    # Extraemos el nivel del usuario (limpiando espacios por si acaso)
+    nivel_user = str(user.get("NIVEL", "Padawan")).strip()
+    config = rangos_config.get(nivel_user, rangos_config["Padawan"])
+    
+    # --- SIDEBAR PERSONALIZADO ---
+    with st.sidebar:
+        # Mostramos la insignia del rango
+        st.image(config["img"], use_container_width=True)
+        st.markdown(f"<h2 style='text-align: center;'>{user['NOMBRE']}</h2>", unsafe_allow_html=True)
+        st.markdown(f"<p style='text-align: center; color: {config['color']}; font-weight: bold;'>{config['label']}</p>", unsafe_allow_html=True)
+        st.divider()
+        
+        # MENÚ DE NAVEGACIÓN
+        menu = st.radio(
+            "Módulos del Sistema:",
+            ["🏠 Home", "🎓 Escuela", "📝 Bitácora", "📊 Backtesting", "💰 Finanzas"]
+        )
+        
+        st.divider()
+        if st.button("Cerrar Sesión", use_container_width=True):
+            del st.session_state["USUARIO"]
+            st.rerun()
 
-    menu = st.sidebar.radio("Ir a:", ["🏠 Bienvenida", "🎓 Escuela", "📝 Bitácora", "💰 Finanzas"])
-    
-    if st.sidebar.button("Cerrar Sesión"):
-        del st.session_state["USUARIO"]; st.rerun()
+    # --- LÓGICA DE RENDERIZADO POR SECCIÓN ---
 
-    # --- SECCION 5: BIENVENIDA ---
-    if menu == "🏠 Bienvenida":
+    # # SECCION 5: HOME
+    if menu == "🏠 Home":
         st.header("🌌 Centro de Mando")
-        st.write(f"Bienvenido, {user['NOMBRE']}. Acceso activo hasta: {f_vence}")
+        st.subheader(f"Bienvenido de nuevo, {user['NOMBRE']}")
+        st.write(f"Tu estado actual es: **{user.get('ESTADO', 'ACTIVO')}**")
+        st.write(f"Próximo vencimiento: `{user.get('PROXIMO_VENCIMIENTO', 'N/A')}`")
 
-    # --- SECCION 6: ESCUELA ---
+    # # SECCION 6: ESCUELA
     elif menu == "🎓 Escuela":
-        st.header("🎓 Escuela Jedi")
-        if st.button("▶ Ver Clase 1"):
-            reproducir_video("https://www.youtube.com/watch?v=z6TquA-pF2k", "Clase Inicial")
+        st.header("🎓 Academia de Entrenamiento")
+        # Aquí va tu lógica de mostrar videos según el NIVEL
 
-    # --- SECCION 7: BITÁCORA ---
+    # # SECCION 7: BITÁCORA
     elif menu == "📝 Bitácora":
-        st.header("📝 Registro de Operaciones")
-        hoja_f = doc.worksheet("Finanzas")
-        hoja_b = doc.worksheet("Bitacora")
-        
-        df_f = pd.DataFrame(hoja_f.get_all_records())
-        col_id = [c for c in df_f.columns if "ID_USUARIO" in str(c).upper()][0]
-        df_user = df_f[df_f[col_id].astype(str) == str(user["ID_USUARIO"])]
-        
-        saldo_actual = float(df_user["SALDO_FINAL"].iloc[-1]) if not df_user.empty else 0.0
+        # Aquí va el código de Weltrade que ya tenemos listo
+        st.header("📝 Registro de Operaciones Reales")
+        # ... (Insertar código de la sección 7 aquí)
 
-        if saldo_actual <= 0:
-            st.error(f"❌ Saldo insuficiente ($ {saldo_actual}). Registra un depósito primero.")
-        else:
-            st.success(f"💰 Saldo disponible: $ {saldo_actual}")
-            with st.form("form_op", clear_on_submit=True):
-                c1, c2, c3 = st.columns(3)
-                ins = c1.selectbox("Instrumento", ["FLIPX1", "FLIPX2", "FXVOL20", "FXVOL99", "SFXVOL20"])
-                acc = c2.selectbox("Acción", ["COMPRA", "VENTA"])
-                bala = c3.number_input("Bala ($)", value=4.0, step=0.01)
+    # # SECCION 8: BACKTESTING
+    elif menu == "📊 Backtesting":
+        st.header("📊 Entrenamiento de Simulación (Backtesting)")
+        st.info("Aquí los resultados no afectan tu capital real de la hoja de Finanzas.")
 
-                p_ent = st.number_input("Precio Entrada", format="%.2f")
-                p_sl = st.number_input("Precio SL", format="%.2f")
-                ratio = st.slider("Ratio 1:X", 1.0, 5.0, 2.0)
-
-                distancia = abs(p_ent - p_sl)
-                if distancia > 0:
-                    lotaje = bala / distancia
-                    tp = p_ent + (distancia * ratio) if acc == "COMPRA" else p_ent - (distancia * ratio)
-                    st.info(f"📊 **Plan:** Lotes: `{lotaje:.2f}` | TP: `{tp:.2f}`")
-                    if bala > 6.0: st.warning("⚠️ Cuidado socio, la bala está muy grande.")
-                
-                img_m = st.file_uploader("Gráfico Mayor", type=['png', 'jpg'])
-                emocion = st.select_slider("Estado Emocional", options=["ROJO", "AMARILLO", "VERDE"])
-
-                if st.form_submit_button("Guardar Operación"):
-                    url = subir_a_cloudinary(img_m)
-                    nueva_fila = [len(hoja_b.get_all_records())+1, user["ID_USUARIO"], str(date.today()), ins, acc, bala, p_ent, p_sl, tp, lotaje, f"1:{ratio}", "", "", "", "", url, "", "", "", "", "Pendiente", 0, "NO", "0%", "", "", emocion]
-                    hoja_b.append_row(nueva_fila)
-                    st.success("✅ Operación registrada.")
-
-    # --- SECCION 8: FINANZAS ---
+    # # SECCION 9: FINANZAS
     elif menu == "💰 Finanzas":
-        st.header("💰 Gestión de Capital")
-        st.info("Registra aquí tus depósitos para poder operar.")
+        st.header("💰 Gestión de Capital y Pagos")
+        st.write(f"Estado de Pago: **{user.get('ESTADO_PAGO', 'PENDIENTE')}**")
+
 
 # =========================================================
 # # CONTROL DE FLUJO
