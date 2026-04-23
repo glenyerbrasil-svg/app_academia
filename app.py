@@ -2,17 +2,16 @@ import streamlit as st
 import gspread
 import bcrypt
 import random
-import smtplib
 import time
 import cloudinary
 import cloudinary.uploader
 import pandas as pd
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 # =========================================================
-# 1. CONFIGURACIÓN DE APIS Y SEGURIDAD
+# # SECCION 1: CONFIGURACIÓN DE APIS Y SEGURIDAD
 # =========================================================
 # Cloudinary (Imágenes)
 cloudinary.config(
@@ -55,7 +54,7 @@ def subir_a_cloudinary(archivo):
     return ""
 
 # =========================================================
-# 2. INTERFAZ DE ACCESO
+# # SECCION 2: INTERFAZ DE ACCESO (LOGIN Y REGISTRO)
 # =========================================================
 st.set_page_config(page_title="Academia de Trading", layout="wide")
 
@@ -71,6 +70,7 @@ def login_v2():
         st.error("Error: No se encontró la pestaña 'Usuarios'.")
         return
 
+    # --- SUBSECCIÓN: INGRESAR ---
     if menu_acceso == "Ingresar":
         with st.form("login_f"):
             u = st.text_input("Usuario")
@@ -83,6 +83,38 @@ def login_v2():
                     st.rerun()
                 else: st.error("Usuario o contraseña incorrectos.")
 
+    # --- SUBSECCIÓN: REGISTRARSE (POLÍTICA 7 DÍAS Y DUPLICIDAD) ---
+    elif menu_acceso == "Registrarse":
+        st.subheader("Crea tu cuenta de Padawan")
+        with st.form("registro_f"):
+            n_nombre = st.text_input("Nombre Completo")
+            n_user = st.text_input("Nombre de Usuario")
+            n_email = st.text_input("Correo Electrónico")
+            n_pass = st.text_input("Contraseña", type="password")
+            c_pass = st.text_input("Confirmar Contraseña", type="password")
+            
+            if st.form_submit_button("Finalizar Registro"):
+                if not n_email or not n_pass or not n_nombre:
+                    st.error("Campos obligatorios vacíos.")
+                elif n_pass != c_pass:
+                    st.error("Las contraseñas no coinciden.")
+                else:
+                    datos = hoja_u.get_all_records()
+                    # Validación de Duplicidad
+                    if any(str(r.get("EMAIL")).lower() == n_email.lower() for r in datos):
+                        st.warning("⚠️ Este correo ya está registrado. Ve a 'Recuperar Clave'.")
+                    elif any(str(r.get("USUARIO")).lower() == n_user.lower() for r in datos):
+                        st.error("❌ El nombre de usuario ya existe.")
+                    else:
+                        f_hoy = date.today()
+                        f_vence = f_hoy + timedelta(days=7)
+                        n_id = len(datos) + 1
+                        nueva_fila = [n_id, n_nombre, n_user, n_email, str(f_hoy), hash_pass(n_pass), "DEMO", str(f_vence)]
+                        hoja_u.append_row(nueva_fila)
+                        st.success(f"✅ Registro exitoso. Tu demo vence el {f_vence}. Ya puedes ingresar.")
+                        time.sleep(2)
+
+    # --- SUBSECCIÓN: RECUPERAR CLAVE ---
     elif menu_acceso == "Recuperar Clave":
         email_rec = st.text_input("Email registrado")
         if st.button("Enviar Clave Temporal"):
@@ -90,12 +122,11 @@ def login_v2():
             idx = next((i for i, r in enumerate(datos) if str(r.get("EMAIL")).lower() == email_rec.lower()), None)
             if idx is not None:
                 nueva_p = str(random.randint(1000, 9999)) + "temp"
-                # CORRECCIÓN DE PARÉNTESIS AQUÍ
                 hoja_u.update_cell(idx + 2, 6, hash_pass(nueva_p)) 
-                st.success(f"✅ Clave temporal generada. (Simulación envío a {email_rec})")
+                st.success(f"✅ Clave temporal generada. (Enviada a {email_rec})")
 
 # =========================================================
-# 3. MODALES Y DIÁLOGOS
+# # SECCION 3: REPRODUCTOR Y MODALES
 # =========================================================
 @st.dialog("Reproductor Holocrón", width="large")
 def reproducir_video(url, titulo):
@@ -103,39 +134,50 @@ def reproducir_video(url, titulo):
     st.video(url)
 
 # =========================================================
-# 4. PANEL PRINCIPAL
+# # SECCION 4: PANEL PRINCIPAL Y LÓGICA DE NEGOCIO
 # =========================================================
 def main_app():
     user = st.session_state["USUARIO"]
     cliente = conectar_google()
     doc = cliente.open("Bitacora_Academia1")
     
+    # Verificación de Vencimiento Demo
+    f_vence_str = str(user.get("VENCIMIENTO", date.today()))
+    f_vence = datetime.strptime(f_vence_str, "%Y-%m-%d").date()
+    
     st.sidebar.title(f"Hola, {user['NOMBRE']}")
+    st.sidebar.info(f"Rango: {user.get('RANGO', 'DEMO')}")
+    
+    # CANDADO DE SEGURIDAD PARA CUENTAS VENCIDAS
+    if user.get("RANGO") == "DEMO" and date.today() > f_vence:
+        st.error("🚨 Tu periodo de prueba ha finalizado. Contacta al soporte para activar tu cuenta.")
+        if st.sidebar.button("Cerrar Sesión"):
+            del st.session_state["USUARIO"]; st.rerun()
+        return
+
     menu = st.sidebar.radio("Ir a:", ["🏠 Bienvenida", "🎓 Escuela", "📝 Bitácora", "💰 Finanzas"])
     
     if st.sidebar.button("Cerrar Sesión"):
         del st.session_state["USUARIO"]; st.rerun()
 
-    # --- MÓDULO BIENVENIDA ---
+    # --- SECCION 5: BIENVENIDA ---
     if menu == "🏠 Bienvenida":
         st.header("🌌 Centro de Mando")
-        st.write(f"Bienvenido, {user['NOMBRE']}. Tu rango es: **{user.get('RANGO', 'Padawan')}**")
+        st.write(f"Bienvenido, {user['NOMBRE']}. Acceso activo hasta: {f_vence}")
 
-    # --- MÓDULO ESCUELA ---
+    # --- SECCION 6: ESCUELA ---
     elif menu == "🎓 Escuela":
         st.header("🎓 Escuela Jedi")
         if st.button("▶ Ver Clase 1"):
             reproducir_video("https://www.youtube.com/watch?v=z6TquA-pF2k", "Clase Inicial")
 
-    # --- MÓDULO BITÁCORA (CORREGIDO) ---
+    # --- SECCION 7: BITÁCORA ---
     elif menu == "📝 Bitácora":
         st.header("📝 Registro de Operaciones")
         hoja_f = doc.worksheet("Finanzas")
         hoja_b = doc.worksheet("Bitacora")
         
-        # Lectura robusta de saldo
         df_f = pd.DataFrame(hoja_f.get_all_records())
-        # Buscamos la columna ID_USUARIO sin importar mayúsculas o espacios
         col_id = [c for c in df_f.columns if "ID_USUARIO" in str(c).upper()][0]
         df_user = df_f[df_f[col_id].astype(str) == str(user["ID_USUARIO"])]
         
@@ -147,9 +189,9 @@ def main_app():
             st.success(f"💰 Saldo disponible: $ {saldo_actual}")
             with st.form("form_op", clear_on_submit=True):
                 c1, c2, c3 = st.columns(3)
-                ins = c1.selectbox("Instrumento", ["FLIPX1", "FLIPX2", "FLIPX3", "FLIPX4", "FLIPX5", "FXVOL20", "FXVOL40", "FXVOL60", "FXVOL80", "FXVOL99"])
+                ins = c1.selectbox("Instrumento", ["FLIPX1", "FLIPX2", "FXVOL20", "FXVOL99", "SFXVOL20"])
                 acc = c2.selectbox("Acción", ["COMPRA", "VENTA"])
-                bala = c3.number_input("Bala ($)", value=6.48, step=0.01)
+                bala = c3.number_input("Bala ($)", value=4.0, step=0.01)
 
                 p_ent = st.number_input("Precio Entrada", format="%.2f")
                 p_sl = st.number_input("Precio SL", format="%.2f")
@@ -157,9 +199,10 @@ def main_app():
 
                 distancia = abs(p_ent - p_sl)
                 if distancia > 0:
-                    lotaje = bala / distancia # Lógica Weltrade: Contrato 1
+                    lotaje = bala / distancia
                     tp = p_ent + (distancia * ratio) if acc == "COMPRA" else p_ent - (distancia * ratio)
                     st.info(f"📊 **Plan:** Lotes: `{lotaje:.2f}` | TP: `{tp:.2f}`")
+                    if bala > 6.0: st.warning("⚠️ Cuidado socio, la bala está muy grande.")
                 
                 img_m = st.file_uploader("Gráfico Mayor", type=['png', 'jpg'])
                 emocion = st.select_slider("Estado Emocional", options=["ROJO", "AMARILLO", "VERDE"])
@@ -170,11 +213,14 @@ def main_app():
                     hoja_b.append_row(nueva_fila)
                     st.success("✅ Operación registrada.")
 
-    # --- MÓDULO FINANZAS ---
+    # --- SECCION 8: FINANZAS ---
     elif menu == "💰 Finanzas":
         st.header("💰 Gestión de Capital")
-        st.info("Aquí podrás registrar tus depósitos y retiros.")
+        st.info("Registra aquí tus depósitos para poder operar.")
 
+# =========================================================
+# # CONTROL DE FLUJO
+# =========================================================
 if "USUARIO" not in st.session_state:
     login_v2()
 else:
