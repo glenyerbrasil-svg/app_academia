@@ -54,12 +54,42 @@ def subir_a_cloudinary(archivo):
     return ""
 
 # =========================================================
-# # SECCION 2: INTERFAZ DE ACCESO (LOGIN Y REGISTRO)
+# # SECCION 2: INTERFAZ DE ACCESO (CON VERIFICACIÓN DE EMAIL)
 # =========================================================
-st.set_page_config(page_title="Academia de Trading", layout="wide")
+
+def enviar_verificacion(email_destino, codigo):
+    """Envía el código de seguridad al correo del nuevo padawan."""
+    msg = MIMEMultipart()
+    msg['From'] = EMAIL_EMISOR
+    msg['To'] = email_destino
+    msg['Subject'] = f"🛡️ Código de Verificación: {codigo}"
+    
+    cuerpo = f"""
+    <h2>¡Bienvenido a la Academia de Trading, Socio!</h2>
+    <p>Para activar tu cuenta y comenzar tu entrenamiento, usa el siguiente código:</p>
+    <h1 style='color: #007bff;'>{codigo}</h1>
+    <p>Este código vencerá pronto. Si no solicitaste esto, ignora este correo.</p>
+    """
+    msg.attach(MIMEText(cuerpo, 'html'))
+    
+    try:
+        server = smtplib.SMTP('smtp.gmail.com', 587)
+        server.starttls()
+        server.login(EMAIL_EMISOR, EMAIL_PASSWORD)
+        server.sendmail(EMAIL_EMISOR, email_destino, msg.as_string())
+        server.quit()
+        return True
+    except Exception as e:
+        st.error(f"Error enviando correo: {e}")
+        return False
 
 def login_v2():
     st.title("📈 Academia de Trading")
+    
+    # Manejo de estados de registro (Paso 1: Datos, Paso 2: Verificación)
+    if "PASO_REGISTRO" not in st.session_state:
+        st.session_state["PASO_REGISTRO"] = 1
+
     menu_acceso = st.radio("Menú", ["Ingresar", "Registrarse", "Recuperar Clave"], horizontal=True)
     cliente = conectar_google()
     if not cliente: return
@@ -78,90 +108,81 @@ def login_v2():
             if st.form_submit_button("Entrar"):
                 datos = hoja_u.get_all_records()
                 user = next((r for r in datos if str(r.get("USUARIO")) == u), None)
-                if user and check_pass(p, str(user.get("PASSWORD"))):
-                    st.session_state["USUARIO"] = user
-                    st.rerun()
-                else: st.error("Usuario o contraseña incorrectos.")
+                if user:
+                    if str(user.get("CORREO_VERIFICADO")) == "NO":
+                        st.warning("⚠️ Tu correo no ha sido verificado. Revisa tu bandeja de entrada.")
+                    elif check_pass(p, str(user.get("PASSWORD"))):
+                        st.session_state["USUARIO"] = user
+                        st.rerun()
+                    else: st.error("Contraseña incorrecta.")
+                else: st.error("Usuario no encontrado.")
 
-    # --- SUBSECCIÓN: REGISTRARSE (POLÍTICA 7 DÍAS Y DUPLICIDAD) ---
-    # =========================================================
-# # SECCION 2: INTERFAZ DE ACCESO (AJUSTADA A COLUMNAS EXACTAS)
-# =========================================================
-
+    # --- SUBSECCIÓN: REGISTRARSE (CON DOBLE PASO) ---
     elif menu_acceso == "Registrarse":
-        st.subheader("Crea tu cuenta de Padawan")
-        with st.form("registro_f"):
-            n_nombre = st.text_input("Nombre Completo")
-            n_user = st.text_input("Nombre de Usuario (Login)")
-            n_email = st.text_input("Correo Electrónico")
-            
-            col_pais, col_cel = st.columns([1, 2])
-            paises_dict = {
-                "Brasil (+55)": "+55", "Venezuela (+58)": "+58", 
-                "Colombia (+57)": "+57", "España (+34)": "+34", 
-                "Argentina (+54)": "+54", "México (+52)": "+52", "USA (+1)": "+1"
-            }
-            p_sel = col_pais.selectbox("País", list(paises_dict.keys()))
-            n_pais_nombre = p_sel.split(" (")[0]
-            n_prefijo = paises_dict[p_sel]
-            
-            n_cel_num = col_cel.text_input("Número de Celular")
-            n_nacimiento = st.date_input("Fecha de Nacimiento", min_value=date(1940, 1, 1), max_value=date.today())
-            
-            n_pass = st.text_input("Contraseña", type="password")
-            c_pass = st.text_input("Confirmar Contraseña", type="password")
-            
-            if st.form_submit_button("Finalizar Registro"):
-                if not n_email or not n_pass or not n_nombre or not n_cel_num:
-                    st.error("Socio, completa todos los campos para poder avanzar.")
-                elif n_pass != c_pass:
-                    st.error("Las contraseñas no coinciden.")
-                else:
+        if st.session_state["PASO_REGISTRO"] == 1:
+            with st.form("registro_f"):
+                n_nombre = st.text_input("Nombre Completo")
+                n_user = st.text_input("Nombre de Usuario")
+                n_email = st.text_input("Correo Electrónico")
+                
+                col_pais, col_cel = st.columns([1, 2])
+                paises_dict = {"Brasil (+55)": "+55", "Venezuela (+58)": "+58", "Colombia (+57)": "+57", "España (+34)": "+34"}
+                p_sel = col_pais.selectbox("País", list(paises_dict.keys()))
+                n_cel_num = col_cel.text_input("Número de Celular")
+                n_nacimiento = st.date_input("Fecha de Nacimiento", min_value=date(1940, 1, 1))
+                
+                n_pass = st.text_input("Contraseña", type="password")
+                c_pass = st.text_input("Confirmar Contraseña", type="password")
+                
+                if st.form_submit_button("Enviar Código de Verificación"):
                     datos = hoja_u.get_all_records()
-                    # Validación de Duplicidad
                     if any(str(r.get("EMAIL")).lower() == n_email.lower() for r in datos):
-                        st.warning("⚠️ Este correo ya está registrado. Dirígete a Recuperar Clave.")
-                    elif any(str(r.get("USUARIO")).lower() == n_user.lower() for r in datos):
-                        st.error("❌ El nombre de usuario ya existe.")
+                        st.warning("⚠️ Email ya registrado.")
+                    elif n_pass != c_pass:
+                        st.error("Las contraseñas no coinciden.")
                     else:
-                        f_hoy = date.today()
-                        f_vence = f_hoy + timedelta(days=7) # Política de 7 días
-                        n_id = len(datos) + 1
-                        
-                        # ARMADO DE FILA SEGÚN TUS COLUMNAS EXACTAS
-                        # 1.ID_USUARIO, 2.USUARIO, 3.NOMBRE, 4.EMAIL, 5.TELEFONO, 6.PASSWORD, 7.PAIS, 
-                        # 8.ROL, 9.NIVEL, 10.ESTADO, 11.FECHA_REGISTRO, 12.FECHA_CUMPLEANOS, 
-                        # 13.REGALO_CUMPLE_RECLAMADO, 14.ULTIMO_PAGO, 15.PROXIMO_VENCIMIENTO, 
-                        # 16.FECHA_GRACIA, 17.COMPROBANTE_PAGO, 18.TIPO_PLAN, 19.DISPOSITIVOS_ACTIVOS, 
-                        # 20.CORREO_VERIFICADO, 21.ULTIMA_CONEXION, 22.ESTADO_PAGO, 23.MONTO_ULTIMO_PAGO
-                        
-                        nueva_fila = [
-                            n_id, n_user, n_nombre, n_email, f"{n_prefijo}{n_cel_num}", hash_pass(n_pass), n_pais_nombre,
-                            "DEMO", "Padawan", "ACTIVO", str(f_hoy), str(n_nacimiento),
-                            "NO", "N/A", str(f_vence),
-                            str(f_vence + timedelta(days=2)), "N/A", "PRUEBA", 1,
-                            "NO", str(datetime.now()), "PENDIENTE", 0
-                        ]
-                        
-                        try:
-                            hoja_u.append_row(nueva_fila)
-                            st.success(f"✅ ¡Bienvenido {n_nombre}! Tu acceso vence el {f_vence}.")
-                            time.sleep(2)
+                        # Generamos código y guardamos datos temporalmente
+                        codigo_gen = str(random.randint(100000, 999999))
+                        if enviar_verificacion(n_email, codigo_gen):
+                            st.session_state["TEMP_USER"] = {
+                                "nombre": n_nombre, "user": n_user, "email": n_email,
+                                "tel": f"{paises_dict[p_sel]}{n_cel_num}", "pass": hash_pass(n_pass),
+                                "pais": p_sel.split(" (")[0], "nacimiento": str(n_nacimiento),
+                                "codigo": codigo_gen
+                            }
+                            st.session_state["PASO_REGISTRO"] = 2
                             st.rerun()
-                        except Exception as e:
-                            st.error(f"Error de transferencia: {e}")
 
-    # --- SUBSECCIÓN: RECUPERAR CLAVE ---
-    elif menu_acceso == "Recuperar Clave":
-        email_rec = st.text_input("Email registrado")
-        if st.button("Enviar Clave Temporal"):
-            datos = hoja_u.get_all_records()
-            idx = next((i for i, r in enumerate(datos) if str(r.get("EMAIL")).lower() == email_rec.lower()), None)
-            if idx is not None:
-                nueva_p = str(random.randint(1000, 9999)) + "temp"
-                hoja_u.update_cell(idx + 2, 6, hash_pass(nueva_p)) 
-                st.success(f"✅ Clave temporal generada. (Enviada a {email_rec})")
-
+        elif st.session_state["PASO_REGISTRO"] == 2:
+            st.info(f"Escaneando transmisiones... Enviamos un código a: {st.session_state['TEMP_USER']['email']}")
+            cod_ingresado = st.text_input("Introduce el código de 6 dígitos")
+            
+            if st.button("Verificar y Finalizar"):
+                if cod_ingresado == st.session_state["TEMP_USER"]["codigo"]:
+                    # Guardar en Google Sheets (Mismo orden de 23 columnas que definimos antes)
+                    t = st.session_state["TEMP_USER"]
+                    f_hoy = date.today()
+                    f_vence = f_hoy + timedelta(days=7)
+                    
+                    datos = hoja_u.get_all_records()
+                    nueva_fila = [
+                        len(datos)+1, t['user'], t['nombre'], t['email'], t['tel'], t['pass'], t['pais'],
+                        "DEMO", "Padawan", "ACTIVO", str(f_hoy), t['nacimiento'],
+                        "NO", "N/A", str(f_vence), str(f_vence + timedelta(days=2)), 
+                        "N/A", "PRUEBA", 1, "SI", str(datetime.now()), "PENDIENTE", 0
+                    ]
+                    hoja_u.append_row(nueva_fila)
+                    
+                    st.success("¡Correo verificado con éxito! Ya puedes ingresar.")
+                    st.session_state["PASO_REGISTRO"] = 1
+                    time.sleep(2)
+                    st.rerun()
+                else:
+                    st.error("Código incorrecto. Inténtalo de nuevo.")
+            
+            if st.button("Volver a intentar registro"):
+                st.session_state["PASO_REGISTRO"] = 1
+                st.rerun()
 # =========================================================
 # # SECCION 3: REPRODUCTOR Y MODALES
 # =========================================================
