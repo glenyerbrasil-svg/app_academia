@@ -84,35 +84,72 @@ def login_v2():
                 else: st.error("Usuario o contraseña incorrectos.")
 
     # --- SUBSECCIÓN: REGISTRARSE (POLÍTICA 7 DÍAS Y DUPLICIDAD) ---
+    # =========================================================
+# # SECCION 2: INTERFAZ DE ACCESO (AJUSTADA A COLUMNAS EXACTAS)
+# =========================================================
+
     elif menu_acceso == "Registrarse":
         st.subheader("Crea tu cuenta de Padawan")
         with st.form("registro_f"):
             n_nombre = st.text_input("Nombre Completo")
-            n_user = st.text_input("Nombre de Usuario")
+            n_user = st.text_input("Nombre de Usuario (Login)")
             n_email = st.text_input("Correo Electrónico")
+            
+            col_pais, col_cel = st.columns([1, 2])
+            paises_dict = {
+                "Brasil (+55)": "+55", "Venezuela (+58)": "+58", 
+                "Colombia (+57)": "+57", "España (+34)": "+34", 
+                "Argentina (+54)": "+54", "México (+52)": "+52", "USA (+1)": "+1"
+            }
+            p_sel = col_pais.selectbox("País", list(paises_dict.keys()))
+            n_pais_nombre = p_sel.split(" (")[0]
+            n_prefijo = paises_dict[p_sel]
+            
+            n_cel_num = col_cel.text_input("Número de Celular")
+            n_nacimiento = st.date_input("Fecha de Nacimiento", min_value=date(1940, 1, 1), max_value=date.today())
+            
             n_pass = st.text_input("Contraseña", type="password")
             c_pass = st.text_input("Confirmar Contraseña", type="password")
             
             if st.form_submit_button("Finalizar Registro"):
-                if not n_email or not n_pass or not n_nombre:
-                    st.error("Campos obligatorios vacíos.")
+                if not n_email or not n_pass or not n_nombre or not n_cel_num:
+                    st.error("Socio, completa todos los campos para poder avanzar.")
                 elif n_pass != c_pass:
                     st.error("Las contraseñas no coinciden.")
                 else:
                     datos = hoja_u.get_all_records()
                     # Validación de Duplicidad
                     if any(str(r.get("EMAIL")).lower() == n_email.lower() for r in datos):
-                        st.warning("⚠️ Este correo ya está registrado. Ve a 'Recuperar Clave'.")
+                        st.warning("⚠️ Este correo ya está registrado. Dirígete a Recuperar Clave.")
                     elif any(str(r.get("USUARIO")).lower() == n_user.lower() for r in datos):
                         st.error("❌ El nombre de usuario ya existe.")
                     else:
                         f_hoy = date.today()
-                        f_vence = f_hoy + timedelta(days=7)
+                        f_vence = f_hoy + timedelta(days=7) # Política de 7 días
                         n_id = len(datos) + 1
-                        nueva_fila = [n_id, n_nombre, n_user, n_email, str(f_hoy), hash_pass(n_pass), "DEMO", str(f_vence)]
-                        hoja_u.append_row(nueva_fila)
-                        st.success(f"✅ Registro exitoso. Tu demo vence el {f_vence}. Ya puedes ingresar.")
-                        time.sleep(2)
+                        
+                        # ARMADO DE FILA SEGÚN TUS COLUMNAS EXACTAS
+                        # 1.ID_USUARIO, 2.USUARIO, 3.NOMBRE, 4.EMAIL, 5.TELEFONO, 6.PASSWORD, 7.PAIS, 
+                        # 8.ROL, 9.NIVEL, 10.ESTADO, 11.FECHA_REGISTRO, 12.FECHA_CUMPLEANOS, 
+                        # 13.REGALO_CUMPLE_RECLAMADO, 14.ULTIMO_PAGO, 15.PROXIMO_VENCIMIENTO, 
+                        # 16.FECHA_GRACIA, 17.COMPROBANTE_PAGO, 18.TIPO_PLAN, 19.DISPOSITIVOS_ACTIVOS, 
+                        # 20.CORREO_VERIFICADO, 21.ULTIMA_CONEXION, 22.ESTADO_PAGO, 23.MONTO_ULTIMO_PAGO
+                        
+                        nueva_fila = [
+                            n_id, n_user, n_nombre, n_email, f"{n_prefijo}{n_cel_num}", hash_pass(n_pass), n_pais_nombre,
+                            "DEMO", "Padawan", "ACTIVO", str(f_hoy), str(n_nacimiento),
+                            "NO", "N/A", str(f_vence),
+                            str(f_vence + timedelta(days=2)), "N/A", "PRUEBA", 1,
+                            "NO", str(datetime.now()), "PENDIENTE", 0
+                        ]
+                        
+                        try:
+                            hoja_u.append_row(nueva_fila)
+                            st.success(f"✅ ¡Bienvenido {n_nombre}! Tu acceso vence el {f_vence}.")
+                            time.sleep(2)
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Error de transferencia: {e}")
 
     # --- SUBSECCIÓN: RECUPERAR CLAVE ---
     elif menu_acceso == "Recuperar Clave":
