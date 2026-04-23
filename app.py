@@ -306,16 +306,42 @@ def main_app():
             </div>
         """, unsafe_allow_html=True)
 
-    # --- SECCION 6: ESCUELA ---
+# --- SECCION 6: ESCUELA (JERARQUÍA DE ACCESO) ---
     elif menu == "🎓 Escuela":
-        st.header("🎓 Escuela de Entrenamiento")
-        st.write("Bienvenido a la academia, aquí verás tus cursos.")
-        # Aquí puedes meter la lógica de los videos más tarde
+        st.header("🎓 Holocrón de Entrenamiento")
+        
+        # Definimos los niveles en orden jerárquico
+        niveles_jerarquia = ["Padawan", "Jedi", "Maestro Jedi"]
+        
+        # Buscamos la posición del usuario en la jerarquía
+        try:
+            rango_index = niveles_jerarquia.index(nivel_user)
+        except ValueError:
+            rango_index = 0  # Por defecto si hay error es Padawan
+            
+        # --- BLOQUE 1: CONTENIDO PADAWAN ---
+        # Todos tienen acceso a este bloque
+        with st.expander("🛡️ Módulo 1: Iniciación (Nivel Padawan)", expanded=(nivel_user == "Padawan")):
+            st.info("Fundamentos, psicología básica y manejo de la Bitácora.")
+            st.write("*(Aquí cargaremos los videos y guías para principiantes)*")
 
-    # # SECCION 6: ESCUELA
-    elif menu == "🎓 Escuela":
-        st.header("🎓 Academia de Entrenamiento")
-        # Aquí va tu lógica de mostrar videos según el NIVEL
+        # --- BLOQUE 2: CONTENIDO JEDI ---
+        # Solo visible para Jedi y Maestro Jedi
+        if rango_index >= 1:
+            with st.expander("⚔️ Módulo 2: Caballero (Nivel Jedi)", expanded=(nivel_user == "Jedi")):
+                st.info("Estrategias avanzadas, gestión de riesgo profesional y confluencias.")
+                st.write("*(Aquí cargaremos el contenido de nivel intermedio)*")
+        else:
+            st.lock("Módulo 2: Contenido restringido. Sigue entrenando para alcanzar el rango de Jedi.")
+
+        # --- BLOQUE 3: CONTENIDO MAESTRO JEDI ---
+        # Solo visible para el Maestro Jedi
+        if rango_index >= 2:
+            with st.expander("🌌 Módulo 3: Maestría (Nivel Maestro Jedi)", expanded=(nivel_user == "Maestro Jedi")):
+                st.info("Lectura institucional, entradas de alta precisión y mentoría.")
+                st.write("*(Aquí cargaremos el contenido de nivel experto)*")
+        else:
+            st.lock("Módulo 3: Contenido restringido. Solo accesible para Maestros Jedi.")
 
     # # SECCION 7: BITÁCORA
     elif menu == "📝 Bitácora":
