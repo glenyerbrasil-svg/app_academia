@@ -54,12 +54,12 @@ def subir_a_cloudinary(archivo):
     return ""
 
 # =========================================================
-# # SECCION 2: INTERFAZ DE ACCESO (REGISTRO Y VERIFICACIÓN)
+# # SECCION 2: INTERFAZ DE ACCESO (REGISTRO, ESTÉTICA Y VERIFICACIÓN)
 # =========================================================
 
 def enviar_verificacion(email_destino, codigo):
     """Envía el código de seguridad al correo del nuevo padawan."""
-    import smtplib # Refuerzo de importación
+    import smtplib 
     msg = MIMEMultipart()
     msg['From'] = EMAIL_EMISOR
     msg['To'] = email_destino
@@ -70,12 +70,12 @@ def enviar_verificacion(email_destino, codigo):
         <body style="font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px;">
             <div style="max-width: 600px; margin: auto; background: white; padding: 20px; border-radius: 10px; border: 1px solid #ddd;">
                 <h2 style="color: #007bff; text-align: center;">¡Bienvenido a la Academia, Socio!</h2>
-                <p>Estás a un paso de comenzar tu entrenamiento. Usa este código para verificar tu cuenta:</p>
+                <p>Estás a un paso de comenzar tu entrenamiento. Usa este código para activar tu cuenta:</p>
                 <div style="background: #e9ecef; padding: 15px; text-align: center; font-size: 24px; font-weight: bold; letter-spacing: 5px; border-radius: 5px;">
                     {codigo}
                 </div>
                 <p style="font-size: 12px; color: #777; text-align: center; margin-top: 20px;">
-                    Si no solicitaste este registro, puedes ignorar este correo con seguridad.
+                    Si no solicitaste este registro, puedes ignorar este correo.
                 </p>
             </div>
         </body>
@@ -97,7 +97,7 @@ def enviar_verificacion(email_destino, codigo):
 def login_v2():
     st.title("📈 Academia de Trading")
     
-    # Inicialización de estados de registro
+    # Estados de flujo de registro
     if "PASO_REGISTRO" not in st.session_state:
         st.session_state["PASO_REGISTRO"] = 1
 
@@ -109,32 +109,32 @@ def login_v2():
         doc = cliente.open("Bitacora_Academia1")
         hoja_u = doc.worksheet("Usuarios") 
     except:
-        st.error("Error: No se encontró la pestaña 'Usuarios' en el Google Sheets.")
+        st.error("Error: No se encontró la pestaña 'Usuarios'.")
         return
 
     # --- SUBSECCIÓN: INGRESAR ---
     if menu_acceso == "Ingresar":
         with st.form("login_f"):
-            u = st.text_input("Usuario")
+            u = st.text_input("Usuario").strip().lower()
             p = st.text_input("Contraseña", type="password")
             if st.form_submit_button("Entrar"):
                 datos = hoja_u.get_all_records()
-                user = next((r for r in datos if str(r.get("USUARIO")) == u), None)
+                user = next((r for r in datos if str(r.get("USUARIO")).lower() == u), None)
                 
                 if user:
                     if str(user.get("CORREO_VERIFICADO")) == "NO":
-                        st.warning("⚠️ Tu cuenta aún no ha sido verificada por correo.")
+                        st.warning("⚠️ Tu cuenta no ha sido verificada. Revisa tu email.")
                     elif check_pass(p, str(user.get("PASSWORD"))):
                         st.session_state["USUARIO"] = user
                         st.rerun()
                     else: st.error("Contraseña incorrecta.")
                 else: st.error("El usuario no existe.")
 
-    # --- SUBSECCIÓN: REGISTRARSE (CON VERIFICACIÓN ACTIVA) ---
+    # --- SUBSECCIÓN: REGISTRARSE ---
     elif menu_acceso == "Registrarse":
         if st.session_state["PASO_REGISTRO"] == 1:
             with st.form("registro_f"):
-                n_nombre = st.text_input("Nombre Completo")
+                n_nombre = st.text_input("Nombre Completo (Ej: Pedro Perez)")
                 n_user = st.text_input("Nombre de Usuario (Login)")
                 n_email = st.text_input("Correo Electrónico")
                 
@@ -147,23 +147,26 @@ def login_v2():
                 n_pass = st.text_input("Contraseña", type="password")
                 c_pass = st.text_input("Confirmar Contraseña", type="password")
                 
-                if st.form_submit_button("Validar y Enviar Código"):
-                    datos = hoja_u.get_all_records()
+                if st.form_submit_button("Validar e Iniciar Verificación"):
+                    # --- LIMPIEZA ESTÉTICA (Toque de Socio) ---
+                    nombre_estetico = n_nombre.strip().title() # Pone iniciales en Mayúscula
+                    user_limpio = n_user.strip().lower()      # Login siempre en minúsculas
+                    email_limpio = n_email.strip().lower()    # Email siempre en minúsculas
                     
-                    # Verificación de duplicidad antes de enviar correo
-                    if any(str(r.get("EMAIL")).lower() == n_email.lower() for r in datos):
-                        st.warning("⚠️ Este correo ya está registrado. Ve a 'Recuperar Clave'.")
-                    elif any(str(r.get("USUARIO")).lower() == n_user.lower() for r in datos):
+                    datos = hoja_u.get_all_records()
+                    if any(str(r.get("EMAIL")).lower() == email_limpio for r in datos):
+                        st.warning("⚠️ Este email ya está registrado.")
+                    elif any(str(r.get("USUARIO")).lower() == user_limpio for r in datos):
                         st.error("❌ El nombre de usuario ya está en uso.")
-                    elif not n_email or not n_pass or not n_nombre or not n_cel_num:
-                        st.error("Socio, no dejes campos vacíos.")
+                    elif not email_limpio or not n_pass or not nombre_estetico or not n_cel_num:
+                        st.error("Socio, completa todos los campos.")
                     elif n_pass != c_pass:
                         st.error("Las contraseñas no coinciden.")
                     else:
                         codigo_gen = str(random.randint(100000, 999999))
-                        if enviar_verificacion(n_email, codigo_gen):
+                        if enviar_verificacion(email_limpio, codigo_gen):
                             st.session_state["TEMP_USER"] = {
-                                "user": n_user, "nombre": n_nombre, "email": n_email,
+                                "user": user_limpio, "nombre": nombre_estetico, "email": email_limpio,
                                 "tel": f"{paises[p_sel]}{n_cel_num}", "pass": hash_pass(n_pass),
                                 "pais": p_sel.split(" (")[0], "nacimiento": str(n_nacimiento),
                                 "codigo": codigo_gen
@@ -172,47 +175,41 @@ def login_v2():
                             st.rerun()
 
         elif st.session_state["PASO_REGISTRO"] == 2:
-            st.info(f"📩 Código enviado a **{st.session_state['TEMP_USER']['email']}**")
-            cod_ingresado = st.text_input("Ingresa el código de 6 dígitos", help="Revisa tu carpeta de Spam si no lo ves.")
+            st.info(f"📩 Código enviado a: **{st.session_state['TEMP_USER']['email']}**")
+            cod_ingresado = st.text_input("Ingresa el código de 6 dígitos")
             
             col_v1, col_v2 = st.columns(2)
-            
             if col_v1.button("Verificar y Finalizar"):
                 if cod_ingresado == st.session_state["TEMP_USER"]["codigo"]:
                     t = st.session_state["TEMP_USER"]
                     f_hoy = date.today()
-                    f_vence = f_hoy + timedelta(days=7) # Política Demo
+                    f_vence = f_hoy + timedelta(days=7)
                     
                     datos = hoja_u.get_all_records()
-                    # Mapeo exacto de tus 23 columnas
+                    # Mapeo de las 23 columnas de tu Excel
                     nueva_fila = [
                         len(datos)+1, t['user'], t['nombre'], t['email'], t['tel'], t['pass'], t['pais'],
                         "DEMO", "Padawan", "ACTIVO", str(f_hoy), t['nacimiento'],
                         "NO", "N/A", str(f_vence), str(f_vence + timedelta(days=2)), 
                         "N/A", "PRUEBA", 1, "SI", str(datetime.now()), "PENDIENTE", 0
                     ]
-                    
-                    try:
-                        hoja_u.append_row(nueva_fila)
-                        st.success("✨ ¡Cuenta verificada! Ya eres un Padawan oficial.")
-                        st.session_state["PASO_REGISTRO"] = 1 # Reset para el próximo
-                        time.sleep(2)
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Error al escribir en la base de datos: {e}")
+                    hoja_u.append_row(nueva_fila)
+                    st.success(f"✨ ¡Bienvenido {t['nombre']}! Cuenta verificada con éxito.")
+                    st.session_state["PASO_REGISTRO"] = 1
+                    time.sleep(2)
+                    st.rerun()
                 else:
-                    st.error("Código incorrecto socio, verifica bien.")
+                    st.error("Código incorrecto.")
             
-            if col_v2.button("Cancelar / Volver"):
+            if col_v2.button("Volver al inicio"):
                 st.session_state["PASO_REGISTRO"] = 1
                 st.rerun()
 
     # --- SUBSECCIÓN: RECUPERAR CLAVE ---
     elif menu_acceso == "Recuperar Clave":
-        email_rec = st.text_input("Ingresa tu email registrado")
+        email_rec = st.text_input("Email registrado")
         if st.button("Enviar Clave Temporal"):
-            # Lógica de recuperación...
-            st.info("Simulando envío de clave temporal...")# =========================================================
+            st.info("Buscando usuario... Función en desarrollo.")
 
 # # SECCION 3: REPRODUCTOR Y MODALES
 # =========================================================
