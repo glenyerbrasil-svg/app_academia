@@ -342,7 +342,6 @@ def main_app():
                 st.write("*(Contenido de máxima jerarquía desbloqueado)*")
         else:
             st.error("🚫 **Acceso denegado.** Este conocimiento está reservado únicamente para **Maestros Jedi**.")
-
 # =========================================================
     # # SECCION 7: BITÁCORA (VERSIÓN ANTIBALAS)
     # =========================================================
@@ -400,6 +399,87 @@ def main_app():
         except:
             st.warning("No se pudo cargar el gráfico de rendimiento.")
 
+    # # SECCION 8: BACKTESTING
+    elif menu == "📊 Backtesting":
+        st.header("📊 Entrenamiento de Simulación (Backtesting)")
+        st.info("Aquí los resultados no afectan tu capital real de la hoja de Finanzas.")
+
+    # # SECCION 9: FINANZAS
+    elif menu == "💰 Finanzas":
+        st.header("💰 Gestión de Capital y Finanzas")
+        
+        hoja_f = doc.worksheet("Finanzas")
+        datos_f = hoja_f.get_all_records()
+        df_f = pd.DataFrame(datos_f)
+
+        # 1. FILTRAR DATOS DEL USUARIO
+        df_user_f = df_f[df_f["ID_USUARIO"].astype(str) == str(user["ID_USUARIO"])]
+        
+        # Obtener Saldo Actual
+        if not df_user_f.empty:
+            saldo_actual = float(df_user_f.iloc[-1]["SALDO_FINAL"])
+        else:
+            saldo_actual = 0.0
+
+        # 2. TARJETAS DE RESUMEN (Métricas)
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Saldo Actual", f"${saldo_actual:,.2f}")
+        
+        if not df_user_f.empty:
+            total_dep = df_user_f["DEPOSITO"].astype(float).sum()
+            total_ret = df_user_f["RETIRO"].astype(float).sum()
+            c2.metric("Total Depósitos", f"${total_dep:,.2f}")
+            c3.metric("Total Retiros", f"${total_ret:,.2f}")
+
+        st.divider()
+
+        # 3. FORMULARIO DE MOVIMIENTO
+        st.subheader("➕ Registrar Nuevo Movimiento")
+        with st.form("form_finanzas", clear_on_submit=True):
+            col_a, col_b = st.columns(2)
+            tipo = col_a.selectbox("Tipo de Movimiento", ["DEPOSITO", "RETIRO"])
+            monto = col_b.number_input("Monto ($)", min_value=1.0, step=10.0)
+            notas = st.text_input("Notas (Ej: Capital inicial, Ganancias semana 1)")
+
+            if st.form_submit_button("Confirmar Movimiento"):
+                # Cálculos de Saldo
+                saldo_anterior = saldo_actual
+                if tipo == "DEPOSITO":
+                    nuevo_deposito = monto
+                    nuevo_retiro = 0
+                    nuevo_saldo_final = saldo_anterior + monto
+                else:
+                    nuevo_deposito = 0
+                    nuevo_retiro = monto
+                    nuevo_saldo_final = saldo_anterior - monto
+
+                # Preparar las 8 columnas: 
+                # ID_FINANZAS, FECHA, ID_USUARIO, TIPO_MOVIMIENTO, SALDO_ANT, DEPOSITO, RETIRO, SALDO_FINAL, NOTAS
+                nueva_fila_f = [
+                    len(datos_f) + 1,           # ID_FINANZAS
+                    str(date.today()),           # FECHA
+                    user["ID_USUARIO"],          # ID_USUARIO
+                    tipo,                        # TIPO_MOVIMIENTO
+                    saldo_anterior,              # SALDO_ANT
+                    nuevo_deposito,              # DEPOSITO
+                    nuevo_retiro,                # RETIRO
+                    nuevo_saldo_final,           # SALDO_FINAL
+                    notas                        # NOTAS
+                ]
+
+                try:
+                    hoja_f.append_row(nueva_fila_f)
+                    st.success(f"✅ {tipo} registrado con éxito. Nuevo saldo: ${nuevo_saldo_final:,.2f}")
+                    time.sleep(2)
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error al registrar: {e}")
+
+        # 4. HISTORIAL DE MOVIMIENTOS
+        if not df_user_f.empty:
+            st.subheader("📜 Historial de Movimientos")
+            # Mostramos los últimos 5 movimientos
+            st.dataframe(df_user_f.tail(5)[["FECHA", "TIPO_MOVIMIENTO", "SALDO_ANT", "DEPOSITO", "RETIRO", "SALDO_FINAL", "NOTAS"]], use_container_width=True)
 
 # =========================================================
 # # CONTROL DE FLUJO
