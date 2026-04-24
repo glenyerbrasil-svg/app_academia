@@ -342,16 +342,17 @@ def main_app():
                 st.write("*(Contenido de máxima jerarquía desbloqueado)*")
         else:
             st.error("🚫 **Acceso denegado.** Este conocimiento está reservado únicamente para **Maestros Jedi**.")
+
+
 # =========================================================
-    # # SECCION 7: BITÁCORA (VERSIÓN ANTIBALAS)
+    # # SECCION 7: BITÁCORA (VERSIÓN PROFESIONAL Y MATEMÁTICA)
     # =========================================================
     elif menu == "📝 Bitácora":
-        import plotly.graph_objects as go
         from datetime import datetime
 
         st.header("📝 Bitácora de Operaciones")
 
-        # 1. CONEXIÓN Y LECTURA DE SALDO (Para validación de riesgo)
+        # --- 1. LECTURA DE DATOS Y SALDO (Para Gestión de Riesgo) ---
         try:
             hoja_f = doc.worksheet("Finanzas")
             hoja_b = doc.worksheet("Bitacora")
@@ -359,78 +360,89 @@ def main_app():
             
             saldo_actual = 0.0
             if not df_f.empty:
-                # Localizamos al usuario para obtener su último saldo final
                 col_u = [c for c in df_f.columns if "USUARIO" in str(c).upper()]
                 if col_u:
                     df_user_f = df_f[df_f[col_u[0]].astype(str) == str(user["ID_USUARIO"])]
                     if not df_user_f.empty:
+                        # Buscamos saldo_final de la última fila del usuario
                         saldo_actual = float(df_user_f.iloc[-1].get("SALDO_FINAL", 0))
             
-            st.info(f"💰 **Saldo disponible:** ${saldo_actual:,.2f}")
+            st.info(f"💰 **Saldo disponible para operar:** ${saldo_actual:,.2f}")
         except Exception as e:
-            st.error("Socio, primero registra un depósito en Finanzas.")
+            st.error("Error al conectar con Finanzas. Registra tu capital inicial.")
             st.stop()
 
-        # 2. FORMULARIO CON MOTOR MATEMÁTICO EN TIEMPO REAL
-        with st.form("form_registro_op"):
-            c1, c2, c3 = st.columns(3)
-            ins = c1.selectbox("Instrumento", ["FLIPX1", "FLIPX2", "FXVOL20", "FXVOL40", "SFXVOL20", "SFXVOL40"])
-            acc = c2.selectbox("Acción", ["COMPRA", "VENTA"])
-            
+        # --- 2. FORMULARIO CON MOTOR MATEMÁTICO EN VIVO ---
+        st.subheader("🚀 Nueva Operación")
+        with st.form("registro_op_pro"):
+            col1, col2, col3 = st.columns(3)
+            ins = col1.selectbox("Instrumento", ["FLIPX1", "FLIPX2", "FXVOL20", "FXVOL40", "SFXVOL20", "SFXVOL40"])
+            acc = col2.selectbox("Acción", ["COMPRA", "VENTA"])
             # La "Bala" es el riesgo fijo en USD por operación
-            bala = c3.number_input("Valor de la Bala ($)", min_value=0.5, value=4.0, step=0.5)
+            bala = col3.number_input("Valor de la Bala ($)", min_value=0.5, value=4.0, step=0.5)
 
-            # --- REGLA DEL 10% (Gestión de Riesgo) ---
+            # --- REGLA DEL 10% (Alerta visual) ---
             if saldo_actual > 0 and bala > (saldo_actual * 0.10):
-                st.warning(f"⚠️ Alerta: Estás arriesgando el {(bala/saldo_actual)*100:.1f}% de tu cuenta. ¡Bájale a la emoción!")
+                st.warning(f"⚠️ Alerta: Estás arriesgando el {(bala/saldo_actual)*100:.1f}% de tu cuenta.")
 
             col_p1, col_p2, col_p3 = st.columns(3)
             p_ent = col_p1.number_input("Precio de Entrada", format="%.2f", value=0.0)
-            p_sl = col_p2.number_input("Precio de Stop Loss", format="%.2f", value=0.0)
+            p_sl = col_p2.number_input("Precio de SL", format="%.2f", value=0.0)
             ratio = col_p3.slider("Ratio Objetivo (1:X)", 1.0, 5.0, 2.0)
 
-            # --- CÁLCULOS MATEMÁTICOS ---
-            # 1. Distancia al SL (en puntos/pips)
+            # =========================================================
+            # # MOTOR MATEMÁTICO (Cálculos automáticos e inmediatos)
+            # =========================================================
             distancia = abs(p_ent - p_sl)
             
-            # 2. Cálculo de Lotaje (Bala / Distancia) - Contrato = 1
+            # Cálculo de Lotaje (Bala / Distancia) - Asumiendo Contrato = 1
             lotaje = bala / distancia if distancia > 0 else 0.0
             
-            # 3. Proyección de Take Profit (Basado en el Ratio 1:X)
-            if acc == "COMPRA":
-                tp_proyectado = p_ent + (distancia * ratio)
-            else:
-                tp_proyectado = p_ent - (distancia * ratio)
+            # Proyección de TP (Ratio 1:X)
+            tp_proyectado = p_ent + (distancia * ratio) if acc == "COMPRA" else p_ent - (distancia * ratio)
             
-            # 4. Beneficio Potencial en Dólares
+            # Beneficio Potencial (USD)
             beneficio_usd = bala * ratio
 
-            # --- CUADRO DE ANÁLISIS PRE-OPERACIÓN ---
+            # Cuadro de Análisis Pre-Operación (Sólo aparece si hay precios)
             if p_ent > 0 and p_sl > 0:
                 st.markdown(f"""
-                    <div style="background-color: #1e1e1e; padding: 20px; border-radius: 10px; border: 1px solid #444; text-align: center;">
+                    <div style="background-color: #1e1e1e; padding: 15px; border-radius: 10px; border: 1px solid #444; text-align: center; margin-bottom: 15px;">
                         <div style="display: flex; justify-content: space-around;">
-                            <div style="color:#FF4B4B;">📉 PÉRDIDA MÁXIMA<br><h2>-${bala:.2f}</h2></div>
-                            <div style="color:#00FF00;">📈 GANANCIA PROYECTADA<br><h2>+${beneficio_usd:.2f}</h2></div>
+                            <div style="color:#FF4B4B;">📉 RIESGO<br><h2>-${bala:.2f}</h2></div>
+                            <div style="color:#00FF00;">📈 BENEFICIO<br><h2>+${beneficio_usd:.2f}</h2></div>
                         </div>
-                        <p style="margin-top:10px; font-size:13px; color:#aaa;">
-                            <b>Lotaje Sugerido:</b> {lotaje:.2f} | <b>Objetivo TP:</b> {tp_proyectado:.2f} | <b>Ratio:</b> 1:{ratio}
-                        </p>
+                        <p style="margin-top:10px; font-size:14px; color: #aaa;">Lotaje Sugerido: <b>{lotaje:.2f}</b> | TP: <b>{tp_proyectado:.2f}</b></p>
                     </div>
                 """, unsafe_allow_html=True)
 
             st.divider()
             
-            # Psicotrading y Capturas
-            dd_val = st.select_slider("Drawdown máximo esperado (%)", options=list(range(0, 101)), value=0)
-            obs = st.text_area("Observaciones (¿Por qué entraste?)")
-            emocion = st.select_slider("Estado Emocional", options=["🔴 Ansiedad", "🟡 Neutral", "🟢 Calma"], value="🟢 Calma")
+            # --- 3. SECCIÓN DE IMÁGENES (NUEVA) ---
+            st.subheader("🖼️ Análisis Técnico (Gráficos)")
+            col_img1, col_img2, col_img3 = st.columns(3)
+            # Nota: Al subir el archivo, Streamlit lo maneja temporalmente. 
+            # El código de subida a Cloudinary irá aquí más adelante.
+            img_mayor = col_img1.file_uploader("Gráfico Mayor (H4/D1)", type=['png', 'jpg'])
+            img_menor = col_img2.file_uploader("Gráfico Menor (M15/H1)", type=['png', 'jpg'])
+            img_ejec = col_img3.file_uploader("Ejecución (M1)", type=['png', 'jpg'])
+            
+            st.divider()
 
-            # 3. ENVÍO A GOOGLE SHEETS (Las 27 columnas)
+            # Psicotrading y Notas
+            dd_val = st.select_slider("Drawdown esperado (%)", options=list(range(0, 101)), value=0)
+            obs = st.text_area("Observaciones del Trade")
+            
+            # --- 4. SEMÁFORO EMOCIONAL CORREGIDO (NUEVO ORDEN) ---
+            # El slider empieza en Calma (Verde), sigue en Ansiedad (Amarillo) y termina en Venganza (Rojo)
+            emocion = st.select_slider("Estado Emocional", options=["🟢 CALMA", "🟡 ANSIEDAD", "🔴 VENGANZA"], value="🟢 CALMA")
+
+            # --- 5. REGISTRO FINAL EN GOOGLE SHEETS (27 Columnas) ---
             if st.form_submit_button("🚀 REGISTRAR OPERACIÓN PENDIENTE"):
                 if p_ent == 0 or p_sl == 0:
-                    st.error("Socio, los precios no pueden ser 0.")
+                    st.error("Debes ingresar precios válidos de Entrada y SL.")
                 else:
+                    # Captura de tiempo exacto para el cruce de días
                     fecha_full = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     datos_b = hoja_b.get_all_values()
                     
@@ -440,30 +452,30 @@ def main_app():
                         user["ID_USUARIO"],      # ID_USUARIO
                         str(date.today()),       # FECHA
                         ins, acc, bala, p_ent, p_sl, 
-                        tp_proyectado,           # PRECIO_TP
-                        round(lotaje, 2),        # LOTAJE
+                        tp_proyectado,           # PRECIO_TP (Calculado)
+                        round(lotaje, 2),        # LOTAJE (Calculado)
                         0,                       # MARGEN
                         fecha_full,              # HORA_ENTRADA
                         "N/A",                   # HORA_SALIDA
                         "N/A",                   # TIEMPO_TOTAL
                         "N/A",                   # DIRECCION_MAYOR
-                        "URL_IMG_MAYOR",         # IMAGEN_MAYOR
+                        "N/A",                   # IMAGEN_MAYOR (Placeholder)
                         "N/A",                   # DIRECCION_MENOR
-                        "URL_IMG_MENOR",         # IMAGEN_MENOR
+                        "N/A",                   # IMAGEN_MENOR (Placeholder)
                         "N/A",                   # DIRECCION_EJECUCION
-                        "URL_IMG_EJEC",          # IMAGEN_EJECUCION
+                        "N/A",                   # IMAGEN_EJECUCION (Placeholder)
                         "PENDIENTE",             # ESTADO_RESULTADO
                         0,                       # RESULTADO_DINERO
                         "NO",                    # LLEGO_11
                         dd_val,                  # DRAWDOWN (Slider)
                         "N/A",                   # IMAGEN_RESULTADO
                         obs,                     # OBSERVACIONES
-                        emocion                  # ESTADO_EMOCIONAL
+                        emocion                  # ESTADO_EMOCIONAL (Corregido)
                     ]
                     
                     try:
                         hoja_b.append_row(nueva_fila)
-                        st.success("✅ Trade registrado. El mercado tiene la palabra.")
+                        st.success("✅ ¡Operación en bitácora! Ahora a esperar el resultado.")
                         time.sleep(1)
                         st.rerun()
                     except Exception as e:
