@@ -343,21 +343,148 @@ def main_app():
         else:
             st.error("🚫 **Acceso denegado.** Este conocimiento está reservado únicamente para **Maestros Jedi**.")
 
-    # # SECCION 7: BITÁCORA
+# =========================================================
+    # # SECCION 7: BITÁCORA (EL GUARDIÁN DEL CAPITAL)
+    # =========================================================
     elif menu == "📝 Bitácora":
-        # Aquí va el código de Weltrade que ya tenemos listo
-        st.header("📝 Registro de Operaciones Reales")
-        # ... (Insertar código de la sección 7 aquí)
+        import plotly.graph_objects as go
+        from datetime import datetime
 
-    # # SECCION 8: BACKTESTING
-    elif menu == "📊 Backtesting":
-        st.header("📊 Entrenamiento de Simulación (Backtesting)")
-        st.info("Aquí los resultados no afectan tu capital real de la hoja de Finanzas.")
+        st.header("📝 Bitácora de Operaciones")
 
-    # # SECCION 9: FINANZAS
-    elif menu == "💰 Finanzas":
-        st.header("💰 Gestión de Capital y Pagos")
-        st.write(f"Estado de Pago: **{user.get('ESTADO_PAGO', 'PENDIENTE')}**")
+        # 1. CONEXIÓN Y DATOS (Finanzas y Bitácora)
+        hoja_f = doc.worksheet("Finanzas")
+        hoja_b = doc.worksheet("Bitacora")
+        
+        # Obtener Saldo para Regla del 10%
+        df_f = pd.DataFrame(hoja_f.get_all_records())
+        col_id_f = [c for c in df_f.columns if "ID_USUARIO" in str(c).upper()][0]
+        df_user_f = df_f[df_f[col_id_f].astype(str) == str(user["ID_USUARIO"])]
+        saldo_actual = float(df_user_f["SALDO_FINAL"].iloc[-1]) if not df_user_f.empty else 0.0
+
+        # --- SUBSECCIÓN A: ANÁLISIS VISUAL (Últimas 20 Op.) ---
+        st.subheader("📊 Rendimiento Reciente")
+        datos_b = hoja_b.get_all_records()
+        df_b = pd.DataFrame(datos_b)
+        
+        if not df_b.empty:
+            # Filtrar últimas 20 operaciones CERRADAS del usuario
+            df_user_b = df_b[df_b["ID_USUARIO"].astype(str) == str(user["ID_USUARIO"])]
+            df_cerradas = df_user_b[df_user_b["ESTADO_RESULTADO"] != "PENDIENTE"].tail(20)
+            
+            if not df_cerradas.empty:
+                counts = df_cerradas["ESTADO_RESULTADO"].value_counts()
+                ganadas = counts.get("GANADA", 0)
+                perdidas = counts.get("PERDIDA", 0)
+                be = counts.get("BE", 0)
+                total = len(df_cerradas)
+                win_rate = (ganadas / total) * 100
+
+                # Gráfico Circular (Donut)
+                fig = go.Figure(data=[go.Pie(
+                    labels=['Ganadas', 'Perdidas', 'BE'],
+                    values=[ganadas, perdidas, be],
+                    hole=.6,
+                    marker_colors=['#00FF00', '#FF4B4B', '#FFFFFF'],
+                    textinfo='percent'
+                )])
+                fig.update_layout(
+                    annotations=[dict(text=f'{win_rate:.0f}%<br>WinRate', x=0.5, y=0.5, font_size=20, showarrow=False)],
+                    showlegend=True, margin=dict(t=0, b=0, l=0, r=0), height=250
+                )
+                
+                col_g1, col_g2 = st.columns([1.5, 1])
+                col_g1.plotly_chart(fig, use_container_width=True)
+                col_g2.markdown(f"""
+                    <div style='padding-top: 50px;'>
+                        <p style='color:#00FF00;'>🟢 Ganadas: <b>{ganadas}</b></p>
+                        <p style='color:#FF4B4B;'>🔴 Perdidas: <b>{perdidas}</b></p>
+                        <p style='color:#FFFFFF;'>⚪ BE: <b>{be}</b></p>
+                        <p style='font-size: 12px;'>Muestra: Últimas {total} op.</p>
+                    </div>
+                """, unsafe_allow_html=True)
+            else:
+                st.info("Socio, aún no tienes operaciones cerradas para mostrar estadísticas.")
+        
+        st.divider()
+
+        # --- SUBSECCIÓN B: FORMULARIO DE ENTRADA ---
+        st.subheader("🚀 Nueva Operación")
+        with st.form("registro_op"):
+            c1, c2, c3 = st.columns(3)
+            ins = c1.selectbox("Instrumento", ["FLIPX1", "FLIPX2", "FXVOL20", "FXVOL40", "SFXVOL20", "SFXVOL40"])
+            acc = c2.selectbox("Acción", ["COMPRA", "VENTA"])
+            bala = c3.number_input("Valor de la Bala ($)", min_value=0.5, value=4.0, step=0.5)
+
+            # ALERTA 10%
+            if bala > (saldo_actual * 0.10):
+                st.warning(f"⚠️ ¡Cuidado Socio! Estás arriesgando el {(bala/saldo_actual)*100:.1f}% de tu cuenta. Esto es impulso, no estrategia.")
+
+            p_ent = st.number_input("Precio de Entrada", format="%.2f")
+            p_sl = st.number_input("Precio de SL", format="%.2f")
+            ratio = st.slider("Ratio Objetivo (1:X)", 1.0, 5.0, 2.0)
+
+            # Cálculos automáticos
+            distancia = abs(p_ent - p_sl)
+            lotaje = bala / distancia if distancia > 0 else 0.0
+            tp_proyectado = p_ent + (distancia * ratio) if acc == "COMPRA" else p_ent - (distancia * ratio)
+            beneficio_usd = bala * ratio
+
+            # CUADRO DE RIESGO/BENEFICIO (Punto Crucial)
+            st.markdown(f"""
+                <div style="background-color: #1e1e1e; padding: 20px; border-radius: 10px; border: 1px solid #444; text-align: center;">
+                    <div style="display: flex; justify-content: space-around;">
+                        <div><p style="color:#FF4B4B; margin:0;">PÉRDIDA MÁXIMA</p><h2 style="margin:0;">-${bala:.2f}</h2></div>
+                        <div><p style="color:#00FF00; margin:0;">BENEFICIO POTENCIAL</p><h2 style="margin:0;">+${beneficio_usd:.2f}</h2></div>
+                    </div>
+                    <p style="margin-top:15px; font-size:14px;">Lotaje sugerido: <b>{lotaje:.2f}</b> | TP: <b>{tp_proyectado:.2f}</b></p>
+                </div>
+            """, unsafe_allow_html=True)
+
+            st.divider()
+            
+            # Imágenes y Otros
+            c_img1, c_img2 = st.columns(2)
+            img_m = c_img1.file_uploader("Gráfico Mayor (Cloudinary)", type=['png', 'jpg'])
+            img_e = c_img2.file_uploader("Gráfico Ejecución (Cloudinary)", type=['png', 'jpg'])
+            
+            # SLIDER DE DRAWDOWN (Barra de Volumen)
+            dd_val = st.select_slider("¿Cuánto Drawdown (retroceso) tuvo la entrada? (%)", options=list(range(0, 101)), value=0)
+            
+            obs = st.text_area("Notas del Trade / Sentimiento")
+            emocion = st.select_slider("Estado Emocional", options=["🔴 ROJO", "🟡 AMARILLO", "🟢 VERDE"], value="🟢 VERDE")
+
+            if st.form_submit_button("💾 REGISTRAR EN BITÁCORA (PENDIENTE)"):
+                # Captura de tiempo exacto para cruce de días
+                fecha_hora_ent = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                
+                # Mapeo de las 27 COLUMNAS exactas
+                nueva_fila = [
+                    len(datos_b) + 1,       # ID_BITACORA
+                    user["ID_USUARIO"],      # ID_USUARIO
+                    str(date.today()),       # FECHA
+                    ins, acc, bala, p_ent, p_sl, 
+                    tp_proyectado, round(lotaje, 2), 
+                    0,                       # MARGEN
+                    fecha_hora_ent,          # HORA_ENTRADA (Full para cálculo)
+                    "N/A",                   # HORA_SALIDA
+                    "N/A",                   # TIEMPO_TOTAL
+                    "N/A", "URL_MAYOR",      # DIR_MAYOR / IMG_MAYOR
+                    "N/A", "URL_MENOR",      # DIR_MENOR / IMG_MENOR
+                    "N/A", "URL_EJECUCION",  # DIR_EJECUCION / IMG_EJECUCION
+                    "PENDIENTE",             # ESTADO_RESULTADO
+                    0,                       # RESULTADO_DINERO
+                    "NO",                    # LLEGO_11
+                    dd_val,                  # DRAWDOWN (Slider)
+                    "N/A",                   # IMAGEN_RESULTADO
+                    obs,                     # OBSERVACIONES
+                    emocion                  # ESTADO_EMOCIONAL
+                ]
+                
+                hoja_b.append_row(nueva_fila)
+                st.success("✨ ¡Operación Registrada! La disciplina es el camino.")
+                time.sleep(1)
+                st.rerun()
 
 
 # =========================================================
