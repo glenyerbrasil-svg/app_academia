@@ -408,29 +408,40 @@ def main_app():
         
         try:
             hoja_f = doc.worksheet("Finanzas")
-            df_f = pd.DataFrame(hoja_f.get_all_records())
+            # Leemos los datos como lista de listas para evitar el error de mapeo si está vacío
+            lista_datos = hoja_f.get_all_values()
             
-            # Detectar columna de usuario automáticamente
-            col_u = [c for c in df_f.columns if "USUARIO" in str(c).upper()]
-            
-            if col_u:
-                df_user_f = df_f[df_f[col_u[0]].astype(str) == str(user["ID_USUARIO"])]
-                saldo_actual = float(df_user_f.iloc[-1]["SALDO_FINAL"]) if not df_user_f.empty else 0.0
+            if len(lista_datos) <= 1:
+                st.warning("Ecosistema nuevo detectado. Registra tu primer depósito para comenzar.")
+                df_f = pd.DataFrame(columns=["ID_FINANZAS","FECHA","ID_USUARIO","TIPO_MOVIMIENTO","SALDO_ANT","DEPOSITO","RETIRO","SALDO_FINAL","NOTAS"])
+                saldo_actual = 0.0
             else:
-                st.error("No se encontró la columna ID_USUARIO en la hoja Finanzas. Revisa el encabezado.")
-                st.stop()
+                # Si hay datos, creamos el DataFrame
+                df_f = pd.DataFrame(lista_datos[1:], columns=lista_datos[0])
+                # Filtramos por el usuario actual (usando el nombre exacto de tu columna en la foto)
+                df_user_f = df_f[df_f["ID_USUARIO"].astype(str) == str(user["ID_USUARIO"])]
+                saldo_actual = float(df_user_f.iloc[-1]["SALDO_FINAL"]) if not df_user_f.empty else 0.0
 
-            # Tarjetas y Formulario (Igual al anterior...)
             st.metric("Saldo Actual", f"${saldo_actual:,.2f}")
             
-            with st.form("nuevo_movimiento"):
+            with st.form("nuevo_mov"):
                 tipo = st.selectbox("Tipo", ["DEPOSITO", "RETIRO"])
-                monto = st.number_input("Monto", min_value=1.0)
-                if st.form_submit_button("Registrar"):
-                    # Lógica de cálculo y append_row
-                    pass
+                monto = st.number_input("Monto ($)", min_value=1.0)
+                notas = st.text_input("Notas")
+                
+                if st.form_submit_button("Confirmar Movimiento"):
+                    saldo_ant = saldo_actual
+                    s_final = saldo_ant + monto if tipo == "DEPOSITO" else saldo_ant - monto
+                    dep = monto if tipo == "DEPOSITO" else 0
+                    ret = monto if tipo == "RETIRO" else 0
+                    
+                    nueva_fila = [len(lista_datos), str(date.today()), user["ID_USUARIO"], tipo, saldo_ant, dep, ret, s_final, notas]
+                    hoja_f.append_row(nueva_fila)
+                    st.success("¡Movimiento registrado!")
+                    time.sleep(1)
+                    st.rerun()
         except Exception as e:
-            st.error(f"Error en Finanzas: {e}")
+            st.error(f"Error de conexión: {e}")
 
 # =========================================================
 # # CONTROL DE FLUJO
