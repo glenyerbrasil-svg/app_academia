@@ -449,39 +449,56 @@ def main_app():
                 time.sleep(1)
                 limpiar_y_reset()
 
-        # --- 4. HISTORIAL CON VISTA PREVIA DE COLORES ---
+# --- 4. HISTORIAL DE OPERACIONES (ÚLTIMAS 5) ---
         st.divider()
-        st.subheader("📅 Últimas Operaciones")
+        st.subheader("📅 Últimos 5 Movimientos")
+        
         if not df_b.empty:
             id_u = str(user["ID_USUARIO"])
-            df_u = df_b[df_b["ID_USUARIO"].astype(str) == id_u].tail(10)
+            # Filtramos por usuario y tomamos solo los últimos 5
+            df_user = df_b[df_b["ID_USUARIO"].astype(str) == id_u].tail(5)
             
-            for _, f in df_u[::-1].iterrows():
-                # Lógica de colores según resultado
-                res = f.get("ESTADO_RESULTADO", "PENDIENTE")
-                bg_color = "#1e4620" if res == "TP" else "#5f2120" if res == "SL" else "#664d03" if res == "BE" else "#212529"
-                text_label = "✅ POSITIVA" if res == "TP" else "❌ NEGATIVA" if res == "SL" else "⚖️ BE" if res == "BE" else "⏳ PENDIENTE"
-                
-                # Barra de color personalizada
+            # Invertimos para ver el más reciente primero
+            for _, fila in df_user[::-1].iterrows():
+                # Extracción segura de datos para evitar KeyErrors
+                res_estado = str(fila.get("ESTADO_RESULTADO", "PENDIENTE")).upper()
+                fecha_op = fila.get("FECHA", "S/F")
+                inst_op = fila.get("INSTRUMENTO", "N/A")
+                bala_op = fila.get("VALOR_BALA", 0)
+                utilidad_op = fila.get("MONTO_RESULTADO", 0)
+                id_op = fila.get("ID_BITACORA", "0")
+
+                # Lógica de colores y etiquetas
+                if res_estado == "TP":
+                    bg_color, label = "#1e4620", "✅ POSITIVA"
+                elif res_estado == "SL":
+                    bg_color, label = "#5f2120", "❌ NEGATIVA"
+                elif res_estado == "BE":
+                    bg_color, label = "#664d03", "⚖️ BREAK EVEN"
+                else:
+                    bg_color, label = "#212529", "⏳ PENDIENTE"
+
+                # Renderizado de la barra con texto BLANCO
                 st.markdown(f"""
-                    <div style="background-color: {bg_color}; padding: 10px; border-radius: 10px; border: 1px solid #ffffff33;">
-                        <div style="display: flex; justify-content: space-between;">
-                            <span>📅 {f.get('FECHA')} | <b>{f.get('INSTRUMENTO')}</b></span>
-                            <span>{text_label}</span>
+                    <div style="background-color: {bg_color}; padding: 15px; border-radius: 10px; border: 1px solid #ffffff33; color: white; margin-bottom: 5px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span style="font-size: 1.1em;">📅 {fecha_op} | <b>{inst_op}</b></span>
+                            <span style="font-weight: bold; background: rgba(255,255,255,0.1); padding: 2px 8px; border-radius: 5px;">{label}</span>
                         </div>
-                        <hr style="margin: 8px 0; opacity: 0.2;">
-                        <div style="display: flex; justify-content: space-between; font-size: 0.9em;">
-                            <span>Bala: <b>${f.get('VALOR_BALA')}</b></span>
-                            <span style="font-size: 1.1em;">Resultado: <b>${f.get('MONTO_RESULTADO')}</b></span>
+                        <div style="margin-top: 10px; display: flex; justify-content: space-between; border-top: 1px solid #ffffff22; pt: 8px;">
+                            <span>Bala: <b>${bala_op}</b></span>
+                            <span style="font-size: 1.2em;">Utilidad: <b>${utilidad_op}</b></span>
                         </div>
                     </div>
                 """, unsafe_allow_html=True)
                 
-                # Botón de editar debajo de la barra
-                if st.button(f"✏️ Editar Trade #{f.get('ID_BITACORA')}", key=f"btn_edit_{f.get('ID_BITACORA')}"):
-                    st.session_state.edit_data = f.to_dict()
+                # Botón de edición con Key única para evitar el error de DuplicateKey
+                if st.button(f"✏️ Editar Operación #{id_op}", key=f"btn_edit_{id_op}_{v}"):
+                    st.session_state.edit_data = fila.to_dict()
                     st.rerun()
-                st.write("") # Espacio entre registros
+                st.write("") 
+        else:
+            st.info("Aún no tienes operaciones registradas.")
 
     # # SECCION 8: BACKTESTING
     elif menu == "📊 Backtesting":
