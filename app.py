@@ -345,7 +345,7 @@ def main_app():
 
 
 # =========================================================
-    # # SECCION 7: BITÁCORA (VERSIÓN DEFINITIVA Y SEGURA)
+    # # SECCION 7: BITÁCORA (RATIO 1:1 & LIMPIEZA TOTAL)
     # =========================================================
     elif menu == "📝 Bitácora":
         from datetime import datetime
@@ -356,58 +356,69 @@ def main_app():
             hoja_f = doc.worksheet("Finanzas")
             hoja_b = doc.worksheet("Bitacora")
             
-            # Leemos datos frescos
+            # Cargamos y limpiamos nombres de columnas (quita espacios invisibles)
             df_b_raw = pd.DataFrame(hoja_b.get_all_records())
-            df_f = pd.DataFrame(hoja_f.get_all_records())
+            df_b_raw.columns = df_b_raw.columns.str.strip() 
             
+            df_f = pd.DataFrame(hoja_f.get_all_records())
+            df_f.columns = df_f.columns.str.strip()
+
             saldo_actual = 0.0
             if not df_f.empty:
-                df_user_f = df_f[df_f["ID_USUARIO"].astype(str) == str(user["ID_USUARIO"])]
+                col_id_fin = "ID_USUARIO" if "ID_USUARIO" in df_f.columns else df_f.columns[2]
+                df_user_f = df_f[df_f[col_id_fin].astype(str) == str(user["ID_USUARIO"])]
                 if not df_user_f.empty:
                     saldo_actual = float(df_user_f.iloc[-1].get("SALDO_FINAL", 0))
             
             st.info(f"💰 **Saldo disponible:** ${saldo_actual:,.2f}")
         except Exception as e:
-            st.error(f"Error de conexión: {e}")
+            st.error(f"Error de conexión con Sheets: {e}")
             st.stop()
 
         # --- MOTOR DE REGISTRO ---
         st.subheader("🚀 Nueva Operación")
         c1, c2, c3 = st.columns(3)
-        ins = c1.selectbox("Instrumento", ["FLIPX1", "FLIPX2", "FXVOL20", "FXVOL40", "SFXVOL20", "SFXVOL40"], key="ins")
-        acc = c2.selectbox("Acción", ["COMPRA", "VENTA"], key="acc")
-        # PROBLEMA 1: Bala ahora inicia en 0.0
-        bala = c3.number_input("Valor de la Bala ($)", min_value=0.0, value=0.0, step=0.5, key="bala")
+        ins = c1.selectbox("Instrumento", ["FLIPX1", "FLIPX2", "FXVOL20", "FXVOL40", "SFXVOL20", "SFXVOL40"], key="ins_reg")
+        acc = c2.selectbox("Acción", ["COMPRA", "VENTA"], key="acc_reg")
+        # Bala en 0 por defecto
+        bala = c3.number_input("Valor de la Bala ($)", min_value=0.0, value=0.0, step=0.5, key="bala_reg")
 
         cp1, cp2, cp3 = st.columns(3)
-        p_ent = cp1.number_input("Precio de Entrada", format="%.2f", value=0.0, key="p_ent")
-        p_sl = cp2.number_input("Precio de SL", format="%.2f", value=0.0, key="p_sl")
-        ratio = cp3.number_input("Ratio Objetivo (1:X)", min_value=1.0, value=2.0, step=0.1, key="ratio")
+        p_ent = cp1.number_input("Precio de Entrada", format="%.2f", value=0.0, key="ent_reg")
+        p_sl = cp2.number_input("Precio de SL", format="%.2f", value=0.0, key="sl_reg")
+        # RATIO 1:1 POR DEFECTO
+        ratio = cp3.number_input("Ratio Objetivo (1:X)", min_value=0.1, value=1.0, step=0.1, key="ratio_reg")
 
-        # Cálculos
+        # Cálculos de proyección
         distancia = abs(p_ent - p_sl)
         lotaje = bala / distancia if distancia > 0 else 0.0
         tp_proyectado = p_ent + (distancia * ratio) if acc == "COMPRA" else p_ent - (distancia * ratio)
         beneficio_usd = bala * ratio
 
         if p_ent > 0 and p_sl > 0 and bala > 0:
-            st.success(f"🎯 TP Proyectado: {tp_proyectado:.2f} | Lotaje: {lotaje:.2f}")
+            st.markdown(f"""
+                <div style="background-color: #1e1e1e; padding: 15px; border-radius: 10px; border: 1px solid #00FF00; text-align: center;">
+                    <span style="color:#00FF00; font-weight:bold;">Lotaje: {lotaje:.2f} | TP Proyectado: {tp_proyectado:.2f}</span>
+                </div>
+            """, unsafe_allow_html=True)
 
         with st.form("form_registro_bitacora"):
             st.subheader("🖼️ Análisis Técnico")
             img1, img2, img3 = st.columns(3)
-            f_mayor = img1.file_uploader("Gráfico Mayor", type=['png', 'jpg'], key="f_m")
-            f_menor = img2.file_uploader("Gráfico Menor", type=['png', 'jpg'], key="f_mn")
-            f_ejec = img3.file_uploader("Ejecución", type=['png', 'jpg'], key="f_e")
-            obs = st.text_area("Observaciones", key="obs")
-            emocion = st.select_slider("Estado Emocional", options=["🟢 CALMA", "🟡 ANSIEDAD", "🔴 VENGANZA"], value="🟢 CALMA", key="emo")
+            f_mayor = img1.file_uploader("Gráfico Mayor", type=['png', 'jpg'], key="u_img1")
+            f_menor = img2.file_uploader("Gráfico Menor", type=['png', 'jpg'], key="u_img2")
+            f_ejec = img3.file_uploader("Ejecución", type=['png', 'jpg'], key="u_img3")
+            obs = st.text_area("Observaciones", key="u_obs")
+            emocion = st.select_slider("Estado Emocional", options=["🟢 CALMA", "🟡 ANSIEDAD", "🔴 VENGANZA"], value="🟢 CALMA", key="u_emo")
 
             if st.form_submit_button("🚀 REGISTRAR PENDIENTE"):
                 if p_ent == 0 or p_sl == 0 or bala == 0:
-                    st.error("Socio, completa los datos (Bala y Precios).")
+                    st.error("Socio, falta completar la Bala o los Precios.")
                 else:
                     fecha_now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     datos_b = hoja_b.get_all_values()
+                    
+                    # Estructura exacta de tus 27 columnas
                     nueva_fila = [
                         len(datos_b), user["ID_USUARIO"], str(date.today()),
                         ins, acc, bala, p_ent, p_sl, tp_proyectado, round(lotaje, 2),
@@ -415,14 +426,13 @@ def main_app():
                         "PENDIENTE", 0, "NO", 0, "N/A", obs, emocion
                     ]
                     hoja_b.append_row(nueva_fila)
+                    st.success("✅ Trade registrado correctamente.")
                     
-                    # PROBLEMA 2: LIMPIEZA SIN CERRAR SESIÓN
-                    st.success("✅ ¡Registrado!")
-                    # Borramos solo las llaves del formulario, NO las del usuario
-                    keys_to_keep = ['logged_in', 'user_info', 'menu_opcion']
-                    for key in list(st.session_state.keys()):
-                        if key not in keys_to_keep:
-                            del st.session_state[key]
+                    # LIMPIEZA TOTAL SIN CERRAR SESIÓN
+                    keys_protegidas = ['logged_in', 'user_info', 'menu_opcion']
+                    for k in list(st.session_state.keys()):
+                        if k not in keys_protegidas:
+                            del st.session_state[k]
                     
                     time.sleep(1)
                     st.rerun()
@@ -431,46 +441,42 @@ def main_app():
         st.divider()
         st.subheader("⏳ Operaciones en Curso")
 
-        # Volvemos a leer para asegurar que la lista esté actualizada (PROBLEMA 3)
-        df_cierre = pd.DataFrame(hoja_b.get_all_records())
-        if not df_cierre.empty:
-            # Filtro estricto
-            ops_abiertas = df_cierre[(df_cierre["ID_USUARIO"].astype(str) == str(user["ID_USUARIO"])) & 
-                                     (df_cierre["ESTADO_RESULTADO"] == "PENDIENTE")]
+        if not df_b_raw.empty:
+            # Filtro por usuario y estado pendiente
+            ops_abiertas = df_b_raw[(df_b_raw["ID_USUARIO"].astype(str) == str(user["ID_USUARIO"])) & 
+                                    (df_b_raw["ESTADO_RESULTADO"] == "PENDIENTE")]
 
             if not ops_abiertas.empty:
                 for idx, fila in ops_abiertas.iterrows():
-                    with st.expander(f"📌 {fila['INSTRUMENTO']} - {fila['ACCION']} | Entrada: {fila['PRECIO_ENT']}"):
-                        with st.form(f"cierre_{fila['ID_BITACORA']}"):
-                            img_res = st.file_uploader("🖼️ Imagen Resultado", type=['png', 'jpg'])
-                            cf1, cf2 = st.columns(2)
-                            res_final = cf1.selectbox("Resultado", ["TP", "SL", "BE"])
+                    id_trade = fila.get('ID_BITACORA', idx)
+                    with st.expander(f"📌 {fila.get('INSTRUMENTO','')} - {fila.get('ACCION','')} | Entrada: {fila.get('PRECIO_ENT',0)}"):
+                        with st.form(f"cierre_f_{id_trade}"):
+                            st.file_uploader("🖼️ Imagen de Resultado", type=['png', 'jpg'], key=f"img_res_{id_trade}")
+                            c_f1, c_f2 = st.columns(2)
+                            res_final = c_f1.selectbox("Resultado", ["TP", "SL", "BE"], key=f"sel_res_{id_trade}")
                             
-                            # Cálculo de sugerencia de monto
-                            m_sug = (abs(float(fila['PRECIO_T']) - float(fila['PRECIO_ENT'])) * float(fila['LOTAJE'])) if res_final == "TP" else (-float(fila['VALOR_BALA']) if res_final == "SL" else 0.0)
-                            m_real = cf2.number_input("Monto Final USD", value=float(m_sug))
+                            # Intentamos PRECIO_T o PRECIO_TP para evitar KeyError
+                            p_target = float(fila.get('PRECIO_T', fila.get('PRECIO_TP', 0)))
+                            p_entry = float(fila.get('PRECIO_ENT', 0))
+                            lote_f = float(fila.get('LOTAJE', 0))
+                            bala_f = float(fila.get('VALOR_BALA', 0))
+
+                            m_sug = abs(p_target - p_entry) * lote_f if res_final == "TP" else (-bala_f if res_final == "SL" else 0.0)
+                            m_real = c_f2.number_input("Monto USD Real", value=float(m_sug), key=f"val_res_{id_trade}")
                             
-                            if st.form_submit_button("🏁 FINALIZAR TRADE"):
-                                # Fila = ID + 2
-                                n_fila = int(fila['ID_BITACORA']) + 2
-                                hoja_b.update_cell(n_fila, 21, res_final)
-                                hoja_b.update_cell(n_fila, 22, m_real)
-                                hoja_b.update_cell(n_fila, 13, datetime.now().strftime("%H:%M:%S"))
+                            if st.form_submit_button("🏁 FINALIZAR"):
+                                n_fila_sheets = int(id_trade) + 2
+                                # Actualizamos columnas 21 (ESTADO), 22 (DINERO), 13 (HORA SALIDA)
+                                hoja_b.update_cell(n_fila_sheets, 21, res_final)
+                                hoja_b.update_cell(n_fila_sheets, 22, m_real)
+                                hoja_b.update_cell(n_fila_sheets, 13, datetime.now().strftime("%H:%M:%S"))
                                 
-                                # Sincronizar Finanzas
+                                # Sincronizar con Finanzas
                                 d_fin = hoja_f.get_all_values()
                                 hoja_f.append_row([
                                     len(d_fin), str(date.today()), user["ID_USUARIO"],
-                                    f"TRADE {fila['INSTRUMENTO']}", saldo_actual,
+                                    f"CIERRE {fila.get('INSTRUMENTO','')}", saldo_actual,
                                     abs(m_real) if m_real >= 0 else 0,
-                                    abs(m_real) if m_real < 0 else 0,
-                                    saldo_actual + m_real, f"Cierre ID {fila['ID_BITACORA']}"
-                                ])
-                                st.success("¡Operación cerrada!")
-                                time.sleep(1)
-                                st.rerun() # Esto limpiará la lista porque ya no será "PENDIENTE"
-            else:
-                st.info("No hay operaciones pendientes.")
 
     # # SECCION 8: BACKTESTING
     elif menu == "📊 Backtesting":
