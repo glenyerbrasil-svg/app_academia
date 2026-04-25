@@ -442,13 +442,13 @@ def main_app():
             
             observaciones = st.text_area("Análisis y Observaciones del Trade", placeholder="¿Por qué entraste? ¿Cómo te sentiste?")
 
-# --- BOTÓN DE GUARDAR CON LIMPIEZA TOTAL ---
+# --- BOTÓN DE GUARDAR (ESTRATEGIA DE RESET SEGURO) ---
             if st.button("💾 GUARDAR REGISTRO", use_container_width=True):
                 if p_ent == 0 or p_sl == 0 or bala == 0:
-                    st.warning("⚠️ Socio, los datos técnicos (Bala, Entrada, SL) son obligatorios.")
+                    st.warning("⚠️ Socio, los datos técnicos son obligatorios.")
                 else:
                     with st.spinner("Sincronizando con la nube..."):
-                        # 1. Preparamos la fila para Google Sheets
+                        # 1. Preparamos la fila
                         fila_nueva = [
                             len(hoja_b.get_all_values()), user["ID_USUARIO"], str(date.today()),
                             ins, acc, bala, p_ent, p_sl, tp_sugerido, round(lotaje, 2),
@@ -462,7 +462,7 @@ def main_app():
                         ]
                         hoja_b.append_row(fila_nueva)
                         
-                        # 2. Sincronización con Finanzas si cerró
+                        # 2. Sincronización con Finanzas
                         if tipo_final != "PENDIENTE":
                             hoja_f.append_row([
                                 len(hoja_f.get_all_values()), str(date.today()), user["ID_USUARIO"],
@@ -474,14 +474,13 @@ def main_app():
                         
                         st.success(f"✅ ¡Operación {ins} registrada con éxito!")
                         
-                        # 3. EL TRUCO PARA DEJARLO EN BLANCO:
-                        # Borramos cualquier rastro de datos en el estado de la sesión
-                        for key in st.session_state.keys():
-                            del st.session_state[key]
+                        # --- 3. EL CAMBIO DEFINITIVO: RESET SIN BORRAR LA SESIÓN ---
+                        # En lugar de borrar st.session_state, forzamos el refresco
+                        # Streamlit, al no tener valores 'value' fijos en los inputs,
+                        # los reiniciará solos al hacer rerun si no están anclados.
                         
-                        # 4. Pausa táctica y reinicio limpio
                         time.sleep(1.2)
-                        st.rerun()
+                        st.rerun() # <--- Esto refresca la página manteniendo al usuario
 
         # --- 5. HISTORIAL DE SEGURIDAD ---
         st.divider()
