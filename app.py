@@ -411,32 +411,44 @@ def main_app():
         with st.container():
             col_emo, col_res = st.columns(2)
             
-            # Reorganización: Calma es el inicio (extremo izquierdo)
-            # A medida que deslizas a la derecha, la emoción cambia según tu criterio
-            opciones_emo = [
-                "🟢 Calma",    # Posición 0 (Default)
-                "🔵 Zen",      # Posición 1
-                "🟡 Neutral",  # Posición 2
-                "🟠 Nervioso", # Posición 3
-                "🔴 Ansioso"   # Posición 4
-            ]
+            # Semáforo corregido (Calma a la izquierda)
+            opciones_emo = ["🟢 Calma", "🔵 Zen", "🟡 Neutral", "🟠 Nervioso", "🔴 Ansioso"]
+            semaforo = col_emo.select_slider("Semáforo Emocional", options=opciones_emo, value="🟢 Calma")
             
-            # El valor por defecto es el primero de la lista (Calma)
-            semaforo = col_emo.select_slider(
-                "Semáforo Emocional", 
-                options=opciones_emo, 
-                value="🟢 Calma",
-                help="Desliza a la derecha si sientes que tu estado emocional varía"
+            # Selector de estado
+            tipo_final = col_res.selectbox("Estado Final", ["PENDIENTE", "TP", "SL", "BE"])
+            
+            # --- LÓGICA DE CÁLCULO AUTOMÁTICO DE RESULTADO ---
+            monto_sugerido = 0.0
+            
+            if tipo_final == "TP":
+                # Ganancia basada en el cálculo de arriba
+                monto_sugerido = abs(tp_sugerido - p_ent) * lotaje
+            elif tipo_final == "SL":
+                # Pérdida de la bala (en negativo)
+                monto_sugerido = -float(bala)
+            elif tipo_final == "BE":
+                # Break Even inicializado en 0.0 para que tú lo edites
+                monto_sugerido = 0.0
+            
+            # Campo de Monto Final (Se actualiza solo pero permite edición manual)
+            # Usamos una key dinámica para que Streamlit detecte el cambio de 'tipo_final'
+            monto_final = st.number_input(
+                f"Monto Resultante para {tipo_final} ($)", 
+                value=float(monto_sugerido), 
+                format="%.2f",
+                help="Puedes editar este valor manualmente si hubo comisiones o spreads."
             )
             
-            tipo_final = col_res.selectbox("Estado Final", ["PENDIENTE", "TP", "SL", "BE"])
+            observaciones = st.text_area("Análisis y Observaciones del Trade", placeholder="¿Por qué entraste? ¿Cómo te sentiste?")
+
             # BOTÓN DE GUARDAR ÚNICO
             if st.button("💾 GUARDAR REGISTRO", use_container_width=True):
                 if p_ent == 0 or p_sl == 0 or bala == 0:
-                    st.warning("⚠️ Completa los precios y la bala antes de guardar.")
+                    st.warning("⚠️ Socio, los datos técnicos (Bala, Entrada, SL) son obligatorios.")
                 else:
-                    with st.spinner("Guardando en la nube..."):
-                        # Preparamos la fila (usamos nombres de archivos si hay carga)
+                    with st.spinner("Sincronizando con la nube..."):
+                        # Preparamos la fila para Google Sheets
                         fila_nueva = [
                             len(hoja_b.get_all_values()), user["ID_USUARIO"], str(date.today()),
                             ins, acc, bala, p_ent, p_sl, tp_sugerido, round(lotaje, 2),
@@ -450,17 +462,19 @@ def main_app():
                         ]
                         hoja_b.append_row(fila_nueva)
                         
-                        # Si hay dinero de por medio, a Finanzas
+                        # Si la operación no quedó pendiente, actualizamos Finanzas
                         if tipo_final != "PENDIENTE":
                             hoja_f.append_row([
                                 len(hoja_f.get_all_values()), str(date.today()), user["ID_USUARIO"],
-                                f"TRADE {ins}", saldo_actual, abs(monto_final) if monto_final >= 0 else 0,
-                                abs(monto_final) if monto_final < 0 else 0, saldo_actual + monto_final, "APP"
+                                f"CIERRE {ins}", saldo_actual, 
+                                abs(monto_final) if monto_final >= 0 else 0, # Entrada (Ganancia)
+                                abs(monto_final) if monto_final < 0 else 0,  # Salida (Pérdida)
+                                saldo_actual + monto_final, "APP_TRADE"
                             ])
                         
-                        st.success("✅ ¡Trade guardado y formulario limpio!")
-                        time.sleep(1)
-                        st.rerun() # Limpia todo automáticamente
+                        st.success(f"✅ ¡Operación {ins} registrada con éxito!")
+                        time.sleep(1.2)
+                        st.rerun() # Limpia todo el formulario para el siguiente trade
 
         # --- 5. HISTORIAL DE SEGURIDAD ---
         st.divider()
