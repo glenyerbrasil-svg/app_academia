@@ -391,7 +391,7 @@ def main_app():
         img_ent = g_c3.file_uploader("Gráfico Entrada", type=['png', 'jpg', 'jpeg'], key=f"img3_{v}")
         img_res = g_c4.file_uploader("Gráfico Resultado", type=['png', 'jpg', 'jpeg'], key=f"img4_{v}")
 
-        # --- 5. PSICOLOGÍA Y RESULTADO ---
+# --- 5. PSICOLOGÍA Y RESULTADO ---
         st.divider()
         col_e, col_r = st.columns(2)
         opciones_emo = ["🟢 Calma", "🔵 Zen", "🟡 Neutral", "🟠 Nervioso", "🔴 Ansioso"]
@@ -399,11 +399,17 @@ def main_app():
         
         tipo_final = col_r.selectbox("Estado Final", ["PENDIENTE", "TP", "SL", "BE"], key=f"tipo_{v}")
         
+        # LÓGICA DE REPARACIÓN DEL MONTO AUTOMÁTICO
         monto_auto = 0.0
-        if tipo_final == "TP": monto_auto = abs(tp_sugerido - p_ent) * lotaje
-        elif tipo_final == "SL": monto_auto = -float(bala)
+        if tipo_final == "TP":
+            monto_auto = float(abs(tp_sugerido - p_ent) * lotaje)
+        elif tipo_final == "SL":
+            monto_auto = -float(bala)
+        elif tipo_final == "BE":
+            monto_auto = 0.0
         
-        monto_final = st.number_input("Monto Resultante ($)", value=float(monto_auto), format="%.2f", key=f"monto_{v}")
+        # Se asegura que el value tome el monto_auto calculado arriba
+        monto_final = st.number_input("Monto Resultante ($)", value=monto_auto, format="%.2f", key=f"monto_{v}")
         observaciones = st.text_area("Observaciones", key=f"obs_{v}")
 
         # --- 6. BOTÓN DE GUARDAR ---
