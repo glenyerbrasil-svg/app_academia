@@ -345,18 +345,34 @@ def main_app():
 
 
 # =========================================================
-    # # SECCION 7: BITÁCORA (VERSIÓN PROFESIONAL Y MATEMÁTICA)
+    # # SECCION 7: BITÁCORA (VERSIÓN INTEGRAL: REGISTRO Y CIERRE)
     # =========================================================
     elif menu == "📝 Bitácora":
         from datetime import datetime
         st.header("📝 Bitácora de Operaciones")
 
-        # 1. LECTURA DE SALDO (Igual que antes)
-        # ... (Mantén tu código de conexión a Finanzas aquí) ...
+        # 1. LECTURA DE SALDO Y HOJAS
+        try:
+            hoja_f = doc.worksheet("Finanzas")
+            hoja_b = doc.worksheet("Bitacora")
+            df_f = pd.DataFrame(hoja_f.get_all_records())
+            
+            saldo_actual = 0.0
+            if not df_f.empty:
+                col_u = [c for c in df_f.columns if "USUARIO" in str(c).upper()]
+                if col_u:
+                    df_user_f = df_f[df_f[col_u[0]].astype(str) == str(user["ID_USUARIO"])]
+                    if not df_user_f.empty:
+                        saldo_actual = float(df_user_f.iloc[-1].get("SALDO_FINAL", 0))
+            
+            st.info(f"💰 **Saldo disponible:** ${saldo_actual:,.2f}")
+        except Exception as e:
+            st.error(f"Error de conexión: {e}")
+            st.stop()
 
         st.subheader("🚀 Nueva Operación")
         
-        # --- CAMPOS FUERA DEL FORM PARA REACTIVIDAD INMEDIATA ---
+        # --- CAMPOS REACTIVOS INMEDIATOS ---
         col1, col2, col3 = st.columns(3)
         ins = col1.selectbox("Instrumento", ["FLIPX1", "FLIPX2", "FXVOL20", "FXVOL40", "SFXVOL20", "SFXVOL40"])
         acc = col2.selectbox("Acción", ["COMPRA", "VENTA"])
@@ -365,19 +381,14 @@ def main_app():
         col_p1, col_p2, col_p3 = st.columns(3)
         p_ent = col_p1.number_input("Precio de Entrada", format="%.2f", value=0.0)
         p_sl = col_p2.number_input("Precio de SL", format="%.2f", value=0.0)
-        
-        # Aquí el cambio clave: de slider a number_input
         ratio = col_p3.number_input("Ratio Objetivo (1:X)", min_value=1.0, max_value=20.0, value=2.0, step=0.1)
 
-        # =========================================================
-        # # MOTOR MATEMÁTICO INSTANTÁNEO (Fuera del Form)
-        # =========================================================
+        # --- MOTOR MATEMÁTICO ---
         distancia = abs(p_ent - p_sl)
         lotaje = bala / distancia if distancia > 0 else 0.0
         tp_proyectado = p_ent + (distancia * ratio) if acc == "COMPRA" else p_ent - (distancia * ratio)
         beneficio_usd = bala * ratio
 
-        # CUADRO DE RESULTADOS AUTOMÁTICO
         if p_ent > 0 and p_sl > 0:
             st.markdown(f"""
                 <div style="background-color: #1e1e1e; padding: 20px; border-radius: 10px; border: 2px solid #00FF00; text-align: center; margin-bottom: 20px;">
@@ -393,7 +404,7 @@ def main_app():
                 </div>
             """, unsafe_allow_html=True)
 
-        # --- RESTO DEL FORMULARIO PARA REGISTRO ---
+        # --- FORMULARIO DE REGISTRO (ENTRADA) ---
         with st.form("registro_op_final"):
             st.subheader("🖼️ Análisis Técnico (Gráficos)")
             c_img1, c_img2, c_img3 = st.columns(3)
@@ -403,16 +414,85 @@ def main_app():
             
             dd_val = st.select_slider("Drawdown esperado (%)", options=list(range(0, 101)), value=0)
             obs = st.text_area("Observaciones")
-            
-            # SEMÁFORO CORREGIDO: CALMA (Verde) -> ANSIEDAD (Amarillo) -> VENGANZA (Rojo)
-            emocion = st.select_slider("Estado Emocional", 
-                                     options=["🟢 CALMA", "🟡 ANSIEDAD", "🔴 VENGANZA"], 
-                                     value="🟢 CALMA")
+            emocion = st.select_slider("Estado Emocional", options=["🟢 CALMA", "🟡 ANSIEDAD", "🔴 VENGANZA"], value="🟢 CALMA")
 
             if st.form_submit_button("🚀 REGISTRAR OPERACIÓN PENDIENTE"):
-                # ... (Aquí va tu lógica de append_row que ya teníamos) ...
-                # Asegúrate de usar las variables p_ent, p_sl, lotaje, etc., definidas arriba
-                pass
+                if p_ent == 0 or p_sl == 0:
+                    st.error("Socio, los precios no pueden ser 0.")
+                else:
+                    fecha_full = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    datos_b = hoja_b.get_all_values()
+                    
+                    nueva_fila = [
+                        len(datos_b), user["ID_USUARIO"], str(date.today()),
+                        ins, acc, bala, p_ent, p_sl, tp_proyectado, round(lotaje, 2),
+                        0, fecha_full, "N/A", "N/A", "N/A", "URL_MAYOR",
+                        "N/A", "URL_MENOR", "N/A", "URL_EJEC", "PENDIENTE",
+                        0, "NO", dd_val, "N/A", obs, emocion
+                    ]
+                    hoja_b.append_row(nueva_fila)
+                    st.success("✅ Trade registrado como PENDIENTE.")
+                    time.sleep(1)
+                    st.rerun()
+
+        # =========================================================
+        # # MÓDULO DE CIERRE (GESTIÓN DE OPERACIONES ABIERTAS)
+        # =========================================================
+        st.divider()
+        st.subheader("⏳ Operaciones en Curso (Abiertas)")
+
+        datos_b_check = hoja_b.get_all_records()
+        if datos_b_check:
+            df_check = pd.DataFrame(datos_b_check)
+            ops_abiertas = df_check[(df_check["ID_USUARIO"].astype(str) == str(user["ID_USUARIO"])) & 
+                                    (df_check["ESTADO_RESULTADO"] == "PENDIENTE")]
+
+            if not ops_abiertas.empty:
+                for i, fila in ops_abiertas.iterrows():
+                    with st.expander(f"📌 {fila['INSTRUMENTO']} - {fila['ACCION']} (Entrada: {fila['PRECIO_ENTRADA']})"):
+                        with st.form(f"cierre_{fila['ID_BITACORA']}"):
+                            st.markdown("### 🏁 Finalizar Operación")
+                            
+                            # 4ta Imagen: El Resultado
+                            img_res = st.file_uploader("🖼️ Subir Captura del Resultado", type=['png', 'jpg'])
+                            
+                            c_fin1, c_fin2 = st.columns(2)
+                            # Selector Triple: TP, SL, BE
+                            res_final = c_fin1.selectbox("Resultado", ["TP (GANADA)", "SL (PERDIDA)", "BE (BREAK EVEN)"])
+                            
+                            # Lógica de monto sugerido
+                            monto_sug = 0.0
+                            if res_final == "TP (GANADA)":
+                                monto_sug = beneficio_usd # Usa el beneficio calculado arriba
+                            elif res_final == "SL (PERDIDA)":
+                                monto_sug = -float(fila['BALA'])
+                            
+                            monto_real = c_fin2.number_input("Monto Final USD (+/-)", value=float(monto_sug), step=0.1)
+                            
+                            if st.form_submit_button("✅ CERRAR TRADE Y ACTUALIZAR SALDO"):
+                                # 1. Actualizar Bitácora
+                                n_fila = int(fila['ID_BITACORA']) + 2
+                                hoja_b.update_cell(n_fila, 21, res_final.split(" ")[0]) # Estado
+                                hoja_b.update_cell(n_fila, 22, monto_real)              # Dinero
+                                hoja_b.update_cell(n_fila, 13, datetime.now().strftime("%H:%M:%S")) # Hora Salida
+                                
+                                # 2. Sincronizar con Finanzas
+                                datos_fin = hoja_f.get_all_values()
+                                nueva_fin = [
+                                    len(datos_fin), str(date.today()), user["ID_USUARIO"],
+                                    f"CIERRE {fila['INSTRUMENTO']}", saldo_actual,
+                                    abs(monto_real) if monto_real >= 0 else 0, # Deposito
+                                    abs(monto_real) if monto_real < 0 else 0,  # Retiro
+                                    saldo_actual + monto_real,                 # Nuevo Saldo
+                                    f"Trade ID: {fila['ID_BITACORA']}"
+                                ]
+                                hoja_f.append_row(nueva_fin)
+                                
+                                st.success(f"Trade cerrado. Nuevo saldo: ${saldo_actual + monto_real:.2f}")
+                                time.sleep(1)
+                                st.rerun()
+            else:
+                st.info("No hay operaciones abiertas. ¡Busca una oportunidad!")
 
     # # SECCION 8: BACKTESTING
     elif menu == "📊 Backtesting":
