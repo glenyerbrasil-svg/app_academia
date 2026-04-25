@@ -332,7 +332,7 @@ def main_app():
 
 
 # =========================================================
-    # # SECCION 7: BITÁCORA (SOLO INGRESO DE DATOS)
+    # # SECCION 7: BITÁCORA (SOLUCIÓN FINAL UNIFICADA)
     # =========================================================
     elif menu == "📝 Bitácora":
         from datetime import datetime
@@ -391,41 +391,34 @@ def main_app():
         img_ent = g_c3.file_uploader("Gráfico Entrada", type=['png', 'jpg', 'jpeg'], key=f"img3_{v}")
         img_res = g_c4.file_uploader("Gráfico Resultado", type=['png', 'jpg', 'jpeg'], key=f"img4_{v}")
 
-# --- 5. PSICOLOGÍA Y RESULTADO (SOLUCIÓN DEFINITIVA) ---
+        # --- 5. PSICOLOGÍA Y RESULTADO (LÓGICA MEJORADA) ---
         st.divider()
         col_e, col_r = st.columns(2)
         opciones_emo = ["🟢 Calma", "🔵 Zen", "🟡 Neutral", "🟠 Nervioso", "🔴 Ansioso"]
         semaforo = col_e.select_slider("Semáforo Emocional", options=opciones_emo, value="🟢 Calma", key=f"emo_{v}")
         
-        # Función para actualizar el monto cuando cambia el estado
-        def actualizar_monto():
-            estado = st.session_state[f"tipo_{v}"]
-            if estado == "TP":
-                st.session_state[f"monto_{v}"] = float(abs(tp_sugerido - p_ent) * lotaje)
-            elif estado == "SL":
-                st.session_state[f"monto_{v}"] = -float(bala)
-            elif estado == "BE":
-                st.session_state[f"monto_{v}"] = 0.0
-
-        tipo_final = col_r.selectbox(
-            "Estado Final", 
-            ["PENDIENTE", "TP", "SL", "BE"], 
-            key=f"tipo_{v}",
-            on_change=actualizar_monto # Esto dispara el cálculo al tocar el selector
-        )
+        # 1. Definimos el estado primero
+        tipo_final = col_r.selectbox("Estado Final", ["PENDIENTE", "TP", "SL", "BE"], key=f"tipo_{v}")
         
-        # El input ahora está vinculado 100% al estado
-        monto_final = st.number_input("Monto Resultante ($)", format="%.2f", key=f"monto_{v}")
+        # 2. Calculamos el monto sugerido basado en el estado
+        monto_sugerido = 0.0
+        if tipo_final == "TP":
+            monto_sugerido = float(abs(tp_sugerido - p_ent) * lotaje)
+        elif tipo_final == "SL":
+            monto_sugerido = -float(bala)
+
+        # 3. El input usa el monto sugerido como valor base
+        monto_final = st.number_input("Monto Resultante ($)", value=monto_sugerido, format="%.2f", key=f"monto_{v}")
         observaciones = st.text_area("Observaciones", key=f"obs_{v}")
 
-        # --- 6. BOTÓN DE GUARDAR ---
+        # --- 6. BOTÓN DE GUARDAR (UN SOLO BLOQUE) ---
         if st.button("💾 GUARDAR REGISTRO", use_container_width=True, key=f"btn_save_{v}"):
             if p_ent == 0 or p_sl == 0 or bala == 0:
-                st.warning("⚠️ Socio, faltan datos técnicos.")
+                st.warning("⚠️ Socio, los datos técnicos son obligatorios.")
             else:
-                with st.spinner("Sincronizando..."):
-                    # Extraemos el valor actual del estado para asegurar que no vaya en 0
-                    monto_a_guardar = float(st.session_state[f"monto_{v}"])
+                with st.spinner("Sincronizando con Google Sheets..."):
+                    # Preparamos la fila para Bitacora con datos limpios
+                    monto_final_val = float(monto_final)
                     
                     nueva_fila = [
                         len(hoja_b.get_all_values()), user["ID_USUARIO"], str(date.today()),
@@ -435,55 +428,24 @@ def main_app():
                         img_may.name if img_may else "N/A", img_men.name if img_men else "N/A",
                         img_ent.name if img_ent else "N/A", img_res.name if img_res else "N/A",
                         "N/A", "N/A", "N/A", "N/A",
-                        tipo_final, 
-                        monto_a_guardar, # <--- Aquí ya no irá en 0
-                        "NO", 0, "N/A", observaciones, semaforo
+                        tipo_final, monto_final_val, "NO", 0, "N/A", observaciones, semaforo
                     ]
                     hoja_b.append_row(nueva_fila)
                     
+                    # Si la operación no es pendiente, actualizamos el saldo en Finanzas
                     if tipo_final != "PENDIENTE":
-                        ing = monto_a_guardar if monto_a_guardar > 0 else 0
-                        egr = abs(monto_a_guardar) if monto_a_guardar < 0 else 0
+                        ingreso = monto_final_val if monto_final_val > 0 else 0
+                        egreso = abs(monto_final_val) if monto_final_val < 0 else 0
+                        
                         hoja_f.append_row([
                             len(hoja_f.get_all_values()), str(date.today()), user["ID_USUARIO"],
-                            f"CIERRE {ins}", float(saldo_actual), float(ing), float(egr), 
-                            float(saldo_actual + monto_a_guardar), "APP"
+                            f"CIERRE {ins}", float(saldo_actual), float(ingreso), float(egreso), 
+                            float(saldo_actual + monto_final_val), "APP"
                         ])
                     
-                    st.success(f"✅ Guardado: ${monto_a_guardar:.2f}")
+                    st.success(f"✅ ¡Operación guardada! Resultado: ${monto_final_val:.2f}")
                     time.sleep(1)
                     limpiar_todo_al_final()
-
-        # --- 6. BOTÓN DE GUARDAR ---
-        if st.button("💾 GUARDAR REGISTRO", use_container_width=True, key=f"btn_save_{v}"):
-            if p_ent == 0 or p_sl == 0 or bala == 0:
-                st.warning("⚠️ Socio, los datos técnicos son obligatorios.")
-            else:
-                with st.spinner("Sincronizando con Google Sheets..."):
-                    # Preparamos la fila para Bitacora
-                    nueva_fila = [
-                        len(hoja_b.get_all_values()), user["ID_USUARIO"], str(date.today()),
-                        ins, acc, bala, p_ent, p_sl, tp_sugerido, round(lotaje, 2),
-                        0, datetime.now().strftime("%H:%M:%S"),
-                        img_may.name if img_may else "N/A", img_men.name if img_men else "N/A",
-                        img_ent.name if img_ent else "N/A", img_res.name if img_res else "N/A",
-                        "N/A", "N/A", "N/A", "N/A",
-                        tipo_final, monto_final, "NO", 0, "N/A", observaciones, semaforo
-                    ]
-                    hoja_b.append_row(nueva_fila)
-                    
-                    # Si la operación está cerrada, actualizamos Finanzas
-                    if tipo_final != "PENDIENTE":
-                        hoja_f.append_row([
-                            len(hoja_f.get_all_values()), str(date.today()), user["ID_USUARIO"],
-                            f"CIERRE {ins}", saldo_actual, abs(monto_final) if monto_final >= 0 else 0,
-                            abs(monto_final) if monto_final < 0 else 0, saldo_actual + monto_final, "APP"
-                        ])
-                    
-                    st.success("✅ ¡Operación guardada!")
-                    time.sleep(1)
-                    limpiar_todo_al_final()
-
     # # SECCION EDITAR (LABORATORIO TEMPORAL)
     elif menu == "✏️ Editar":
         st.header("✏️ Laboratorio de Edición")
