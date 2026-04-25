@@ -444,11 +444,17 @@ def main_app():
                         ]
                         hoja_b.append_row(nueva_fila)
                         
-                        # --- SOLUCIÓN 1: LIMPIEZA PROFUNDA ---
-                        st.success("✅ ¡Registrado! Reseteando plantilla...")
+                        # --- LIMPIEZA TOTAL DE SESIÓN (LA GRANADA) ---
+                        st.success("✅ ¡Registrado! Limpiando sistema...")
+                        
+                        # Borramos absolutamente todo lo que Streamlit guardó en memoria
+                        for key in list(st.session_state.keys()):
+                            # Solo dejamos la info del usuario para que no te saque de la app
+                            if key != "user_info" and key != "logged_in": 
+                                del st.session_state[key]
+                        
                         time.sleep(1)
-                        # Llamamos a la función mágica que cambia la llave
-                        resetear_formulario_completo()
+                        st.rerun()
 
         # =========================================================
         # # MÓDULO DE CIERRE (CON ELIMINACIÓN REAL DE LA LISTA)
