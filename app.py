@@ -345,27 +345,28 @@ def main_app():
 
 
 # =========================================================
-    # # SECCION 7: BITÁCORA (SOLUCIÓN DEFINITIVA DE LIMPIEZA)
+    # # SECCION 7: BITÁCORA (SOLUCIÓN FINAL CON CALLBACKS)
     # =========================================================
     elif menu == "📝 Bitácora":
         from datetime import datetime
         st.header("📝 Bitácora de Operaciones")
 
-        # 1. INICIALIZAR VARIABLES DE ESTADO (Si no existen)
-        # Esto permite que nosotros controlemos el valor de los cuadros de texto
-        if "bit_instrumento" not in st.session_state: st.session_state.bit_instrumento = "FLIPX1"
-        if "bit_accion" not in st.session_state: st.session_state.bit_accion = "COMPRA"
-        if "bit_bala" not in st.session_state: st.session_state.bit_bala = 0.0
-        if "bit_ent" not in st.session_state: st.session_state.bit_ent = 0.0
-        if "bit_sl" not in st.session_state: st.session_state.bit_sl = 0.0
-        if "bit_ratio" not in st.session_state: st.session_state.bit_ratio = 1.0
-        if "bit_obs" not in st.session_state: st.session_state.bit_obs = ""
+        # 1. FUNCIÓN MÁGICA DE LIMPIEZA (CALLBACK)
+        def limpiar_formulario_callback():
+            # Borramos las llaves del formulario para que vuelvan a sus valores por defecto
+            llaves_a_limpiar = [
+                'f_ins', 'f_acc', 'f_bala', 'f_ent', 'f_sl', 'f_ratio', 'f_obs',
+                'u_m', 'u_mn', 'u_e' # Esto limpiará también los archivos
+            ]
+            for k in llaves_a_limpiar:
+                if k in st.session_state:
+                    del st.session_state[k]
 
-        # LECTURA DE DATOS
+        # 2. LECTURA DE DATOS
         try:
             hoja_f = doc.worksheet("Finanzas")
             hoja_b = doc.worksheet("Bitacora")
-            # Leemos datos frescos forzados
+            # Forzamos lectura fresca para que la lista de pendientes sea real
             df_b_raw = pd.DataFrame(hoja_b.get_all_records())
             df_b_raw.columns = df_b_raw.columns.str.strip() 
             
@@ -380,15 +381,16 @@ def main_app():
         st.subheader("🚀 Nueva Operación")
         
         c1, c2, c3 = st.columns(3)
-        # Vinculamos el selectbox/input al session_state mediante 'key'
-        ins = c1.selectbox("Instrumento", ["FLIPX1", "FLIPX2", "FXVOL20", "FXVOL40", "SFXVOL20", "SFXVOL40"], key="bit_instrumento")
-        acc = c2.selectbox("Acción", ["COMPRA", "VENTA"], key="bit_accion")
-        bala = c3.number_input("Valor de la Bala ($)", min_value=0.0, step=0.5, key="bit_bala")
+        ins = c1.selectbox("Instrumento", ["FLIPX1", "FLIPX2", "FXVOL20", "FXVOL40", "SFXVOL20", "SFXVOL40"], key="f_ins")
+        acc = c2.selectbox("Acción", ["COMPRA", "VENTA"], key="f_acc")
+        # Bala inicia en 0.0
+        bala = c3.number_input("Valor de la Bala ($)", min_value=0.0, value=0.0, step=0.5, key="f_bala")
 
         cp1, cp2, cp3 = st.columns(3)
-        p_ent = cp1.number_input("Precio de Entrada", format="%.2f", key="bit_ent")
-        p_sl = cp2.number_input("Precio de SL", format="%.2f", key="bit_sl")
-        ratio = cp3.number_input("Ratio Objetivo (1:X)", min_value=0.1, step=0.1, key="bit_ratio")
+        p_ent = cp1.number_input("Precio de Entrada", format="%.2f", value=0.0, key="f_ent")
+        p_sl = cp2.number_input("Precio de SL", format="%.2f", value=0.0, key="f_sl")
+        # Ratio 1:1 por defecto
+        ratio = cp3.number_input("Ratio Objetivo (1:X)", min_value=0.1, value=1.0, step=0.1, key="f_ratio")
 
         # Cálculos instantáneos
         distancia = abs(p_ent - p_sl)
@@ -398,18 +400,18 @@ def main_app():
         if p_ent > 0 and p_sl > 0 and bala > 0:
             st.success(f"✅ Lotaje: {lotaje_calc:.2f} | TP: {tp_calc:.2f}")
 
-        with st.form("form_registro"):
+        with st.form("form_registro_operacion"):
             st.subheader("🖼️ Análisis Técnico")
             img1, img2, img3 = st.columns(3)
-            # Para archivos no se puede forzar valor, pero el rerun lo limpia
-            f_mayor = img1.file_uploader("Gráfico Mayor", type=['png', 'jpg'])
-            f_menor = img2.file_uploader("Gráfico Menor", type=['png', 'jpg'])
-            f_ejec = img3.file_uploader("Ejecución", type=['png', 'jpg'])
-            obs = st.text_area("Observaciones", key="bit_obs")
+            f_mayor = img1.file_uploader("Gráfico Mayor", type=['png', 'jpg'], key="u_m")
+            f_menor = img2.file_uploader("Gráfico Menor", type=['png', 'jpg'], key="u_mn")
+            f_ejec = img3.file_uploader("Ejecución", type=['png', 'jpg'], key="u_e")
+            obs = st.text_area("Observaciones", key="f_obs")
             
+            # El botón llama a la función de guardado
             if st.form_submit_button("🚀 REGISTRAR PENDIENTE"):
                 if p_ent == 0 or p_sl == 0 or bala == 0:
-                    st.error("Completa los datos antes de guardar.")
+                    st.error("Socio, falta información para calcular.")
                 else:
                     fecha_now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     datos_b = hoja_b.get_all_values()
@@ -421,52 +423,45 @@ def main_app():
                         "PENDIENTE", 0, "NO", 0, "N/A", obs, "CALMA"
                     ]
                     hoja_b.append_row(nueva_fila)
+                    st.success("✅ ¡Trade registrado!")
                     
-                    # --- LIMPIEZA MANUAL FORZADA ---
-                    st.session_state.bit_bala = 0.0
-                    st.session_state.bit_ent = 0.0
-                    st.session_state.bit_sl = 0.0
-                    st.session_state.bit_ratio = 1.0
-                    st.session_state.bit_obs = ""
-                    
-                    st.success("✅ ¡Trade guardado!")
+                    # LLAMAMOS A LA LIMPIEZA Y REINICIAMOS
+                    limpiar_formulario_callback()
                     time.sleep(1)
                     st.rerun()
 
-        # --- MÓDULO DE CIERRE (CON FILTRO REAL) ---
+        # --- MÓDULO DE CIERRE (ELIMINACIÓN REAL DE LISTA) ---
         st.divider()
         st.subheader("⏳ Operaciones en Curso")
 
-        # Volvemos a filtrar el DF para asegurar que los cambios se vean
         if not df_b_raw.empty:
+            # Filtro por usuario y estado
             ops_abiertas = df_b_raw[(df_b_raw["ID_USUARIO"].astype(str) == str(user["ID_USUARIO"])) & 
                                     (df_b_raw["ESTADO_RESULTADO"] == "PENDIENTE")]
 
             if not ops_abiertas.empty:
                 for idx, fila in ops_abiertas.iterrows():
-                    id_t = fila.get('ID_BITACORA', idx)
+                    id_trade = fila.get('ID_BITACORA', idx)
                     with st.expander(f"📌 {fila.get('INSTRUMENTO','')} | Entrada: {fila.get('PRECIO_ENT',0)}"):
-                        # Usamos el id del trade para que el formulario sea único
-                        with st.form(f"cierre_form_{id_t}"):
-                            st.write(f"Trade ID: {id_t}")
-                            res_final = st.selectbox("Resultado", ["TP", "SL", "BE"], key=f"sel_{id_t}")
+                        with st.form(f"cierre_{id_trade}"):
+                            res_final = st.selectbox("Resultado", ["TP", "SL", "BE"], key=f"res_{id_trade}")
                             
+                            # Cálculo de sugerencia seguro
                             p_target = float(fila.get('PRECIO_T', fila.get('PRECIO_TP', 0)))
                             p_entry = float(fila.get('PRECIO_ENT', 0))
                             lote_f = float(fila.get('LOTAJE', 0))
                             bala_f = float(fila.get('VALOR_BALA', 0))
 
                             m_sug = abs(p_target - p_entry) * lote_f if res_final == "TP" else (-bala_f if res_final == "SL" else 0.0)
-                            m_real = st.number_input("Monto USD", value=float(m_sug), key=f"val_{id_t}")
+                            m_real = st.number_input("Monto USD", value=float(m_sug), key=f"val_{id_trade}")
                             
                             if st.form_submit_button("🏁 FINALIZAR"):
-                                # +2 porque en Sheets la fila 1 es encabezado y el ID empieza en 0
-                                fila_actualizar = int(id_t) + 2
-                                hoja_b.update_cell(fila_actualizar, 21, res_final)
-                                hoja_b.update_cell(fila_actualizar, 22, m_real)
-                                hoja_b.update_cell(fila_actualizar, 13, datetime.now().strftime("%H:%M:%S"))
+                                n_fila = int(id_trade) + 2
+                                hoja_b.update_cell(n_fila, 21, res_final)
+                                hoja_b.update_cell(n_fila, 22, m_real)
+                                hoja_b.update_cell(n_fila, 13, datetime.now().strftime("%H:%M:%S"))
                                 
-                                # Registrar en Finanzas
+                                # Sincronización con Finanzas
                                 d_fin = hoja_f.get_all_values()
                                 hoja_f.append_row([
                                     len(d_fin), str(date.today()), user["ID_USUARIO"],
@@ -475,13 +470,11 @@ def main_app():
                                     abs(m_real) if m_real < 0 else 0,
                                     saldo_actual + m_real, "Bitácora"
                                 ])
-                                st.success("¡Trade cerrado!")
+                                st.success("✅ Trade cerrado. Limpiando lista...")
                                 time.sleep(1)
-                                # ESTO ES LO QUE LIMPIA LA LISTA: Re-ejecuta todo, 
-                                # lee el Excel de nuevo, y como ya no es "PENDIENTE", desaparece.
-                                st.rerun()
+                                st.rerun() # Esto obliga a leer el Sheets y el trade ya NO saldrá aquí
             else:
-                st.info("No hay trades pendientes.")
+                st.info("No hay trades abiertos.")
 
     # # SECCION 8: BACKTESTING
     elif menu == "📊 Backtesting":
