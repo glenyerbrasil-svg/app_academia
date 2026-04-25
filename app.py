@@ -345,144 +345,143 @@ def main_app():
 
 
 # =========================================================
-    # # SECCION 7: BITÁCORA (INTEGRAL CON EDICIÓN Y LIMPIEZA)
+    # # SECCION 7: BITÁCORA (VERSIÓN FINAL CON CÁLCULOS EN VIVO)
     # =========================================================
     elif menu == "📝 Bitácora":
         from datetime import datetime
         st.header("📝 Bitácora de Operaciones")
 
-        # --- 1. GESTIÓN DE ESTADO (LIMPIEZA Y EDICIÓN) ---
-        # Inicializamos variables de estado si no existen
-        if 'edit_mode' not in st.session_state: st.session_state.edit_mode = False
-        if 'datos_edit' not in st.session_state: st.session_state.datos_edit = {}
+        # 1. FUNCIÓN MÁGICA DE LIMPIEZA (CALLBACK)
+        # Se ejecuta después de guardar para resetear los inputs
+        def limpiar_formulario_callback():
+            llaves_a_borrar = [
+                'b_ins', 'b_acc', 'b_bala', 'b_rat', 'b_ent', 'b_sl',
+                'b_img1', 'b_img2', 'b_img3', 'b_img4', 'b_obs', 
+                'b_emo', 'b_res_tipo', 'b_res_monto'
+            ]
+            for llave in llaves_a_borrar:
+                if llave in st.session_state:
+                    del st.session_state[llave]
 
-        def limpiar_formulario():
-            st.session_state.edit_mode = False
-            st.session_state.datos_edit = {}
-            st.cache_data.clear()
-            st.rerun()
-
-        # --- 2. CARGA DE DATOS ---
+        # 2. LECTURA DE DATOS
         try:
             hoja_f = doc.worksheet("Finanzas")
             hoja_b = doc.worksheet("Bitacora")
-            # Forzamos todo a string y limpiamos columnas para evitar KeyErrors
-            df_total = pd.DataFrame(hoja_b.get_all_records()).astype(str)
-            df_total.columns = df_total.columns.str.strip()
+            # Forzamos lectura fresca para que la lista de pendientes sea real
+            df_b_raw = pd.DataFrame(hoja_b.get_all_records())
+            df_b_raw.columns = df_b_raw.columns.str.strip() 
             
             df_f = pd.DataFrame(hoja_f.get_all_records())
             saldo_actual = float(df_f.iloc[-1].get("SALDO_FINAL", 0)) if not df_f.empty else 0.0
+            st.info(f"💰 **Saldo disponible:** ${saldo_actual:,.2f}")
         except Exception as e:
             st.error(f"Error de conexión: {e}")
             st.stop()
 
-        # --- 3. FORMULARIO DINÁMICO ---
-        st.subheader("🚀 Registro / Edición de Operación")
+        # --- 3. MOTOR DE REGISTRO (SIN SESIÓN PEGADA) ---
+        st.subheader("🚀 Nueva Operación")
         
-        # Valores por defecto (si estamos editando, se cargan los del trade)
-        d = st.session_state.datos_edit
-        
-        with st.container():
+        # Formulario principal con Callbacks
+        with st.form("form_bitacora_completo", clear_on_submit=False):
             # Fila 1: Instrumento y Bala
-            col_ins, col_acc, col_bala = st.columns(3)
-            list_ins = ["FLIPX1", "FLIPX2", "FLIPX3", "FLIPX4", "FLIPX5", "FXVOL20", "FXVOL40", "FXVOL60", "FXVOL80", "FXVOL99", "SFXVOL20", "SFXVOL40", "SFXVOL60", "SFXVOL80", "SFXVOL99"]
-            
-            idx_ins = list_ins.index(d['INSTRUMENTO']) if d.get('INSTRUMENTO') in list_ins else 0
-            ins = col_ins.selectbox("Instrumento", list_ins, index=idx_ins)
-            
-            idx_acc = ["COMPRA", "VENTA"].index(d['ACCION']) if d.get('ACCION') in ["COMPRA", "VENTA"] else 0
-            acc = col_acc.selectbox("Acción", ["COMPRA", "VENTA"], index=idx_acc)
-            
-            bala = col_bala.number_input("Valor de la Bala ($)", value=float(d.get('VALOR_BALA', 0.0)), step=0.5)
+            col1, col2, col3 = st.columns(3)
+            instrumentos = ["FLIPX1", "FLIPX2", "FLIPX3", "FLIPX4", "FLIPX5", "FXVOL20", "FXVOL40", "FXVOL60", "FXVOL80", "FXVOL99", "SFXVOL20", "SFXVOL40", "SFXVOL60", "SFXVOL80", "SFXVOL99"]
+            ins = col1.selectbox("Instrumento", instrumentos, key="b_ins")
+            acc = col2.selectbox("Acción", ["COMPRA", "VENTA"], key="b_acc")
+            # Bala inicia en 0.0
+            bala = col3.number_input("Valor de la Bala ($)", min_value=0.0, value=0.0, step=0.5, format="%.2f", key="b_bala")
 
             # Fila 2: ORDEN SOLICITADO (Ratio, Entrada, SL)
-            c_rat, c_ent, c_sl = st.columns(3)
-            ratio = c_rat.number_input("1) Ratio Objetivo (1:X)", value=float(d.get('RATIO', 1.0)), step=0.1)
-            p_ent = c_ent.number_input("2) Precio de Entrada", value=float(d.get('PRECIO_ENT', 0.0)), format="%.4f")
-            p_sl = c_sl.number_input("3) Precio de SL", value=float(d.get('PRECIO_SL', 0.0)), format="%.4f")
+            col4, col5, col6 = st.columns(3)
+            # Ratio 1:1 por defecto
+            ratio = col4.number_input("1) Ratio Objetivo (1:X)", min_value=0.1, value=1.0, step=0.1, key="b_rat")
+            p_ent = col5.number_input("2) Precio de Entrada", format="%.4f", value=0.0, key="b_ent")
+            p_sl = col6.number_input("3) Precio de SL", format="%.4f", value=0.0, key="b_sl")
 
-            # Cálculo automático en pantalla
+            # Cálculos automáticos visibles ANTES de guardar
             dist = abs(p_ent - p_sl)
             lot_c = bala / dist if dist > 0 else 0.0
             tp_c = p_ent + (dist * ratio) if acc == "COMPRA" else p_ent - (dist * ratio)
 
             if p_ent > 0 and p_sl > 0:
-                st.info(f"📊 **Cálculo:** Lotaje: **{lot_c:.2f}** | TP Sugerido: **{tp_c:.4f}**")
+                st.markdown(f"""
+                    <div style="background-color: #0E1117; padding: 10px; border-radius: 5px; border: 1px solid #4CAF50; margin-bottom: 10px;">
+                        <h4 style="color: #4CAF50; margin: 0; text-align: center;">🎯 TP: {tp_c:.4f} | 📦 Lotaje: {lot_c:.2f}</h4>
+                    </div>
+                """, unsafe_allow_html=True)
 
-        # Gráficos
-        st.divider()
-        g1, g2 = st.columns(2)
-        link_mayor = g1.text_input("Gráfico Mayor", value=d.get('GRAFICO_MAYOR', ''))
-        link_menor = g2.text_input("Gráfico Menor", value=d.get('GRAFICO_MENOR', ''))
-        g3, g4 = st.columns(2)
-        link_ent = g3.text_input("Gráfico Entrada", value=d.get('GRAFICO_ENTRADA', ''))
-        link_res = g4.text_input("Gráfico Resultado", value=d.get('GRAFICO_RESULTADO', ''))
+            # Fila 3: Gráficos
+            st.divider()
+            st.write("🖼️ Links de Gráficos (TradingView, Lightshot, etc.)")
+            g1, g2 = st.columns(2)
+            g_mayor = g1.text_input("Gráfico Mayor (H4/D1)", key="b_img1")
+            g_menor = g2.text_input("Gráfico Menor (M15/H1)", key="b_img2")
+            g3, g4 = st.columns(2)
+            g_entrada = g3.text_input("Gráfico de Entrada", key="b_img3")
+            g_resultado = g4.text_input("Gráfico de Resultado", key="b_img4")
 
-        # Cierre y Emociones
-        st.divider()
-        with st.form("form_registro_bitacora"):
-            c_em, c_res = st.columns(2)
-            # Semáforo emocional (ajustado para que no de error de índice)
-            list_em = ["🔴 Ansioso", "🟠 Nervioso", "🟡 Neutral", "🟢 Calma", "🔵 Zen"]
-            idx_em = list_em.index(d['SENTIMIENTO']) if d.get('SENTIMIENTO') in list_em else 3
-            semaforo = c_em.select_slider("Semáforo Emocional", options=list_em, value=list_em[idx_em])
+            # Fila 4: Psicología y Cierre
+            st.divider()
+            c_emo, c_res = st.columns(2)
+            semaforo = c_emo.select_slider("Semáforo Emocional", options=["Ansioso", "Nervioso", "Neutral", "Calma", "Zen"], value="Calma", key="b_emo")
             
-            idx_res = ["PENDIENTE", "TP", "SL", "BE"].index(d['ESTADO_RESULTADO']) if d.get('ESTADO_RESULTADO') in ["PENDIENTE", "TP", "SL", "BE"] else 0
-            tipo_res = c_res.selectbox("Resultado", ["PENDIENTE", "TP", "SL", "BE"], index=idx_res)
+            # Resultado: PENDIENTE por defecto
+            tipo_res = c_res.selectbox("Estado de la Operación", ["PENDIENTE", "TP", "SL", "BE"], key="b_res_tipo")
             
-            # Cálculo de monto para el BE/TP/SL
-            m_sug = 0.0
-            if tipo_res == "TP": m_sug = abs(tp_c - p_ent) * lot_c
-            elif tipo_res == "SL": m_sug = -bala
+            # Cálculo sugerido del monto
+            m_sugerido = 0.0
+            if tipo_res == "TP": m_sugerido = abs(tp_c - p_ent) * lot_c
+            elif tipo_res == "SL": m_sugerido = -bala
             
-            monto_f = st.number_input("Monto Resultante ($)", value=float(d.get('MONTO_RESULTADO', m_sug)))
-            obs = st.text_area("Observaciones", value=d.get('OBSERVACIONES', ''))
+            # Editable para el Break Even
+            monto_f = st.number_input("Monto Resultante Final ($)", value=float(m_sugerido), format="%.2f", key="b_res_monto")
+            
+            obs = st.text_area("Observaciones del Trade", key="b_obs")
 
-            btn_label = "📝 ACTUALIZAR TRADE" if st.session_state.edit_mode else "💾 GUARDAR NUEVO"
-            if st.form_submit_button(btn_label):
-                if p_ent == 0:
-                    st.error("Socio, falta el precio de entrada.")
+            # BOTÓN DE GUARDAR
+            if st.form_submit_button("💾 GUARDAR REGISTRO COMPLETO"):
+                if p_ent == 0 or p_sl == 0 or bala == 0:
+                    st.error("Socio, te faltan datos técnicos (Bala o Precios).")
                 else:
-                    # Datos para la fila
-                    # Si editamos, usamos su ID original; si no, el largo de la hoja
-                    id_save = d.get('ID_BITACORA', len(hoja_b.get_all_values()) - 1)
-                    
-                    datos_fila = [
-                        id_save, user["ID_USUARIO"], str(date.today()),
+                    nueva_fila = [
+                        len(hoja_b.get_all_values()), user["ID_USUARIO"], str(date.today()),
                         ins, acc, bala, p_ent, p_sl, tp_c, round(lot_c, 2),
-                        0, datetime.now().strftime("%H:%M:%S"), link_mayor, link_menor, link_ent, link_res,
+                        0, datetime.now().strftime("%H:%M:%S"), g_mayor, g_menor, g_entrada, g_resultado, 
                         "N/A", "N/A", "N/A", "N/A",
                         tipo_res, monto_f, "NO", 0, "N/A", obs, semaforo
                     ]
-
-                    if st.session_state.edit_mode:
-                        # Sobrescribir fila (ID + 2)
-                        fila_edit = int(id_save) + 2
-                        hoja_b.update(f"A{fila_edit}:AA{fila_edit}", [datos_fila])
-                        st.success("✅ Trade actualizado.")
-                    else:
-                        hoja_b.append_row(datos_fila)
-                        st.success("✅ Trade guardado.")
-
-                    # Finanzas solo si no es pendiente
-                    if tipo_res != "PENDIENTE":
-                        hoja_f.append_row([len(hoja_f.get_all_values()), str(date.today()), user["ID_USUARIO"], f"BITACORA {ins}", saldo_actual, abs(monto_f) if monto_f >= 0 else 0, abs(monto_f) if monto_f < 0 else 0, saldo_actual + monto_f, "AUTO"])
+                    hoja_b.append_row(nueva_fila)
                     
+                    # Registro en Finanzas si cerró
+                    if tipo_res != "PENDIENTE":
+                        hoja_f.append_row([
+                            len(hoja_f.get_all_values()), str(date.today()), user["ID_USUARIO"],
+                            f"BITACORA {ins}", saldo_actual, abs(monto_f) if monto_f >= 0 else 0,
+                            abs(monto_f) if monto_f < 0 else 0, saldo_actual + monto_f, "AUTO"
+                        ])
+                    
+                    st.success("✅ Trade archivado correctamente.")
+                    
+                    # LLAMAMOS A LA LIMPIEZA Y REINICIAMOS
+                    limpiar_formulario_callback()
                     time.sleep(1)
-                    limpiar_formulario() # <--- AQUÍ SE BORRA TODO
+                    st.rerun()
 
-        # --- 4. HISTORIAL ---
+        # --- 4. LISTA DE LOS ÚLTIMOS 5 ---
         st.divider()
         st.subheader("📅 Últimos 5 Movimientos")
         id_u = str(user["ID_USUARIO"])
-        if not df_total.empty:
-            df_u = df_total[df_total["ID_USUARIO"] == id_u].tail(5)
-            for _, fila in df_u[::-1].iterrows():
-                with st.expander(f"📌 {fila['INSTRUMENTO']} | {fila['ESTADO_RESULTADO']} | {fila['FECHA']}"):
-                    if st.button(f"✏️ Editar ID: {fila['ID_BITACORA']}", key=f"edit_{fila['ID_BITACORA']}"):
-                        st.session_state.edit_mode = True
-                        st.session_state.datos_edit = fila.to_dict()
-                        st.rerun()
+        if not df_b_raw.empty:
+            # Filtramos por usuario y tomamos los últimos 5
+            df_user = df_b_raw[df_b_raw["ID_USUARIO"] == id_u].tail(5)
+            # Invertimos para ver el más nuevo arriba
+            for _, fila in df_user[::-1].iterrows():
+                estado_f = fila["ESTADO_RESULTADO"]
+                icon = "🔵" if estado_f == "PENDIENTE" else "🟢" if estado_f == "TP" else "🔴"
+                with st.expander(f"{icon} {fila['INSTRUMENTO']} | {estado_f} | {fila['FECHA']}"):
+                    st.write(f"**Obs:** {fila['OBSERVACIONES']}")
+                    if estado_f == "PENDIENTE":
+                        st.warning("Para editar o cerrar este trade, usa el formulario de arriba.")
 
     # # SECCION 8: BACKTESTING
     elif menu == "📊 Backtesting":
