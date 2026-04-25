@@ -148,10 +148,9 @@ def login_v2():
                 c_pass = st.text_input("Confirmar Contraseña", type="password")
                 
                 if st.form_submit_button("Validar e Iniciar Verificación"):
-                    # --- LIMPIEZA ESTÉTICA (Toque de Socio) ---
-                    nombre_estetico = n_nombre.strip().title() # Pone iniciales en Mayúscula
-                    user_limpio = n_user.strip().lower()      # Login siempre en minúsculas
-                    email_limpio = n_email.strip().lower()    # Email siempre en minúsculas
+                    nombre_estetico = n_nombre.strip().title() 
+                    user_limpio = n_user.strip().lower()      
+                    email_limpio = n_email.strip().lower()    
                     
                     datos = hoja_u.get_all_records()
                     if any(str(r.get("EMAIL")).lower() == email_limpio for r in datos):
@@ -186,7 +185,6 @@ def login_v2():
                     f_vence = f_hoy + timedelta(days=7)
                     
                     datos = hoja_u.get_all_records()
-                    # Mapeo de las 23 columnas de tu Excel
                     nueva_fila = [
                         len(datos)+1, t['user'], t['nombre'], t['email'], t['tel'], t['pass'], t['pais'],
                         "DEMO", "Padawan", "ACTIVO", str(f_hoy), t['nacimiento'],
@@ -205,7 +203,6 @@ def login_v2():
                 st.session_state["PASO_REGISTRO"] = 1
                 st.rerun()
 
-    # --- SUBSECCIÓN: RECUPERAR CLAVE ---
     elif menu_acceso == "Recuperar Clave":
         email_rec = st.text_input("Email registrado")
         if st.button("Enviar Clave Temporal"):
@@ -226,11 +223,8 @@ def main_app():
     cliente = conectar_google()
     doc = cliente.open("Bitacora_Academia1")
     
-    # --- CONFIGURACIÓN DE RANGOS E IMÁGENES (GitHub Raw) ---
-    # Convertimos tus links a formato raw para que Streamlit los lea
     URL_BASE = "https://raw.githubusercontent.com/glenyerbrasil-svg/app_academia/main/assets/"
     
-    # Mapeo exacto basado en tu columna "NIVEL"
     rangos_config = {
         "Padawan": {
             "img": f"{URL_BASE}joven_padawan.png",
@@ -249,22 +243,20 @@ def main_app():
         }
     }
     
-    # Extraemos el nivel del usuario (limpiando espacios por si acaso)
     nivel_user = str(user.get("NIVEL", "Padawan")).strip()
     config = rangos_config.get(nivel_user, rangos_config["Padawan"])
     
     # --- SIDEBAR PERSONALIZADO ---
     with st.sidebar:
-        # Mostramos la insignia del rango
         st.image(config["img"], use_container_width=True)
         st.markdown(f"<h2 style='text-align: center;'>{user['NOMBRE']}</h2>", unsafe_allow_html=True)
         st.markdown(f"<p style='text-align: center; color: {config['color']}; font-weight: bold;'>{config['label']}</p>", unsafe_allow_html=True)
         st.divider()
         
-        # MENÚ DE NAVEGACIÓN
+        # MENÚ DE NAVEGACIÓN (MODIFICADO POR EL SOCIO)
         menu = st.radio(
             "Módulos del Sistema:",
-            ["🏠 Home", "🎓 Escuela", "📝 Bitácora", "📊 Backtesting", "💰 Finanzas"]
+            ["🏠 Home", "🎓 Escuela", "📝 Bitácora", "✏️ Editar", "📊 Backtesting", "💰 Finanzas", "📈 Reportes", "💬 Forum"]
         )
         
         st.divider()
@@ -296,7 +288,6 @@ def main_app():
             }
         }
 
-        # Asegúrate de que 'nivel_user' esté definido arriba en tu main_app
         info = mensajes_rango.get(nivel_user, mensajes_rango["Padawan"])
 
         st.markdown(f"""
@@ -312,20 +303,17 @@ def main_app():
         
         niveles_jerarquia = ["Padawan", "Jedi", "Maestro Jedi"]
         
-        # Obtenemos el índice del rango del usuario
         try:
             rango_index = niveles_jerarquia.index(nivel_user)
         except ValueError:
             rango_index = 0
             
-        # --- BLOQUE 1: PADAWAN ---
         with st.expander("🛡️ Módulo 1: Iniciación (Nivel Padawan)", expanded=(nivel_user == "Padawan")):
             st.info("Fundamentos, psicología básica y manejo de la Bitácora.")
             st.write("*(Contenido disponible para todos)*")
 
         st.divider()
 
-        # --- BLOQUE 2: JEDI ---
         if rango_index >= 1:
             with st.expander("⚔️ Módulo 2: Caballero (Nivel Jedi)", expanded=(nivel_user == "Jedi")):
                 st.info("Estrategias avanzadas y gestión de riesgo profesional.")
@@ -335,7 +323,6 @@ def main_app():
 
         st.divider()
 
-        # --- BLOQUE 3: MAESTRO JEDI ---
         if rango_index >= 2:
             with st.expander("🌌 Módulo 3: Maestría (Nivel Maestro Jedi)", expanded=(nivel_user == "Maestro Jedi")):
                 st.info("Lectura institucional y entradas de alta precisión.")
@@ -351,21 +338,18 @@ def main_app():
         from datetime import datetime
         st.header("📝 Bitácora de Operaciones")
 
-        # 1. MOTOR DE LIMPIEZA: Contador de Versión (Evita DuplicateKey y APIException)
         if 'v_form' not in st.session_state:
             st.session_state.v_form = 0
 
         def limpiar_todo_al_final():
-            # Aumentamos la versión: esto limpia todos los inputs automáticamente
             st.session_state.v_form += 1
+            st.session_state.edit_data = None
             st.rerun()
 
-        # 2. CARGA Y LIMPIEZA DE DATOS (Evita KeyErrors)
         try:
             hoja_f = doc.worksheet("Finanzas")
             hoja_b = doc.worksheet("Bitacora")
             
-            # Cargamos datos y estandarizamos columnas a MAYÚSCULAS y sin espacios
             datos_b = hoja_b.get_all_records()
             df_b = pd.DataFrame(datos_b) if datos_b else pd.DataFrame()
             if not df_b.empty:
@@ -378,7 +362,6 @@ def main_app():
             st.error(f"Error de conexión o columnas: {e}")
             st.stop()
 
-        # --- 3. REGISTRO TÉCNICO (Cálculos en Vivo con Keys Dinámicas) ---
         v = st.session_state.v_form
         st.subheader("🚀 Nueva Operación")
         
@@ -393,7 +376,6 @@ def main_app():
         p_ent = c_ent.number_input("2) Precio de Entrada", format="%.4f", key=f"ent_{v}")
         p_sl = c_sl.number_input("3) Precio de SL", format="%.4f", key=f"sl_{v}")
 
-        # Cálculos instantáneos (Se actualizan al escribir)
         distancia = abs(p_ent - p_sl)
         lotaje = bala / distancia if distancia > 0 else 0.0
         tp_sugerido = p_ent + (distancia * ratio) if acc == "COMPRA" else p_ent - (distancia * ratio)
@@ -401,7 +383,6 @@ def main_app():
         if p_ent > 0 and p_sl > 0:
             st.success(f"📊 **Cálculo:** Lotaje: **{lotaje:.2f}** | TP Sugerido: **{tp_sugerido:.4f}**")
 
-        # --- 4. SECCIÓN DE GRÁFICOS (Carga de Imágenes/Cámara) ---
         st.divider()
         st.write("🖼️ **Evidencia Visual**")
         g_c1, g_c2 = st.columns(2)
@@ -411,16 +392,13 @@ def main_app():
         img_ent = g_c3.file_uploader("Gráfico Entrada", type=['png', 'jpg', 'jpeg'], key=f"img3_{v}")
         img_res = g_c4.file_uploader("Gráfico Resultado", type=['png', 'jpg', 'jpeg'], key=f"img4_{v}")
 
-        # --- 5. PSICOLOGÍA Y RESULTADO ---
         st.divider()
         col_e, col_r = st.columns(2)
-        # Semáforo: Calma a la izquierda
         opciones_emo = ["🟢 Calma", "🔵 Zen", "🟡 Neutral", "🟠 Nervioso", "🔴 Ansioso"]
         semaforo = col_e.select_slider("Semáforo Emocional", options=opciones_emo, value="🟢 Calma", key=f"emo_{v}")
         
         tipo_final = col_r.selectbox("Estado Final", ["PENDIENTE", "TP", "SL", "BE"], key=f"tipo_{v}")
         
-        # Lógica de monto automático
         monto_auto = 0.0
         if tipo_final == "TP": monto_auto = abs(tp_sugerido - p_ent) * lotaje
         elif tipo_final == "SL": monto_auto = -float(bala)
@@ -428,15 +406,13 @@ def main_app():
         monto_final = st.number_input("Monto Resultante ($)", value=float(monto_auto), format="%.2f", key=f"monto_{v}")
         observaciones = st.text_area("Observaciones", key=f"obs_{v}")
 
-        # --- BOTÓN DE GUARDAR ---
         if st.button("💾 GUARDAR REGISTRO", use_container_width=True, key=f"btn_save_{v}"):
             if p_ent == 0 or p_sl == 0 or bala == 0:
                 st.warning("⚠️ Socio, los datos técnicos son obligatorios.")
             else:
                 with st.spinner("Sincronizando con Google Sheets..."):
-                    # Preparamos la fila
                     nueva_fila = [
-                        len(hoja_b.get_all_values()), user["ID_USUARIO"], str(date.today()),
+                        len(ho_b.get_all_values()), user["ID_USUARIO"], str(date.today()),
                         ins, acc, bala, p_ent, p_sl, tp_sugerido, round(lotaje, 2),
                         0, datetime.now().strftime("%H:%M:%S"),
                         img_may.name if img_may else "N/A", img_men.name if img_men else "N/A",
@@ -455,36 +431,36 @@ def main_app():
                     
                     st.success("✅ ¡Operación guardada!")
                     time.sleep(1)
-                    limpiar_todo_al_final() # <--- Limpieza perfecta sin deslogueo
+                    limpiar_todo_al_final()
 
-        # --- 6. HISTORIAL SEGURO (Evita KeyErrors de las fotos) ---
         st.divider()
         st.subheader("📅 Últimos 5 Movimientos")
         if not df_b.empty:
             id_u = str(user["ID_USUARIO"])
             df_u = df_b[df_b["ID_USUARIO"].astype(str) == id_u].tail(5)
             for _, f in df_u[::-1].iterrows():
-                # Usamos .get() para evitar KeyErrors si falta una columna
                 inst = f.get("INSTRUMENTO", "UKN")
                 est = f.get("ESTADO_RESULTADO", "N/A")
                 fec = f.get("FECHA", "S/F")
                 with st.expander(f"📌 {inst} | {est} | {fec}"):
                     st.write(f"**Monto:** ${f.get('MONTO_RESULTADO', 0)} | **Emoción:** {f.get('SENTIMIENTO', 'N/A')}")
 
+    # # SECCION EDITAR (LABORATORIO TEMPORAL)
+    elif menu == "✏️ Editar":
+        st.header("✏️ Laboratorio de Edición")
+        st.info("Sección temporal para testear el historial y la modificación de registros.")
+
     # # SECCION 8: BACKTESTING
     elif menu == "📊 Backtesting":
         st.header("📊 Entrenamiento de Simulación (Backtesting)")
         st.info("Aquí los resultados no afectan tu capital real de la hoja de Finanzas.")
 
-    # =========================================================
-    # # SECCION 9: FINANZAS (CON DETECCIÓN INTELIGENTE)
-    # =========================================================
+    # # SECCION 9: FINANZAS
     elif menu == "💰 Finanzas":
         st.header("💰 Gestión de Capital")
         
         try:
             hoja_f = doc.worksheet("Finanzas")
-            # Leemos los datos como lista de listas para evitar el error de mapeo si está vacío
             lista_datos = hoja_f.get_all_values()
             
             if len(lista_datos) <= 1:
@@ -492,9 +468,7 @@ def main_app():
                 df_f = pd.DataFrame(columns=["ID_FINANZAS","FECHA","ID_USUARIO","TIPO_MOVIMIENTO","SALDO_ANT","DEPOSITO","RETIRO","SALDO_FINAL","NOTAS"])
                 saldo_actual = 0.0
             else:
-                # Si hay datos, creamos el DataFrame
                 df_f = pd.DataFrame(lista_datos[1:], columns=lista_datos[0])
-                # Filtramos por el usuario actual (usando el nombre exacto de tu columna en la foto)
                 df_user_f = df_f[df_f["ID_USUARIO"].astype(str) == str(user["ID_USUARIO"])]
                 saldo_actual = float(df_user_f.iloc[-1]["SALDO_FINAL"]) if not df_user_f.empty else 0.0
 
@@ -518,6 +492,15 @@ def main_app():
                     st.rerun()
         except Exception as e:
             st.error(f"Error de conexión: {e}")
+
+    # # SECCIONES VACÍAS PARA FUTURO
+    elif menu == "📈 Reportes":
+        st.header("📈 Reportes de Rendimiento")
+        st.write("Próximamente: Estadísticas detalladas de tu operativa.")
+
+    elif menu == "💬 Forum":
+        st.header("💬 Forum de la Academia")
+        st.write("Próximamente: Espacio para compartir trades y análisis con otros socios.")
 
 # =========================================================
 # # CONTROL DE FLUJO
