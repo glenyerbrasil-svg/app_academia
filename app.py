@@ -406,26 +406,30 @@ def main_app():
         img_ent = g_c3.file_uploader("Gráfico Entrada", type=['png', 'jpg', 'jpeg'], key="img_ent")
         img_res = g_c4.file_uploader("Gráfico Resultado", type=['png', 'jpg', 'jpeg'], key="img_res")
 
-        # --- 4. CIERRE Y PSICOLOGÍA ---
+# --- 4. CIERRE Y PSICOLOGÍA ---
         st.divider()
         with st.container():
             col_emo, col_res = st.columns(2)
-            # Semáforo iniciando en "Calma"
-            opciones_emo = ["Ansioso", "Nervioso", "Neutral", "Calma", "Zen"]
-            semaforo = col_emo.select_slider("Semáforo Emocional", options=opciones_emo, value="Calma")
+            
+            # Reorganización: Calma es el inicio (extremo izquierdo)
+            # A medida que deslizas a la derecha, la emoción cambia según tu criterio
+            opciones_emo = [
+                "🟢 Calma",    # Posición 0 (Default)
+                "🔵 Zen",      # Posición 1
+                "🟡 Neutral",  # Posición 2
+                "🟠 Nervioso", # Posición 3
+                "🔴 Ansioso"   # Posición 4
+            ]
+            
+            # El valor por defecto es el primero de la lista (Calma)
+            semaforo = col_emo.select_slider(
+                "Semáforo Emocional", 
+                options=opciones_emo, 
+                value="🟢 Calma",
+                help="Desliza a la derecha si sientes que tu estado emocional varía"
+            )
             
             tipo_final = col_res.selectbox("Estado Final", ["PENDIENTE", "TP", "SL", "BE"])
-            
-            # Cálculo automático del monto final según el estado elegido
-            monto_auto = 0.0
-            if tipo_final == "TP":
-                monto_auto = abs(tp_sugerido - p_ent) * lotaje
-            elif tipo_final == "SL":
-                monto_auto = -bala
-            
-            monto_final = st.number_input("Monto Resultante ($)", value=float(monto_auto), format="%.2f")
-            observaciones = st.text_area("Observaciones del Trade")
-
             # BOTÓN DE GUARDAR ÚNICO
             if st.button("💾 GUARDAR REGISTRO", use_container_width=True):
                 if p_ent == 0 or p_sl == 0 or bala == 0:
