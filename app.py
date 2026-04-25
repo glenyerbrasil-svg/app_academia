@@ -442,13 +442,13 @@ def main_app():
             
             observaciones = st.text_area("Análisis y Observaciones del Trade", placeholder="¿Por qué entraste? ¿Cómo te sentiste?")
 
-# --- BOTÓN DE GUARDAR (ESTRATEGIA DE RESET SEGURO) ---
+# --- BOTÓN DE GUARDAR CON LIMPIEZA ESPECÍFICA ---
             if st.button("💾 GUARDAR REGISTRO", use_container_width=True):
                 if p_ent == 0 or p_sl == 0 or bala == 0:
-                    st.warning("⚠️ Socio, los datos técnicos son obligatorios.")
+                    st.warning("⚠️ Socio, faltan datos técnicos (Bala, Entrada o SL).")
                 else:
-                    with st.spinner("Sincronizando con la nube..."):
-                        # 1. Preparamos la fila
+                    with st.spinner("Guardando en la nube..."):
+                        # 1. Guardar en Google Sheets (Tu lógica de fila_nueva se mantiene igual)
                         fila_nueva = [
                             len(hoja_b.get_all_values()), user["ID_USUARIO"], str(date.today()),
                             ins, acc, bala, p_ent, p_sl, tp_sugerido, round(lotaje, 2),
@@ -462,25 +462,32 @@ def main_app():
                         ]
                         hoja_b.append_row(fila_nueva)
                         
-                        # 2. Sincronización con Finanzas
                         if tipo_final != "PENDIENTE":
                             hoja_f.append_row([
                                 len(hoja_f.get_all_values()), str(date.today()), user["ID_USUARIO"],
-                                f"CIERRE {ins}", saldo_actual, 
-                                abs(monto_final) if monto_final >= 0 else 0,
-                                abs(monto_final) if monto_final < 0 else 0,
-                                saldo_actual + monto_final, "APP_TRADE"
+                                f"TRADE {ins}", saldo_actual, abs(monto_final) if monto_final >= 0 else 0,
+                                abs(monto_final) if monto_final < 0 else 0, saldo_actual + monto_final, "APP"
                             ])
                         
-                        st.success(f"✅ ¡Operación {ins} registrada con éxito!")
+                        st.success("✅ Trade guardado.")
+
+                        # --- 2. LIMPIEZA QUIRÚRGICA ---
+                        # Definimos qué llaves queremos borrar (las de los inputs)
+                        # OJO: Asegúrate de ponerle 'key' a tus inputs arriba (ej: st.number_input(..., key='p_ent'))
+                        llaves_bitacora = [
+                            'ins', 'acc', 'bala', 'ratio', 'p_ent', 'p_sl', 
+                            'img_may', 'img_men', 'img_ent', 'img_res', 
+                            'semaforo', 'tipo_final', 'monto_final', 'observaciones'
+                        ]
                         
-                        # --- 3. EL CAMBIO DEFINITIVO: RESET SIN BORRAR LA SESIÓN ---
-                        # En lugar de borrar st.session_state, forzamos el refresco
-                        # Streamlit, al no tener valores 'value' fijos en los inputs,
-                        # los reiniciará solos al hacer rerun si no están anclados.
-                        
-                        time.sleep(1.2)
-                        st.rerun() # <--- Esto refresca la página manteniendo al usuario
+                        for key in llaves_bitacora:
+                            if key in st.session_state:
+                                st.session_state[key] = None # O el valor inicial (0.0, "", etc)
+                                # O simplemente: del st.session_state[key]
+
+                        # 3. Forzamos el reinicio
+                        time.sleep(1)
+                        st.rerun()
 
         # --- 5. HISTORIAL DE SEGURIDAD ---
         st.divider()
