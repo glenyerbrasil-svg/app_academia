@@ -423,42 +423,91 @@ def main_app():
                 time.sleep(1)
                 st.rerun()
 
-        # --- 4. MÓDULO DE CIERRE (FORZADO) ---
+# =========================================================
+        # # SECCIÓN B: CIERRE DE OPERACIONES (REPARADA PARA LIMPIEZA TOTAL)
+        # =========================================================
         st.divider()
         st.subheader("⏳ Operaciones en Curso")
 
+        id_u_str = str(user["ID_USUARIO"])
+        
+        # 1. Filtramos los datos que ya leímos al principio
         if not df_b_raw.empty:
-            id_u = str(user["ID_USUARIO"])
-            df_p = df_b_raw[(df_b_raw["ID_USUARIO"] == id_u) & (df_b_raw["ESTADO_RESULTADO"].str.upper() == "PENDIENTE")]
+            # Aseguramos que el filtro sea exacto y sin espacios
+            df_pendientes = df_b_raw[
+                (df_b_raw["ID_USUARIO"].astype(str) == id_u_str) & 
+                (df_b_raw["ESTADO_RESULTADO"].str.strip().str.upper() == "PENDIENTE")
+            ].copy()
 
-            if not df_p.empty:
-                for idx, fila in df_p.iterrows():
-                    id_t = fila.get("ID_BITACORA", str(idx))
+            if not df_pendientes.empty:
+                for idx, fila in df_pendientes.iterrows():
+                    # Usamos el ID de bitácora para referenciar la fila
+                    id_interno = fila.get("ID_BITACORA", str(idx))
+                    
                     with st.expander(f"📌 {fila['INSTRUMENTO']} | Entrada: {fila['PRECIO_ENT']}"):
-                        # Para el cierre sí usamos form porque no necesitamos cálculos en vivo complejos
-                        with st.form(key=f"cierre_{id_t}"):
-                            res_c = st.selectbox("Resultado", ["TP", "SL", "BE"])
-                            m_real = st.number_input("Monto USD Final", value=0.0)
+                        # --- CÁLCULO REACTIVO ---
+                        # Cada trade tiene sus propias llaves únicas
+                        sel_key = f"sel_res_{id_interno}"
+                        val_key = f"val_monto_{id_interno}"
+                        
+                        res_seleccionado = st.selectbox("Resultado", ["...", "TP", "SL", "BE"], key=sel_key)
+                        
+                        # Lógica de cálculo instantánea al cambiar el selectbox
+                        monto_sugerido = 0.0
+                        try:
+                            # Convertimos a float lo que viene del DF (que forzamos a string antes)
+                            p_e = float(fila['PRECIO_ENT'])
+                            p_t = float(fila.get('PRECIO_TP', fila.get('PRECIO_T', 0)))
+                            l_t = float(fila['LOTAJE'])
+                            b_v = float(fila['VALOR_BALA'])
                             
-                            if st.form_submit_button("🏁 FINALIZAR"):
-                                f_sheets = int(id_t) + 2
-                                hoja_b.update_cell(f_sheets, 21, res_c)
-                                hoja_b.update_cell(f_sheets, 22, m_real)
-                                hoja_b.update_cell(f_sheets, 13, datetime.now().strftime("%H:%M:%S"))
-                                
-                                # Sincronizar Finanzas
-                                hoja_f.append_row([
-                                    len(hoja_f.get_all_values()), str(date.today()), user["ID_USUARIO"],
-                                    f"CIERRE {fila['INSTRUMENTO']}", saldo_actual,
-                                    abs(m_real) if m_real >= 0 else 0,
-                                    abs(m_real) if m_real < 0 else 0,
-                                    saldo_actual + m_real, "BITACORA"
-                                ])
-                                st.success("Trade liquidado.")
-                                time.sleep(1)
-                                st.rerun()
+                            if res_seleccionado == "TP":
+                                monto_sugerido = abs(p_t - p_e) * l_t
+                            elif res_seleccionado == "SL":
+                                monto_sugerido = -b_v
+                            elif res_seleccionado == "BE":
+                                monto_sugerido = 0.0
+                        except:
+                            monto_sugerido = 0.0
+
+                        # El valor por defecto del number_input cambia solo cuando eliges TP/SL/BE
+                        m_final = st.number_input("Monto USD Final", value=float(monto_sugerido), key=val_key)
+                        
+                        # --- BOTÓN DE CIERRE CON LIMPIEZA FORZADA ---
+                        if st.button(f"🏁 FINALIZAR TRADE #{id_interno}", key=f"btn_fin_{id_interno}"):
+                            if res_seleccionado == "...":
+                                st.warning("Socio, primero selecciona el resultado (TP, SL o BE).")
+                            else:
+                                with st.spinner("Cerrando operación y limpiando lista..."):
+                                    # A. Actualizar Bitácora (Fila = ID + 2)
+                                    fila_sheets = int(id_interno) + 2
+                                    hoja_b.update_cell(fila_sheets, 21, res_seleccionado) # Columna U
+                                    hoja_b.update_cell(fila_sheets, 22, m_final)          # Columna V
+                                    hoja_b.update_cell(fila_sheets, 13, datetime.now().strftime("%H:%M:%S"))
+                                    
+                                    # B. Sincronizar con Finanzas
+                                    d_fin_count = len(hoja_f.get_all_values())
+                                    hoja_f.append_row([
+                                        d_fin_count, str(date.today()), user["ID_USUARIO"],
+                                        f"CIERRE {fila['INSTRUMENTO']}", saldo_actual,
+                                        abs(m_final) if m_final >= 0 else 0,
+                                        abs(m_final) if m_final < 0 else 0,
+                                        saldo_actual + m_final, "APP_TRADE"
+                                    ])
+                                    
+                                    st.success(f"✅ ¡Trade {id_interno} liquidado!")
+                                    
+                                    # --- EL GOLPE DE GRACIA PARA LA LIMPIEZA ---
+                                    # 1. Limpiamos la caché para que la próxima lectura sea real
+                                    st.cache_data.clear()
+                                    # 2. Esperamos un pelín para que Google Sheets procese
+                                    time.sleep(1)
+                                    # 3. Forzamos recarga total de la página
+                                    st.rerun()
             else:
-                st.info("No hay trades pendientes.")
+                st.info("🎯 No hay operaciones abiertas. ¡Vista limpia!")
+        else:
+            st.info("Aún no tienes registros en tu bitácora.")
 
     # # SECCION 8: BACKTESTING
     elif menu == "📊 Backtesting":
