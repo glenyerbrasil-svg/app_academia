@@ -391,33 +391,39 @@ def main_app():
         img_ent = g_c3.file_uploader("Gráfico Entrada", type=['png', 'jpg', 'jpeg'], key=f"img3_{v}")
         img_res = g_c4.file_uploader("Gráfico Resultado", type=['png', 'jpg', 'jpeg'], key=f"img4_{v}")
 
-        # --- 5. PSICOLOGÍA Y RESULTADO (LÓGICA MEJORADA) ---
+# --- 5. PSICOLOGÍA Y RESULTADO (CORRECCIÓN DEFINITIVA DE CÁLCULO) ---
         st.divider()
         col_e, col_r = st.columns(2)
         opciones_emo = ["🟢 Calma", "🔵 Zen", "🟡 Neutral", "🟠 Nervioso", "🔴 Ansioso"]
         semaforo = col_e.select_slider("Semáforo Emocional", options=opciones_emo, value="🟢 Calma", key=f"emo_{v}")
         
-        # 1. Definimos el estado primero
+        # 1. Selector de estado
         tipo_final = col_r.selectbox("Estado Final", ["PENDIENTE", "TP", "SL", "BE"], key=f"tipo_{v}")
         
-        # 2. Calculamos el monto sugerido basado en el estado
-        monto_sugerido = 0.0
+        # 2. LÓGICA DE INYECCIÓN: Calculamos y metemos el valor en el estado del input
+        monto_key = f"monto_{v}"
         if tipo_final == "TP":
-            monto_sugerido = float(abs(tp_sugerido - p_ent) * lotaje)
+            valor_calculado = float(abs(tp_sugerido - p_ent) * lotaje)
+            st.session_state[monto_key] = valor_calculado
         elif tipo_final == "SL":
-            monto_sugerido = -float(bala)
+            valor_calculado = -float(bala)
+            st.session_state[monto_key] = valor_calculado
+        elif tipo_final == "BE":
+            st.session_state[monto_key] = 0.0
+        elif tipo_final == "PENDIENTE" and monto_key not in st.session_state:
+            st.session_state[monto_key] = 0.0
 
-        # 3. El input usa el monto sugerido como valor base
-        monto_final = st.number_input("Monto Resultante ($)", value=monto_sugerido, format="%.2f", key=f"monto_{v}")
+        # 3. El input ahora lee directamente de la sesión actualizada
+        monto_final = st.number_input("Monto Resultante ($)", format="%.2f", key=monto_key)
         observaciones = st.text_area("Observaciones", key=f"obs_{v}")
 
-        # --- 6. BOTÓN DE GUARDAR (UN SOLO BLOQUE) ---
+        # --- 6. BOTÓN DE GUARDAR ---
         if st.button("💾 GUARDAR REGISTRO", use_container_width=True, key=f"btn_save_{v}"):
             if p_ent == 0 or p_sl == 0 or bala == 0:
-                st.warning("⚠️ Socio, los datos técnicos son obligatorios.")
+                st.warning("⚠️ Socio, faltan datos técnicos.")
             else:
-                with st.spinner("Sincronizando con Google Sheets..."):
-                    # Preparamos la fila para Bitacora con datos limpios
+                with st.spinner("Sincronizando..."):
+                    # Usamos el valor que quedó en el input
                     monto_final_val = float(monto_final)
                     
                     nueva_fila = [
@@ -432,20 +438,19 @@ def main_app():
                     ]
                     hoja_b.append_row(nueva_fila)
                     
-                    # Si la operación no es pendiente, actualizamos el saldo en Finanzas
                     if tipo_final != "PENDIENTE":
-                        ingreso = monto_final_val if monto_final_val > 0 else 0
-                        egreso = abs(monto_final_val) if monto_final_val < 0 else 0
-                        
+                        ing = monto_final_val if monto_final_val > 0 else 0
+                        egr = abs(monto_final_val) if monto_final_val < 0 else 0
                         hoja_f.append_row([
                             len(hoja_f.get_all_values()), str(date.today()), user["ID_USUARIO"],
-                            f"CIERRE {ins}", float(saldo_actual), float(ingreso), float(egreso), 
+                            f"CIERRE {ins}", float(saldo_actual), float(ing), float(egr), 
                             float(saldo_actual + monto_final_val), "APP"
                         ])
                     
-                    st.success(f"✅ ¡Operación guardada! Resultado: ${monto_final_val:.2f}")
+                    st.success(f"✅ ¡Guardado! Resultado: ${monto_final_val:.2f}")
                     time.sleep(1)
                     limpiar_todo_al_final()
+
     # # SECCION EDITAR (LABORATORIO TEMPORAL)
     elif menu == "✏️ Editar":
         st.header("✏️ Laboratorio de Edición")
