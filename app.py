@@ -345,33 +345,18 @@ def main_app():
 
 
 # =========================================================
-    # # SECCION 7: BITÁCORA (SOLUCIÓN CREATIVA - LIMPIEZA POR ESTADO)
+    # # SECCION 7: BITÁCORA (NUEVO MODELO: REGISTRO + HISTORIAL)
     # =========================================================
     elif menu == "📝 Bitácora":
         from datetime import datetime
         st.header("📝 Bitácora de Operaciones")
 
-        # 1. EL "INTERRUPTOR" DE LIMPIEZA
-        # Si este interruptor se activa, reseteamos las llaves de los inputs
-        if "limpiar_todo" not in st.session_state:
-            st.session_state.limpiar_todo = False
-
-        if st.session_state.limpiar_todo:
-            st.session_state["b_ins"] = "FLIPX1"
-            st.session_state["b_acc"] = "COMPRA"
-            st.session_state["b_bala"] = 0.0
-            st.session_state["b_ent"] = 0.0
-            st.session_state["b_sl"] = 0.0
-            st.session_state["b_ratio"] = 1.0
-            st.session_state["b_obs"] = ""
-            st.session_state.limpiar_todo = False # Apagamos el interruptor
-
-        # 2. LECTURA DE DATOS
+        # 1. CARGA DE DATOS INICIAL
         try:
             hoja_f = doc.worksheet("Finanzas")
             hoja_b = doc.worksheet("Bitacora")
-            df_b_raw = pd.DataFrame(hoja_b.get_all_records()).astype(str)
-            df_b_raw.columns = df_b_raw.columns.str.strip() 
+            df_total = pd.DataFrame(hoja_b.get_all_records()).astype(str)
+            df_total.columns = df_total.columns.str.strip()
             
             df_f = pd.DataFrame(hoja_f.get_all_records())
             saldo_actual = float(df_f.iloc[-1].get("SALDO_FINAL", 0)) if not df_f.empty else 0.0
@@ -380,134 +365,77 @@ def main_app():
             st.error(f"Error de conexión: {e}")
             st.stop()
 
-        # --- 3. MOTOR DE REGISTRO (SIN FORMULARIO PARA CÁLCULO EN VIVO) ---
-        st.subheader("🚀 Nueva Operación")
-        
-        c1, c2, c3 = st.columns(3)
-        ins = c1.selectbox("Instrumento", ["FLIPX1", "FLIPX2", "FXVOL20", "FXVOL40", "SFXVOL20", "SFXVOL40"], key="b_ins")
-        acc = c2.selectbox("Acción", ["COMPRA", "VENTA"], key="b_acc")
-        bala = c3.number_input("Valor de la Bala ($)", min_value=0.0, step=0.5, format="%.2f", key="b_bala")
+        # 2. FORMULARIO ÚNICO DE REGISTRO
+        st.subheader("🚀 Registrar / Actualizar Operación")
+        with st.form("form_bitacora_unico", clear_on_submit=True):
+            col1, col2, col3 = st.columns(3)
+            ins = col1.selectbox("Instrumento", ["FLIPX1", "FLIPX2", "FXVOL20", "FXVOL40", "SFXVOL20", "SFXVOL40"])
+            acc = col2.selectbox("Acción", ["COMPRA", "VENTA"])
+            bala = col3.number_input("Valor de la Bala ($)", min_value=0.0, step=0.5, format="%.2f")
 
-        cp1, cp2, cp3 = st.columns(3)
-        p_ent = cp1.number_input("Precio de Entrada", format="%.4f", key="b_ent")
-        p_sl = cp2.number_input("Precio de SL", format="%.4f", key="b_sl")
-        ratio = cp3.number_input("Ratio Objetivo (1:1)", min_value=0.1, step=0.1, key="b_ratio")
+            col4, col5, col6 = st.columns(3)
+            p_ent = col4.number_input("Precio de Entrada", format="%.4f")
+            p_sl = col5.number_input("Precio de SL", format="%.4f")
+            ratio = col6.number_input("Ratio Objetivo (1:X)", min_value=0.1, value=1.0, step=0.1)
 
-        # Cálculos instantáneos automáticos
-        distancia = abs(p_ent - p_sl)
-        lotaje_f = bala / distancia if distancia > 0 else 0.0
-        tp_f = p_ent + (distancia * ratio) if acc == "COMPRA" else p_ent - (distancia * ratio)
-
-        # Visualización del cálculo
-        if p_ent > 0 and p_sl > 0 and bala > 0:
-            st.success(f"🎯 **TP Sugerido:** {tp_f:.4f} | 📦 **Lotaje:** {lotaje_f:.2f}")
-
-        obs = st.text_area("Observaciones", key="b_obs")
-
-        # BOTÓN DE REGISTRO (Fuera de un st.form para evitar el bloqueo de limpieza)
-        if st.button("🚀 REGISTRAR OPERACIÓN EN LA NUBE"):
-            if p_ent == 0 or p_sl == 0 or bala == 0:
-                st.error("Socio, no puedes registrar valores en cero.")
-            else:
+            st.divider()
+            st.write("🏁 **Datos de Cierre (Llenar solo si la operación terminó)**")
+            col7, col8 = st.columns(2)
+            estado = col7.selectbox("Estado Final", ["PENDIENTE", "TP", "SL", "BE"])
+            monto_res = col8.number_input("Monto Resultante ($)", value=0.0, format="%.2f")
+            
+            obs = st.text_area("Análisis y Observaciones")
+            
+            if st.form_submit_button("💾 GUARDAR REGISTRO"):
+                # Cálculos automáticos antes de guardar
+                dist = abs(p_ent - p_sl)
+                lot = bala / dist if dist > 0 else 0.0
+                tp_calc = p_ent + (dist * ratio) if acc == "COMPRA" else p_ent - (dist * ratio)
+                
                 nueva_fila = [
                     len(hoja_b.get_all_values()), user["ID_USUARIO"], str(date.today()),
-                    ins, acc, bala, p_ent, p_sl, tp_f, round(lotaje_f, 2),
+                    ins, acc, bala, p_ent, p_sl, tp_calc, round(lot, 2),
                     0, datetime.now().strftime("%H:%M:%S"), "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A",
-                    "PENDIENTE", 0, "NO", 0, "N/A", obs, "CALMA"
+                    estado, monto_res, "NO", 0, "N/A", obs, "CALMA"
                 ]
                 hoja_b.append_row(nueva_fila)
                 
-                # ACTIVAMOS LA LIMPIEZA
-                st.session_state.limpiar_todo = True
-                st.success("✅ ¡Registrado! Limpiando para la siguiente bala...")
+                # Si se cierra con dinero, registramos en Finanzas
+                if estado in ["TP", "SL", "BE"]:
+                    hoja_f.append_row([
+                        len(hoja_f.get_all_values()), str(date.today()), user["ID_USUARIO"],
+                        f"CIERRE {ins}", saldo_actual, abs(monto_res) if monto_res >= 0 else 0,
+                        abs(monto_res) if monto_res < 0 else 0, saldo_actual + monto_res, "BITACORA"
+                    ])
+                
+                st.success("✅ ¡Operación guardada exitosamente!")
                 time.sleep(1)
                 st.rerun()
 
-# =========================================================
-        # # SECCIÓN B: CIERRE DE OPERACIONES (REPARADA PARA LIMPIEZA TOTAL)
-        # =========================================================
+        # 3. LISTA DE LAS ÚLTIMAS 5 OPERACIONES
         st.divider()
-        st.subheader("⏳ Operaciones en Curso")
-
-        id_u_str = str(user["ID_USUARIO"])
+        st.subheader("📅 Últimos 5 Movimientos")
         
-        # 1. Filtramos los datos que ya leímos al principio
-        if not df_b_raw.empty:
-            # Aseguramos que el filtro sea exacto y sin espacios
-            df_pendientes = df_b_raw[
-                (df_b_raw["ID_USUARIO"].astype(str) == id_u_str) & 
-                (df_b_raw["ESTADO_RESULTADO"].str.strip().str.upper() == "PENDIENTE")
-            ].copy()
-
-            if not df_pendientes.empty:
-                for idx, fila in df_pendientes.iterrows():
-                    # Usamos el ID de bitácora para referenciar la fila
-                    id_interno = fila.get("ID_BITACORA", str(idx))
+        id_user_str = str(user["ID_USUARIO"])
+        if not df_total.empty:
+            # Filtramos por usuario y ordenamos para ver las últimas
+            df_user = df_total[df_total["ID_USUARIO"] == id_user_str].tail(5)
+            
+            if not df_user.empty:
+                # Invertimos para ver la más reciente arriba
+                for _, fila in df_user[::-1].iterrows():
+                    color_estado = "🔵" if fila["ESTADO_RESULTADO"] == "PENDIENTE" else "🟢" if fila["ESTADO_RESULTADO"] == "TP" else "🔴"
                     
-                    with st.expander(f"📌 {fila['INSTRUMENTO']} | Entrada: {fila['PRECIO_ENT']}"):
-                        # --- CÁLCULO REACTIVO ---
-                        # Cada trade tiene sus propias llaves únicas
-                        sel_key = f"sel_res_{id_interno}"
-                        val_key = f"val_monto_{id_interno}"
+                    with st.expander(f"{color_estado} {fila['INSTRUMENTO']} - {fila['ACCION']} | {fila['FECHA']}"):
+                        st.write(f"**Entrada:** {fila['PRECIO_ENT']} | **SL:** {fila['PRECIO_SL']} | **TP:** {fila['PRECIO_TP']}")
+                        st.write(f"**Estado:** {fila['ESTADO_RESULTADO']} | **Monto:** ${fila['MONTO_RESULTADO']}")
+                        st.write(f"**Análisis:** {fila['OBSERVACIONES']}")
                         
-                        res_seleccionado = st.selectbox("Resultado", ["...", "TP", "SL", "BE"], key=sel_key)
-                        
-                        # Lógica de cálculo instantánea al cambiar el selectbox
-                        monto_sugerido = 0.0
-                        try:
-                            # Convertimos a float lo que viene del DF (que forzamos a string antes)
-                            p_e = float(fila['PRECIO_ENT'])
-                            p_t = float(fila.get('PRECIO_TP', fila.get('PRECIO_T', 0)))
-                            l_t = float(fila['LOTAJE'])
-                            b_v = float(fila['VALOR_BALA'])
-                            
-                            if res_seleccionado == "TP":
-                                monto_sugerido = abs(p_t - p_e) * l_t
-                            elif res_seleccionado == "SL":
-                                monto_sugerido = -b_v
-                            elif res_seleccionado == "BE":
-                                monto_sugerido = 0.0
-                        except:
-                            monto_sugerido = 0.0
-
-                        # El valor por defecto del number_input cambia solo cuando eliges TP/SL/BE
-                        m_final = st.number_input("Monto USD Final", value=float(monto_sugerido), key=val_key)
-                        
-                        # --- BOTÓN DE CIERRE CON LIMPIEZA FORZADA ---
-                        if st.button(f"🏁 FINALIZAR TRADE #{id_interno}", key=f"btn_fin_{id_interno}"):
-                            if res_seleccionado == "...":
-                                st.warning("Socio, primero selecciona el resultado (TP, SL o BE).")
-                            else:
-                                with st.spinner("Cerrando operación y limpiando lista..."):
-                                    # A. Actualizar Bitácora (Fila = ID + 2)
-                                    fila_sheets = int(id_interno) + 2
-                                    hoja_b.update_cell(fila_sheets, 21, res_seleccionado) # Columna U
-                                    hoja_b.update_cell(fila_sheets, 22, m_final)          # Columna V
-                                    hoja_b.update_cell(fila_sheets, 13, datetime.now().strftime("%H:%M:%S"))
-                                    
-                                    # B. Sincronizar con Finanzas
-                                    d_fin_count = len(hoja_f.get_all_values())
-                                    hoja_f.append_row([
-                                        d_fin_count, str(date.today()), user["ID_USUARIO"],
-                                        f"CIERRE {fila['INSTRUMENTO']}", saldo_actual,
-                                        abs(m_final) if m_final >= 0 else 0,
-                                        abs(m_final) if m_final < 0 else 0,
-                                        saldo_actual + m_final, "APP_TRADE"
-                                    ])
-                                    
-                                    st.success(f"✅ ¡Trade {id_interno} liquidado!")
-                                    
-                                    # --- EL GOLPE DE GRACIA PARA LA LIMPIEZA ---
-                                    # 1. Limpiamos la caché para que la próxima lectura sea real
-                                    st.cache_data.clear()
-                                    # 2. Esperamos un pelín para que Google Sheets procese
-                                    time.sleep(1)
-                                    # 3. Forzamos recarga total de la página
-                                    st.rerun()
+                        # BOTÓN EDITAR (Carga los datos de vuelta al formulario arriba)
+                        if st.button(f"✏️ Editar este Registro", key=f"edit_{fila['ID_BITACORA']}"):
+                            st.info("⚠️ Para editar: Copia los datos arriba, cambia lo necesario y guarda. (En la siguiente fase automatizaremos que se llenen solos)")
             else:
-                st.info("🎯 No hay operaciones abiertas. ¡Vista limpia!")
-        else:
-            st.info("Aún no tienes registros en tu bitácora.")
+                st.info("No hay registros recientes.")
 
     # # SECCION 8: BACKTESTING
     elif menu == "📊 Backtesting":
