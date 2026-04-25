@@ -345,81 +345,102 @@ def main_app():
 
 
 # =========================================================
-    # # SECCION 7: BITÁCORA (CIERRE CON CÁLCULO Y LIMPIEZA)
+    # # SECCION 7: BITÁCORA (VERSIÓN FINAL ANTI-SOBRECARGA)
     # =========================================================
     elif menu == "📝 Bitácora":
         from datetime import datetime
-        # ... (Mantén tu código de lectura de datos y registro inicial igual) ...
+        st.header("📝 Bitácora de Operaciones")
+
+        # 1. FUNCIÓN DE LIMPIEZA DE CACHÉ (Vital para vaciar la lista)
+        def refrescar_datos():
+            st.cache_data.clear() # Borra la memoria temporal de Streamlit
+            st.rerun()
+
+        # 2. LECTURA DE DATOS FRESCA
+        try:
+            hoja_f = doc.worksheet("Finanzas")
+            hoja_b = doc.worksheet("Bitacora")
+            
+            # Forzamos que todo sea String para evitar el error del .str accessor que vimos antes
+            df_b_raw = pd.DataFrame(hoja_b.get_all_records()).astype(str)
+            df_b_raw.columns = df_b_raw.columns.str.strip() 
+            
+            df_f = pd.DataFrame(hoja_f.get_all_records())
+            saldo_actual = float(df_f.iloc[-1].get("SALDO_FINAL", 0)) if not df_f.empty else 0.0
+            st.info(f"💰 **Saldo disponible:** ${saldo_actual:,.2f}")
+        except Exception as e:
+            st.error(f"Error de conexión: {e}")
+            st.stop()
+
+        # ... [Aquí mantén tu código de "Nueva Operación" que ya logramos limpiar] ...
 
         st.divider()
         st.subheader("⏳ Operaciones en Curso")
 
-        # 1. FILTRADO ESTRICTO
+        # 3. FILTRADO DINÁMICO (Esto es lo que limpia la vista)
         id_u_str = str(user["ID_USUARIO"])
         if not df_b_raw.empty:
-            # Filtramos solo PENDIENTES del usuario actual
-            df_p = df_b_raw[(df_b_raw["ID_USUARIO"].astype(str) == id_u_str) & 
-                            (df_b_raw["ESTADO_RESULTADO"].str.upper() == "PENDIENTE")]
+            # Solo mostramos lo que es PENDIENTE y del usuario actual
+            df_pendientes = df_b_raw[
+                (df_b_raw["ID_USUARIO"] == id_u_str) & 
+                (df_b_raw["ESTADO_RESULTADO"].str.upper() == "PENDIENTE")
+            ].copy()
 
-            if not df_p.empty:
-                for idx, fila in df_p.iterrows():
-                    id_t = fila.get("ID_BITACORA", str(idx))
+            if not df_pendientes.empty:
+                for idx, fila in df_pendientes.iterrows():
+                    # Usamos el ID de bitácora real para identificar la fila en Sheets
+                    id_interno = fila.get("ID_BITACORA", str(idx))
                     
                     with st.expander(f"📌 {fila['INSTRUMENTO']} | Entrada: {fila['PRECIO_ENT']}"):
-                        # --- CÁLCULO AUTOMÁTICO DE RESULTADO ---
-                        # Creamos llaves únicas para que Streamlit detecte el cambio en vivo
-                        res_key = f"res_sel_{id_t}"
-                        monto_key = f"monto_val_{id_t}"
+                        # --- CÁLCULO AUTOMÁTICO REACTIVO ---
+                        # Usamos keys únicas para que Streamlit detecte el cambio de selección
+                        sel_key = f"sel_res_{id_interno}"
+                        res_seleccionado = st.selectbox("Resultado", ["...", "TP", "SL", "BE"], key=sel_key)
                         
-                        resultado_cierre = st.selectbox("Resultado", ["Seleccionar...", "TP", "SL", "BE"], key=res_key)
-                        
-                        # Lógica matemática instantánea
-                        m_sugerido = 0.0
-                        try:
-                            p_ent_f = float(fila['PRECIO_ENT'])
-                            p_tp_f = float(fila.get('PRECIO_TP', 0))
-                            lote_f = float(fila['LOTAJE'])
-                            bala_f = float(fila['VALOR_BALA'])
-                            
-                            if resultado_cierre == "TP":
-                                m_sugerido = abs(p_tp_f - p_ent_f) * lote_f
-                            elif resultado_cierre == "SL":
-                                m_sugerido = -bala_f
-                            elif resultado_cierre == "BE":
-                                m_sugerido = 0.0
-                        except:
-                            m_sugerido = 0.0
-
-                        # Mostramos el monto (el usuario puede corregirlo si hubo deslizamiento)
-                        m_final = st.number_input("Monto USD Final", value=float(m_sugerido), key=monto_key, format="%.2f")
-                        
-                        # --- BOTÓN DE FINALIZACIÓN REAL ---
-                        if st.button(f"🏁 FINALIZAR TRADE #{id_t}", key=f"btn_fin_{id_t}"):
-                            if resultado_cierre == "Seleccionar...":
-                                st.error("Socio, selecciona si fue TP o SL antes de cerrar.")
-                            else:
-                                # 1. Actualizar Bitácora (Fila = ID + 2)
-                                f_idx = int(id_t) + 2
-                                hoja_b.update_cell(f_idx, 21, resultado_cierre) # Columna ESTADO_RESULTADO
-                                hoja_b.update_cell(f_idx, 22, m_final)          # Columna MONTO_RESULTADO
-                                hoja_b.update_cell(f_idx, 13, datetime.now().strftime("%H:%M:%S")) # HORA_CIERRE
+                        monto_sugerido = 0.0
+                        if res_seleccionado != "...":
+                            try:
+                                p_e = float(fila['PRECIO_ENT'])
+                                p_t = float(fila.get('PRECIO_TP', fila.get('PRECIO_T', 0)))
+                                l_t = float(fila['LOTAJE'])
+                                b_v = float(fila['VALOR_BALA'])
                                 
-                                # 2. Sincronizar con Finanzas
-                                d_fin_values = hoja_f.get_all_values()
+                                if res_seleccionado == "TP":
+                                    monto_sugerido = abs(p_t - p_e) * l_t
+                                elif res_seleccionado == "SL":
+                                    monto_sugerido = -b_v
+                                else: # BE
+                                    monto_sugerido = 0.0
+                            except:
+                                monto_sugerido = 0.0
+
+                        # El input del monto ahora se actualiza solo según la selección de arriba
+                        m_final = st.number_input("Monto USD Final", value=float(monto_sugerido), key=f"val_{id_interno}")
+                        
+                        if st.button(f"🏁 FINALIZAR OPERACIÓN #{id_interno}", key=f"btn_{id_interno}"):
+                            if res_seleccionado == "...":
+                                st.warning("Socio, indica el resultado primero.")
+                            else:
+                                # 1. Actualizar Bitácora (ID + 2 para llegar a la fila exacta en Sheets)
+                                fila_a_editar = int(id_interno) + 2
+                                hoja_b.update_cell(fila_a_editar, 21, res_seleccionado) # Columna Estado
+                                hoja_b.update_cell(fila_a_editar, 22, m_final)          # Columna Monto
+                                hoja_b.update_cell(fila_a_editar, 13, datetime.now().strftime("%H:%M:%S"))
+                                
+                                # 2. Sincronizar Finanzas
                                 hoja_f.append_row([
-                                    len(d_fin_values), str(date.today()), user["ID_USUARIO"],
+                                    len(hoja_f.get_all_values()), str(date.today()), user["ID_USUARIO"],
                                     f"CIERRE {fila['INSTRUMENTO']}", saldo_actual,
                                     abs(m_final) if m_final >= 0 else 0,
                                     abs(m_final) if m_final < 0 else 0,
-                                    saldo_actual + m_final, "SISTEMA"
+                                    saldo_actual + m_final, "AUTO"
                                 ])
                                 
-                                st.success(f"✅ Trade {id_t} cerrado. Limpiando vista...")
+                                st.success("✅ ¡Trade cerrado! Refrescando lista...")
                                 time.sleep(1)
-                                # EL TRUCO FINAL: Forzamos el rerun para que la lista se vuelva a filtrar
-                                st.rerun()
+                                refrescar_datos() # <--- AQUÍ SE LIMPIA LA LISTA
             else:
-                st.info("No tienes operaciones abiertas. ¡A buscar una entrada!")
+                st.info("Vista limpia. No tienes trades pendientes.")
 
     # # SECCION 8: BACKTESTING
     elif menu == "📊 Backtesting":
