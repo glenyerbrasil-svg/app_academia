@@ -391,75 +391,66 @@ def main_app():
         img_ent = g_c3.file_uploader("Gráfico Entrada", type=['png', 'jpg', 'jpeg'], key=f"img3_{v}")
         img_res = g_c4.file_uploader("Gráfico Resultado", type=['png', 'jpg', 'jpeg'], key=f"img4_{v}")
 
-# --- 5. PSICOLOGÍA Y RESULTADO (CORREGIDO) ---
+# --- 5. PSICOLOGÍA Y RESULTADO (SOLUCIÓN DEFINITIVA) ---
         st.divider()
         col_e, col_r = st.columns(2)
         opciones_emo = ["🟢 Calma", "🔵 Zen", "🟡 Neutral", "🟠 Nervioso", "🔴 Ansioso"]
         semaforo = col_e.select_slider("Semáforo Emocional", options=opciones_emo, value="🟢 Calma", key=f"emo_{v}")
         
-        tipo_final = col_r.selectbox("Estado Final", ["PENDIENTE", "TP", "SL", "BE"], key=f"tipo_{v}")
-        
-        # CÁLCULO DINÁMICO DEL MONTO
-        if tipo_final == "TP":
-            valor_calculado = float(abs(tp_sugerido - p_ent) * lotaje)
-        elif tipo_final == "SL":
-            valor_calculado = -float(bala)
-        else:
-            valor_calculado = 0.0
+        # Función para actualizar el monto cuando cambia el estado
+        def actualizar_monto():
+            estado = st.session_state[f"tipo_{v}"]
+            if estado == "TP":
+                st.session_state[f"monto_{v}"] = float(abs(tp_sugerido - p_ent) * lotaje)
+            elif estado == "SL":
+                st.session_state[f"monto_{v}"] = -float(bala)
+            elif estado == "BE":
+                st.session_state[f"monto_{v}"] = 0.0
 
-        # Mostramos el monto (el usuario puede ajustarlo manualmente si hubo deslizamiento)
-        monto_final = st.number_input("Monto Resultante ($)", value=valor_calculado, format="%.2f", key=f"monto_{v}")
+        tipo_final = col_r.selectbox(
+            "Estado Final", 
+            ["PENDIENTE", "TP", "SL", "BE"], 
+            key=f"tipo_{v}",
+            on_change=actualizar_monto # Esto dispara el cálculo al tocar el selector
+        )
+        
+        # El input ahora está vinculado 100% al estado
+        monto_final = st.number_input("Monto Resultante ($)", format="%.2f", key=f"monto_{v}")
         observaciones = st.text_area("Observaciones", key=f"obs_{v}")
 
-        # --- 6. BOTÓN DE GUARDAR (CON EXPORTACIÓN CORRECTA) ---
+        # --- 6. BOTÓN DE GUARDAR ---
         if st.button("💾 GUARDAR REGISTRO", use_container_width=True, key=f"btn_save_{v}"):
             if p_ent == 0 or p_sl == 0 or bala == 0:
-                st.warning("⚠️ Socio, los datos técnicos son obligatorios.")
+                st.warning("⚠️ Socio, faltan datos técnicos.")
             else:
-                with st.spinner("Sincronizando con Google Sheets..."):
-                    # 1. Aseguramos que los valores sean numéricos para el Excel
-                    monto_a_enviar = float(monto_final)
+                with st.spinner("Sincronizando..."):
+                    # Extraemos el valor actual del estado para asegurar que no vaya en 0
+                    monto_a_guardar = float(st.session_state[f"monto_{v}"])
                     
-                    # 2. Nueva fila para Bitácora
-                    # Nota: Asegúrate que el orden de las columnas coincida con tu Sheet
                     nueva_fila = [
-                        len(hoja_b.get_all_values()),           # ID
-                        user["ID_USUARIO"],                     # Usuario
-                        str(date.today()),                      # Fecha
-                        ins, acc, float(bala),                  # Datos operación
-                        float(p_ent), float(p_sl), float(tp_sugerido), 
+                        len(hoja_b.get_all_values()), user["ID_USUARIO"], str(date.today()),
+                        ins, acc, float(bala), float(p_ent), float(p_sl), float(tp_sugerido), 
                         round(float(lotaje), 2),
-                        0, datetime.now().strftime("%H:%M:%S"), # Otros
-                        img_may.name if img_may else "N/A", 
-                        img_men.name if img_men else "N/A",
-                        img_ent.name if img_ent else "N/A", 
-                        img_res.name if img_res else "N/A",
-                        "N/A", "N/A", "N/A", "N/A",             # Rellenos
-                        tipo_final,                             # ESTADO_RESULTADO
-                        monto_a_enviar,                         # RESULTADO_DINERO (Número real)
-                        "NO", 0, "N/A",                         # LLEGO_11, etc
-                        observaciones, semaforo
+                        0, datetime.now().strftime("%H:%M:%S"),
+                        img_may.name if img_may else "N/A", img_men.name if img_men else "N/A",
+                        img_ent.name if img_ent else "N/A", img_res.name if img_res else "N/A",
+                        "N/A", "N/A", "N/A", "N/A",
+                        tipo_final, 
+                        monto_a_guardar, # <--- Aquí ya no irá en 0
+                        "NO", 0, "N/A", observaciones, semaforo
                     ]
                     hoja_b.append_row(nueva_fila)
                     
-                    # 3. Registro en Finanzas si no es Pendiente
                     if tipo_final != "PENDIENTE":
-                        ingreso = monto_a_enviar if monto_a_enviar > 0 else 0
-                        egreso = abs(monto_a_enviar) if monto_a_enviar < 0 else 0
-                        
+                        ing = monto_a_guardar if monto_a_guardar > 0 else 0
+                        egr = abs(monto_a_guardar) if monto_a_guardar < 0 else 0
                         hoja_f.append_row([
-                            len(hoja_f.get_all_values()), 
-                            str(date.today()), 
-                            user["ID_USUARIO"],
-                            f"CIERRE {ins}", 
-                            float(saldo_actual), 
-                            float(ingreso), 
-                            float(egreso), 
-                            float(saldo_actual + monto_a_enviar), 
-                            "APP"
+                            len(hoja_f.get_all_values()), str(date.today()), user["ID_USUARIO"],
+                            f"CIERRE {ins}", float(saldo_actual), float(ing), float(egr), 
+                            float(saldo_actual + monto_a_guardar), "APP"
                         ])
                     
-                    st.success(f"✅ ¡Operación guardada! Resultado: ${monto_a_enviar:.2f}")
+                    st.success(f"✅ Guardado: ${monto_a_guardar:.2f}")
                     time.sleep(1)
                     limpiar_todo_al_final()
 
