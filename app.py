@@ -332,36 +332,33 @@ def main_app():
 
 
 # =========================================================
-    # # SECCION 7: BITÁCORA (SOLUCIÓN DEFINITIVA ANTIBLOQUEO)
+    # # SECCION 7: BITÁCORA (SOLO INGRESO DE DATOS)
     # =========================================================
     elif menu == "📝 Bitácora":
         from datetime import datetime
         st.header("📝 Bitácora de Operaciones")
 
+        # 1. MOTOR DE LIMPIEZA
         if 'v_form' not in st.session_state:
             st.session_state.v_form = 0
 
         def limpiar_todo_al_final():
             st.session_state.v_form += 1
-            st.session_state.edit_data = None
             st.rerun()
 
+        # 2. CONEXIÓN Y SALDO
         try:
             hoja_f = doc.worksheet("Finanzas")
             hoja_b = doc.worksheet("Bitacora")
             
-            datos_b = hoja_b.get_all_records()
-            df_b = pd.DataFrame(datos_b) if datos_b else pd.DataFrame()
-            if not df_b.empty:
-                df_b.columns = df_b.columns.str.strip().str.upper()
-
             df_f = pd.DataFrame(hoja_f.get_all_records())
             saldo_actual = float(df_f.iloc[-1].get("SALDO_FINAL", 0)) if not df_f.empty else 0.0
             st.info(f"💰 **Saldo disponible:** ${saldo_actual:,.2f}")
         except Exception as e:
-            st.error(f"Error de conexión o columnas: {e}")
+            st.error(f"Error de conexión: {e}")
             st.stop()
 
+        # --- 3. REGISTRO TÉCNICO ---
         v = st.session_state.v_form
         st.subheader("🚀 Nueva Operación")
         
@@ -376,6 +373,7 @@ def main_app():
         p_ent = c_ent.number_input("2) Precio de Entrada", format="%.4f", key=f"ent_{v}")
         p_sl = c_sl.number_input("3) Precio de SL", format="%.4f", key=f"sl_{v}")
 
+        # Cálculos instantáneos
         distancia = abs(p_ent - p_sl)
         lotaje = bala / distancia if distancia > 0 else 0.0
         tp_sugerido = p_ent + (distancia * ratio) if acc == "COMPRA" else p_ent - (distancia * ratio)
@@ -383,6 +381,7 @@ def main_app():
         if p_ent > 0 and p_sl > 0:
             st.success(f"📊 **Cálculo:** Lotaje: **{lotaje:.2f}** | TP Sugerido: **{tp_sugerido:.4f}**")
 
+        # --- 4. EVIDENCIA VISUAL ---
         st.divider()
         st.write("🖼️ **Evidencia Visual**")
         g_c1, g_c2 = st.columns(2)
@@ -392,6 +391,7 @@ def main_app():
         img_ent = g_c3.file_uploader("Gráfico Entrada", type=['png', 'jpg', 'jpeg'], key=f"img3_{v}")
         img_res = g_c4.file_uploader("Gráfico Resultado", type=['png', 'jpg', 'jpeg'], key=f"img4_{v}")
 
+        # --- 5. PSICOLOGÍA Y RESULTADO ---
         st.divider()
         col_e, col_r = st.columns(2)
         opciones_emo = ["🟢 Calma", "🔵 Zen", "🟡 Neutral", "🟠 Nervioso", "🔴 Ansioso"]
@@ -406,13 +406,15 @@ def main_app():
         monto_final = st.number_input("Monto Resultante ($)", value=float(monto_auto), format="%.2f", key=f"monto_{v}")
         observaciones = st.text_area("Observaciones", key=f"obs_{v}")
 
+        # --- 6. BOTÓN DE GUARDAR ---
         if st.button("💾 GUARDAR REGISTRO", use_container_width=True, key=f"btn_save_{v}"):
             if p_ent == 0 or p_sl == 0 or bala == 0:
                 st.warning("⚠️ Socio, los datos técnicos son obligatorios.")
             else:
                 with st.spinner("Sincronizando con Google Sheets..."):
+                    # Preparamos la fila para Bitacora
                     nueva_fila = [
-                        len(ho_b.get_all_values()), user["ID_USUARIO"], str(date.today()),
+                        len(hoja_b.get_all_values()), user["ID_USUARIO"], str(date.today()),
                         ins, acc, bala, p_ent, p_sl, tp_sugerido, round(lotaje, 2),
                         0, datetime.now().strftime("%H:%M:%S"),
                         img_may.name if img_may else "N/A", img_men.name if img_men else "N/A",
@@ -422,6 +424,7 @@ def main_app():
                     ]
                     hoja_b.append_row(nueva_fila)
                     
+                    # Si la operación está cerrada, actualizamos Finanzas
                     if tipo_final != "PENDIENTE":
                         hoja_f.append_row([
                             len(hoja_f.get_all_values()), str(date.today()), user["ID_USUARIO"],
@@ -432,18 +435,6 @@ def main_app():
                     st.success("✅ ¡Operación guardada!")
                     time.sleep(1)
                     limpiar_todo_al_final()
-
-        st.divider()
-        st.subheader("📅 Últimos 5 Movimientos")
-        if not df_b.empty:
-            id_u = str(user["ID_USUARIO"])
-            df_u = df_b[df_b["ID_USUARIO"].astype(str) == id_u].tail(5)
-            for _, f in df_u[::-1].iterrows():
-                inst = f.get("INSTRUMENTO", "UKN")
-                est = f.get("ESTADO_RESULTADO", "N/A")
-                fec = f.get("FECHA", "S/F")
-                with st.expander(f"📌 {inst} | {est} | {fec}"):
-                    st.write(f"**Monto:** ${f.get('MONTO_RESULTADO', 0)} | **Emoción:** {f.get('SENTIMIENTO', 'N/A')}")
 
     # # SECCION EDITAR (LABORATORIO TEMPORAL)
     elif menu == "✏️ Editar":
