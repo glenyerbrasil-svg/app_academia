@@ -365,7 +365,9 @@ def main_app():
         col_p1, col_p2, col_p3 = st.columns(3)
         p_ent = col_p1.number_input("Precio de Entrada", format="%.2f", value=0.0)
         p_sl = col_p2.number_input("Precio de SL", format="%.2f", value=0.0)
-        ratio = col_p3.slider("Ratio Objetivo (1:X)", 1.0, 5.0, 2.0)
+        
+        # Aquí el cambio clave: de slider a number_input
+        ratio = col_p3.number_input("Ratio Objetivo (1:X)", min_value=1.0, max_value=20.0, value=2.0, step=0.1)
 
         # =========================================================
         # # MOTOR MATEMÁTICO INSTANTÁNEO (Fuera del Form)
