@@ -345,13 +345,28 @@ def main_app():
 
 
 # =========================================================
-    # # SECCION 7: BITÁCORA (ESTRUCTURA ANTI-BORRADO)
+    # # SECCION 7: BITÁCORA (SOLUCIÓN CREATIVA - LIMPIEZA POR ESTADO)
     # =========================================================
     elif menu == "📝 Bitácora":
         from datetime import datetime
         st.header("📝 Bitácora de Operaciones")
 
-        # 1. LECTURA DE DATOS
+        # 1. EL "INTERRUPTOR" DE LIMPIEZA
+        # Si este interruptor se activa, reseteamos las llaves de los inputs
+        if "limpiar_todo" not in st.session_state:
+            st.session_state.limpiar_todo = False
+
+        if st.session_state.limpiar_todo:
+            st.session_state["b_ins"] = "FLIPX1"
+            st.session_state["b_acc"] = "COMPRA"
+            st.session_state["b_bala"] = 0.0
+            st.session_state["b_ent"] = 0.0
+            st.session_state["b_sl"] = 0.0
+            st.session_state["b_ratio"] = 1.0
+            st.session_state["b_obs"] = ""
+            st.session_state.limpiar_todo = False # Apagamos el interruptor
+
+        # 2. LECTURA DE DATOS
         try:
             hoja_f = doc.worksheet("Finanzas")
             hoja_b = doc.worksheet("Bitacora")
@@ -365,100 +380,86 @@ def main_app():
             st.error(f"Error de conexión: {e}")
             st.stop()
 
-        # --- 2. INPUTS FUERA DEL FORM (Para que no se borren al calcular) ---
+        # --- 3. MOTOR DE REGISTRO (SIN FORMULARIO PARA CÁLCULO EN VIVO) ---
         st.subheader("🚀 Nueva Operación")
         
         c1, c2, c3 = st.columns(3)
-        ins = c1.selectbox("Instrumento", ["FLIPX1", "FLIPX2", "FXVOL20", "FXVOL40", "SFXVOL20", "SFXVOL40"])
-        acc = c2.selectbox("Acción", ["COMPRA", "VENTA"])
-        # Quitamos la llave 'key' para que no choque con el login
-        bala = c3.number_input("Valor de la Bala ($)", min_value=0.0, step=0.5, format="%.2f")
+        ins = c1.selectbox("Instrumento", ["FLIPX1", "FLIPX2", "FXVOL20", "FXVOL40", "SFXVOL20", "SFXVOL40"], key="b_ins")
+        acc = c2.selectbox("Acción", ["COMPRA", "VENTA"], key="b_acc")
+        bala = c3.number_input("Valor de la Bala ($)", min_value=0.0, step=0.5, format="%.2f", key="b_bala")
 
         cp1, cp2, cp3 = st.columns(3)
-        p_ent = cp1.number_input("Precio de Entrada", format="%.4f")
-        p_sl = cp2.number_input("Precio de SL", format="%.4f")
-        ratio = cp3.number_input("Ratio Objetivo (1:X)", min_value=0.1, value=1.0, step=0.1)
+        p_ent = cp1.number_input("Precio de Entrada", format="%.4f", key="b_ent")
+        p_sl = cp2.number_input("Precio de SL", format="%.4f", key="b_sl")
+        ratio = cp3.number_input("Ratio Objetivo (1:1)", min_value=0.1, step=0.1, key="b_ratio")
 
-        # Lógica de cálculo (Siempre activa, pero solo se muestra si hay datos)
-        dist = abs(p_ent - p_sl)
-        lot_final = bala / dist if dist > 0 else 0.0
-        tp_final = p_ent + (dist * ratio) if acc == "COMPRA" else p_ent - (dist * ratio)
+        # Cálculos instantáneos automáticos
+        distancia = abs(p_ent - p_sl)
+        lotaje_f = bala / distancia if distancia > 0 else 0.0
+        tp_f = p_ent + (distancia * ratio) if acc == "COMPRA" else p_ent - (distancia * ratio)
 
+        # Visualización del cálculo
         if p_ent > 0 and p_sl > 0 and bala > 0:
-            st.markdown(f"""
-                <div style="background-color: #1e1e1e; padding: 15px; border-radius: 10px; border: 1px solid #00FF00; text-align: center;">
-                    <h3 style="color:#00FF00; margin:0;">🎯 TP: {tp_final:.4f} | 📦 Lotaje: {lot_final:.2f}</h3>
-                </div>
-            """, unsafe_allow_html=True)
+            st.success(f"🎯 **TP Sugerido:** {tp_f:.4f} | 📦 **Lotaje:** {lotaje_f:.2f}")
 
-        # --- FORMULARIO SOLO PARA REGISTRO ---
-        # Al no tener clear_on_submit, nosotros controlamos cuándo se limpia
-        with st.form("form_final"):
-            obs = st.text_area("Observaciones y Análisis")
-            
-            if st.form_submit_button("🚀 REGISTRAR PENDIENTE EN LA NUBE"):
-                if p_ent == 0 or p_sl == 0 or bala == 0:
-                    st.error("❌ No puedes registrar valores en cero.")
-                else:
-                    nueva_fila = [
-                        len(hoja_b.get_all_values()), user["ID_USUARIO"], str(date.today()),
-                        ins, acc, bala, p_ent, p_sl, tp_final, round(lot_final, 2),
-                        0, datetime.now().strftime("%H:%M:%S"), "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A",
-                        "PENDIENTE", 0, "NO", 0, "N/A", obs, "CALMA"
-                    ]
-                    hoja_b.append_row(nueva_fila)
-                    st.success("✅ Trade guardado con éxito.")
-                    time.sleep(1)
-                    # El st.rerun() limpiará los inputs porque no tienen 'key' persistente
-                    st.rerun()
+        obs = st.text_area("Observaciones", key="b_obs")
 
-        # --- 3. MÓDULO DE CIERRE ---
+        # BOTÓN DE REGISTRO (Fuera de un st.form para evitar el bloqueo de limpieza)
+        if st.button("🚀 REGISTRAR OPERACIÓN EN LA NUBE"):
+            if p_ent == 0 or p_sl == 0 or bala == 0:
+                st.error("Socio, no puedes registrar valores en cero.")
+            else:
+                nueva_fila = [
+                    len(hoja_b.get_all_values()), user["ID_USUARIO"], str(date.today()),
+                    ins, acc, bala, p_ent, p_sl, tp_f, round(lotaje_f, 2),
+                    0, datetime.now().strftime("%H:%M:%S"), "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A",
+                    "PENDIENTE", 0, "NO", 0, "N/A", obs, "CALMA"
+                ]
+                hoja_b.append_row(nueva_fila)
+                
+                # ACTIVAMOS LA LIMPIEZA
+                st.session_state.limpiar_todo = True
+                st.success("✅ ¡Registrado! Limpiando para la siguiente bala...")
+                time.sleep(1)
+                st.rerun()
+
+        # --- 4. MÓDULO DE CIERRE (FORZADO) ---
         st.divider()
         st.subheader("⏳ Operaciones en Curso")
 
-        id_user_str = str(user["ID_USUARIO"])
         if not df_b_raw.empty:
-            df_pendientes = df_b_raw[
-                (df_b_raw["ID_USUARIO"].astype(str) == id_user_str) & 
-                (df_b_raw["ESTADO_RESULTADO"].str.upper() == "PENDIENTE")
-            ]
+            id_u = str(user["ID_USUARIO"])
+            df_p = df_b_raw[(df_b_raw["ID_USUARIO"] == id_u) & (df_b_raw["ESTADO_RESULTADO"].str.upper() == "PENDIENTE")]
 
-            if not df_pendientes.empty:
-                for idx, fila in df_pendientes.iterrows():
-                    id_interno = fila.get("ID_BITACORA", str(idx))
+            if not df_p.empty:
+                for idx, fila in df_p.iterrows():
+                    id_t = fila.get("ID_BITACORA", str(idx))
                     with st.expander(f"📌 {fila['INSTRUMENTO']} | Entrada: {fila['PRECIO_ENT']}"):
-                        with st.form(key=f"cierre_final_{id_interno}"):
-                            res = st.selectbox("Resultado", ["TP", "SL", "BE"])
-                            
-                            try:
-                                p_e = float(fila['PRECIO_ENT'])
-                                p_t = float(fila.get('PRECIO_TP', fila.get('PRECIO_T', 0)))
-                                l_t = float(fila['LOTAJE'])
-                                b_v = float(fila['VALOR_BALA'])
-                                m_s = abs(p_t - p_e) * l_t if res == "TP" else (-b_v if res == "SL" else 0.0)
-                            except: m_s = 0.0
-
-                            m_final = st.number_input("Monto USD Final", value=float(m_s))
+                        # Para el cierre sí usamos form porque no necesitamos cálculos en vivo complejos
+                        with st.form(key=f"cierre_{id_t}"):
+                            res_c = st.selectbox("Resultado", ["TP", "SL", "BE"])
+                            m_real = st.number_input("Monto USD Final", value=0.0)
                             
                             if st.form_submit_button("🏁 FINALIZAR"):
-                                fila_sheets = int(id_interno) + 2
-                                hoja_b.update_cell(fila_sheets, 21, res)
-                                hoja_b.update_cell(fila_sheets, 22, m_final)
+                                f_sheets = int(id_t) + 2
+                                hoja_b.update_cell(f_sheets, 21, res_c)
+                                hoja_b.update_cell(f_sheets, 22, m_real)
+                                hoja_b.update_cell(f_sheets, 13, datetime.now().strftime("%H:%M:%S"))
                                 
-                                # Registro en Finanzas
-                                d_fin_len = len(hoja_f.get_all_values())
+                                # Sincronizar Finanzas
                                 hoja_f.append_row([
-                                    d_fin_len, str(date.today()), user["ID_USUARIO"],
+                                    len(hoja_f.get_all_values()), str(date.today()), user["ID_USUARIO"],
                                     f"CIERRE {fila['INSTRUMENTO']}", saldo_actual,
-                                    abs(m_final) if m_final >= 0 else 0,
-                                    abs(m_final) if m_final < 0 else 0,
-                                    saldo_actual + m_final, "APP"
+                                    abs(m_real) if m_real >= 0 else 0,
+                                    abs(m_real) if m_real < 0 else 0,
+                                    saldo_actual + m_real, "BITACORA"
                                 ])
-                                st.success("¡Operación cerrada!")
+                                st.success("Trade liquidado.")
                                 time.sleep(1)
                                 st.rerun()
             else:
                 st.info("No hay trades pendientes.")
+
     # # SECCION 8: BACKTESTING
     elif menu == "📊 Backtesting":
         st.header("📊 Entrenamiento de Simulación (Backtesting)")
