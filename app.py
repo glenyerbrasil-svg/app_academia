@@ -452,115 +452,110 @@ def main_app():
                     limpiar_todo_al_final()
 
 # =========================================================
-# # SECCIÓN 8: EDICIÓN DE OPERACIONES (CON FILTROS PRO)
+# # SECCIÓN 8: EDICIÓN DE OPERACIONES (VERSIÓN ANTICHOQUE)
 # =========================================================
     elif menu == "✏️ Editar":
         st.header("✏️ Panel de Edición y Control")
         
         try:
-            # Forzamos la conexión a las hojas
             hoja_b = doc.worksheet("Bitacora")
             hoja_f = doc.worksheet("Finanzas")
-            
-            # Cargamos datos frescos
             datos_b = hoja_b.get_all_records()
+            
             if not datos_b:
-                st.warning("Socio, la bitácora está vacía. No hay nada que editar.")
+                st.warning("No hay registros para editar.")
                 st.stop()
                 
             df_b = pd.DataFrame(datos_b)
-            
-            # --- FILTROS DE BÚSQUEDA ---
-            with st.expander("🔍 Buscador Avanzado", expanded=True):
-                f1, f2, f3 = st.columns(3)
-                search_fecha = f1.text_input("📅 Por Fecha (YYYY-MM-DD)", placeholder="Ej: 2026-04")
-                search_tipo = f2.selectbox("🎯 Por Resultado", ["TODOS", "PENDIENTE", "TP", "SL", "BE", "N/A"])
-                search_ins = f3.text_input("📊 Por Instrumento", placeholder="Ej: SFXVOL60")
-
-            # --- LÓGICA DE FILTRADO ---
-            # Filtramos por tu ID de usuario
+            # Filtro por usuario
             df_edit = df_b[df_b["ID_USUARIO"] == user["ID_USUARIO"]].copy()
 
-            if search_fecha:
-                df_edit = df_edit[df_edit["FECHA"].astype(str).str.contains(search_fecha)]
-            if search_tipo != "TODOS":
-                df_edit = df_edit[df_edit["ESTADO_RESULTADO"] == search_tipo]
-            if search_ins:
-                df_edit = df_edit[df_edit["INSTRUMENTO"].str.contains(search_ins.upper(), na=False)]
+            # --- BUSCADOR ---
+            with st.expander("🔍 Filtrar Operaciones", expanded=True):
+                f1, f2 = st.columns(2)
+                s_tipo = f1.selectbox("Estado", ["TODOS", "PENDIENTE", "TP", "SL", "BE"], key="filtro_tipo_edit")
+                s_ins = f2.text_input("Instrumento (Ej: FLIPX1)", key="filtro_ins_edit").upper()
 
-            # PRIORIDAD: Pendientes arriba
-            df_pendientes = df_edit[df_edit["ESTADO_RESULTADO"] == "PENDIENTE"]
-            df_cerradas = df_edit[df_edit["ESTADO_RESULTADO"] != "PENDIENTE"]
-            df_final = pd.concat([df_pendientes, df_cerradas])
+            if s_tipo != "TODOS":
+                df_edit = df_edit[df_edit["ESTADO_RESULTADO"] == s_tipo]
+            if s_ins:
+                df_edit = df_edit[df_edit["INSTRUMENTO"].str.contains(s_ins, na=False)]
 
-            if df_final.empty:
-                st.info("No encontré operaciones con esos filtros, socio.")
-                st.stop()
+            # Orden: Pendientes primero
+            df_pend = df_edit[df_edit["ESTADO_RESULTADO"] == "PENDIENTE"].sort_index(ascending=False)
+            df_cerr = df_edit[df_edit["ESTADO_RESULTADO"] != "PENDIENTE"].sort_index(ascending=False)
+            df_final = pd.concat([df_pend, df_cerr])
 
-            # --- SELECTOR ---
+            # --- SELECTOR DE OPERACIÓN ---
             opciones = []
             for idx, fila in df_final.iterrows():
-                # El índice en Sheets es el índice del DF + 2 (por encabezado y base 1)
-                label = f"Fila {idx+2} | {fila['ESTADO_RESULTADO']} | {fila['FECHA']} | {fila['INSTRUMENTO']} | ${fila['VALOR_BALA']}"
+                # El ID_BITACORA nos sirve para crear llaves únicas
+                id_registro = fila.get('ID', idx)
+                label = f"ID: {id_registro} | {fila['ESTADO_RESULTADO']} | {fila['FECHA']} | {fila['INSTRUMENTO']}"
                 opciones.append((label, idx + 2, fila))
 
-            seleccion = st.selectbox("Selecciona la operación:", opciones, format_func=lambda x: x[0])
+            if not opciones:
+                st.info("No hay operaciones que coincidan.")
+                st.stop()
+
+            seleccion = st.selectbox("Selecciona la operación a modificar:", opciones, format_func=lambda x: x[0], key="select_op_edit")
             
             fila_idx = seleccion[1]
-            d = seleccion[2] # Datos de la fila
+            d = seleccion[2]
 
-            # --- FORMULARIO DE EDICIÓN ---
+            # --- FORMULARIO DE EDICIÓN CON KEYS ÚNICAS ---
             st.divider()
-            st.subheader(f"🛠️ Editando Instrumento: {d['INSTRUMENTO']}")
+            st.subheader(f"🛠️ Editando Registro #{d.get('ID', fila_idx-2)}")
 
-            with st.form("form_edit_final"):
+            with st.form(f"form_edicion_{fila_idx}"):
                 c1, c2, c3 = st.columns(3)
-                n_ins = c1.text_input("Instrumento", value=str(d.get('INSTRUMENTO', '')))
-                n_acc = c2.selectbox("Acción", ["COMPRA", "VENTA"], index=0 if d.get('ACCION') == "COMPRA" else 1)
-                n_bala = c3.number_input("Bala ($)", value=float(d.get('VALOR_BALA', 0.0)))
+                n_ins = c1.text_input("Instrumento", value=str(d['INSTRUMENTO']))
+                n_acc = c2.selectbox("Acción", ["COMPRA", "VENTA"], index=0 if d['ACCION'] == "COMPRA" else 1)
+                n_bala = c3.number_input("Bala ($)", value=float(d['VALOR_BALA']))
 
                 c4, c5, c6 = st.columns(3)
-                n_ent = c4.number_input("Entrada", value=float(d.get('PRECIO_ENTRADA', 0.0)), format="%.4f")
-                n_sl = c5.number_input("SL", value=float(d.get('PRECIO_SL', 0.0)), format="%.4f")
-                n_tp = c6.number_input("TP", value=float(d.get('PRECIO_TP', 0.0)), format="%.4f")
+                n_ent = c4.number_input("Entrada", value=float(d['PRECIO_ENTRADA']), format="%.4f")
+                n_sl = c5.number_input("SL", value=float(d['PRECIO_SL']), format="%.4f")
+                n_tp = c6.number_input("TP", value=float(d['PRECIO_TP']), format="%.4f")
 
                 st.divider()
                 ce1, ce2 = st.columns(2)
-                estados = ["PENDIENTE", "TP", "SL", "BE", "N/A"]
-                est_actual = d.get('ESTADO_RESULTADO', 'PENDIENTE')
-                n_est = ce1.selectbox("Estado", estados, index=estados.index(est_actual) if est_actual in estados else 0)
-                n_monto = ce2.number_input("Monto Final ($)", value=float(d.get('MONTO_RESULTADO', 0.0)), format="%.2f")
+                lista_est = ["PENDIENTE", "TP", "SL", "BE", "N/A"]
+                est_act = d['ESTADO_RESULTADO']
+                n_est = ce1.selectbox("Nuevo Estado", lista_est, index=lista_est.index(est_act) if est_act in lista_est else 0)
+                n_monto = ce2.number_input("Monto Resultante ($)", value=float(d['MONTO_RESULTADO']))
                 
-                n_obs = st.text_area("Notas", value=str(d.get('OBSERVACIONES', '')))
+                n_obs = st.text_area("Notas", value=str(d['OBSERVACIONES']))
 
-                if st.form_submit_button("🚀 ACTUALIZAR REGISTRO", use_container_width=True):
-                    # Actualización directa por celdas (más seguro para evitar errores de duplicados)
-                    hoja_b.update_cell(fila_idx, 4, n_ins)
-                    hoja_b.update_cell(fila_idx, 5, n_acc)
-                    hoja_b.update_cell(fila_idx, 6, n_bala)
-                    hoja_b.update_cell(fila_idx, 7, n_ent)
-                    hoja_b.update_cell(fila_idx, 8, n_sl)
-                    hoja_b.update_cell(fila_idx, 9, n_tp)
-                    hoja_b.update_cell(fila_idx, 21, n_est)
-                    hoja_b.update_cell(fila_idx, 22, n_monto)
-                    hoja_b.update_cell(fila_idx, 26, n_obs)
+                if st.form_submit_button("💾 ACTUALIZAR DATOS", use_container_width=True):
+                    with st.spinner("Sincronizando..."):
+                        # Actualizamos celdas específicas en Bitacora
+                        hoja_b.update_cell(fila_idx, 4, n_ins)
+                        hoja_b.update_cell(fila_idx, 5, n_acc)
+                        hoja_b.update_cell(fila_idx, 6, n_bala)
+                        hoja_b.update_cell(fila_idx, 7, n_ent)
+                        hoja_b.update_cell(fila_idx, 8, n_sl)
+                        hoja_b.update_cell(fila_idx, 9, n_tp)
+                        hoja_b.update_cell(fila_idx, 21, n_est)
+                        hoja_b.update_cell(fila_idx, 22, n_monto)
+                        hoja_b.update_cell(fila_idx, 26, n_obs)
 
-                    # Lógica de cierre en Finanzas
-                    if est_actual == "PENDIENTE" and n_est != "PENDIENTE":
-                        df_f = pd.DataFrame(hoja_f.get_all_records())
-                        s_act = float(df_f.iloc[-1].get("SALDO_FINAL", 0)) if not df_f.empty else 0.0
-                        hoja_f.append_row([
-                            len(hoja_f.get_all_values()), str(date.today()), user["ID_USUARIO"],
-                            f"CIERRE {n_ins} (EDIT)", s_act, (n_monto if n_monto > 0 else 0),
-                            (abs(n_monto) if n_monto < 0 else 0), (s_act + n_monto), "APP"
-                        ])
-                    
-                    st.success("✅ Cambios guardados. ¡Buen trabajo, socio!")
-                    time.sleep(1)
-                    st.rerun()
+                        # Si se cierra una operación pendiente, registrar en Finanzas
+                        if est_act == "PENDIENTE" and n_est != "PENDIENTE":
+                            df_f = pd.DataFrame(hoja_f.get_all_records())
+                            s_act = float(df_f.iloc[-1].get("SALDO_FINAL", 0)) if not df_f.empty else 0.0
+                            hoja_f.append_row([
+                                len(hoja_f.get_all_values()), str(date.today()), user["ID_USUARIO"],
+                                f"CIERRE EDIT {n_ins}", s_act, (n_monto if n_monto > 0 else 0),
+                                (abs(n_monto) if n_monto < 0 else 0), (s_act + n_monto), "APP"
+                            ])
+                        
+                        st.success("✅ ¡Actualizado con éxito!")
+                        time.sleep(1)
+                        st.rerun()
 
         except Exception as e:
-            st.error(f"Socio, hubo un problema técnico: {e}")
+            st.error(f"Error en el módulo de edición: {e}")
 
     # # SECCION 9: BACKTESTING
     elif menu == "📊 Backtesting":
