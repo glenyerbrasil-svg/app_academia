@@ -345,7 +345,7 @@ def main_app():
 
 
 # =========================================================
-    # # SECCION 7: BITÁCORA (VERSIÓN CON CÁLCULOS VISIBLES)
+    # # SECCION 7: BITÁCORA (VERSIÓN CON CÁLCULO MANUAL)
     # =========================================================
     elif menu == "📝 Bitácora":
         from datetime import datetime
@@ -368,10 +368,10 @@ def main_app():
             st.error(f"Error de conexión: {e}")
             st.stop()
 
-        # --- 2. MOTOR DE REGISTRO (CÁLCULOS DENTRO DEL FORM) ---
+        # --- 2. MOTOR DE REGISTRO CON BOTÓN DE CÁLCULO ---
         st.subheader("🚀 Nueva Operación")
         
-        with st.form("form_registro_v4", clear_on_submit=True):
+        with st.form("form_registro_manual", clear_on_submit=True):
             col1, col2, col3 = st.columns(3)
             ins = col1.selectbox("Instrumento", ["FLIPX1", "FLIPX2", "FXVOL20", "FXVOL40", "SFXVOL20", "SFXVOL40"])
             acc = col2.selectbox("Acción", ["COMPRA", "VENTA"])
@@ -382,44 +382,50 @@ def main_app():
             p_sl = col5.number_input("Precio de SL", format="%.4f")
             ratio = col6.number_input("Ratio Objetivo (1:X)", min_value=0.1, value=1.0, step=0.1)
 
-            # --- BLOQUE DE CÁLCULO VISIBLE ---
-            dist = abs(p_ent - p_sl)
-            lot_preview = bala / dist if dist > 0 else 0.0
-            tp_preview = p_ent + (dist * ratio) if acc == "COMPRA" else p_ent - (dist * ratio)
-
-            if p_ent > 0 and p_sl > 0 and bala > 0:
-                st.markdown(f"""
-                    <div style="background-color: #0E1117; padding: 10px; border-radius: 5px; border: 1px solid #4CAF50; margin-bottom: 10px;">
-                        <h4 style="color: #4CAF50; margin: 0; text-align: center;">
-                            🎯 TP: {tp_preview:.4f} | 📦 Lotaje: {lot_preview:.2f}
-                        </h4>
-                    </div>
-                """, unsafe_allow_html=True)
-            # ---------------------------------
-
             obs = st.text_area("Observaciones")
 
-            if st.form_submit_button("🚀 REGISTRAR PENDIENTE"):
+            # Espacio para mostrar el cálculo cuando se presione el botón
+            container_calculo = st.container()
+            
+            col_b1, col_b2 = st.columns(2)
+            # Botón 1: Solo calcula (No guarda)
+            btn_calc = col_b1.form_submit_button("🧮 CALCULAR OPERACIÓN")
+            # Botón 2: Guarda la operación
+            btn_save = col_b2.form_submit_button("🚀 REGISTRAR PENDIENTE")
+
+            # Lógica del cálculo manual
+            dist = abs(p_ent - p_sl)
+            lot_final = bala / dist if dist > 0 else 0.0
+            tp_final = p_ent + (dist * ratio) if acc == "COMPRA" else p_ent - (dist * ratio)
+
+            if btn_calc:
+                if p_ent > 0 and p_sl > 0 and bala > 0:
+                    container_calculo.success(f"🎯 TP Sugerido: {tp_final:.4f} | 📦 Lotaje Sugerido: {lot_final:.2f}")
+                else:
+                    container_calculo.warning("⚠️ Pon los precios y la bala para calcular.")
+
+            if btn_save:
                 if p_ent == 0 or p_sl == 0 or bala == 0:
-                    st.error("Faltan datos para el registro.")
+                    st.error("❌ No puedes registrar sin calcular o con valores en 0.")
                 else:
                     nueva_fila = [
                         len(hoja_b.get_all_values()), user["ID_USUARIO"], str(date.today()),
-                        ins, acc, bala, p_ent, p_sl, tp_preview, round(lot_preview, 2),
+                        ins, acc, bala, p_ent, p_sl, tp_final, round(lot_final, 2),
                         0, datetime.now().strftime("%H:%M:%S"), "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A",
                         "PENDIENTE", 0, "NO", 0, "N/A", obs, "CALMA"
                     ]
                     hoja_b.append_row(nueva_fila)
-                    st.success("✅ Registrado con éxito.")
+                    st.success("✅ ¡Trade registrado! Limpiando formulario...")
                     time.sleep(1)
                     st.rerun()
 
-        # --- 3. MÓDULO DE CIERRE (MANTIENE LA LIMPIEZA DE LA LISTA) ---
+        # --- 3. MÓDULO DE CIERRE (VISTA DE PENDIENTES) ---
         st.divider()
         st.subheader("⏳ Operaciones en Curso")
 
         id_user_str = str(user["ID_USUARIO"])
         if not df_b_raw.empty:
+            # Filtro estricto para que desaparezcan al cerrar
             df_pendientes = df_b_raw[
                 (df_b_raw["ID_USUARIO"].astype(str) == id_user_str) & 
                 (df_b_raw["ESTADO_RESULTADO"].str.upper() == "PENDIENTE")
@@ -429,10 +435,9 @@ def main_app():
                 for idx, fila in df_pendientes.iterrows():
                     id_interno = fila.get("ID_BITACORA", str(idx))
                     with st.expander(f"📌 {fila['INSTRUMENTO']} | Entrada: {fila['PRECIO_ENT']}"):
-                        with st.form(key=f"cierre_v4_{id_interno}", clear_on_submit=True):
+                        with st.form(key=f"cierre_manual_{id_interno}", clear_on_submit=True):
                             res = st.selectbox("Resultado", ["TP", "SL", "BE"])
                             
-                            # Cálculo de sugerencia
                             try:
                                 p_e = float(fila['PRECIO_ENT'])
                                 p_t = float(fila.get('PRECIO_TP', fila.get('PRECIO_T', 0)))
@@ -446,10 +451,9 @@ def main_app():
                             if st.form_submit_button("🏁 FINALIZAR TRADE"):
                                 fila_sheets = int(id_interno) + 2
                                 hoja_b.update_cell(fila_sheets, 21, res)
-                                hoja_b.update_cell(fila_sheets, 22, m_final)
+                                hoja_b.update_cell(fila_sheets, 22, m_real)
                                 hoja_b.update_cell(fila_sheets, 13, datetime.now().strftime("%H:%M:%S"))
                                 
-                                # Finanzas
                                 d_fin_len = len(hoja_f.get_all_values())
                                 hoja_f.append_row([
                                     d_fin_len, str(date.today()), user["ID_USUARIO"],
@@ -458,7 +462,7 @@ def main_app():
                                     abs(m_final) if m_final < 0 else 0,
                                     saldo_actual + m_final, "APP"
                                 ])
-                                st.success("Trade finalizado.")
+                                st.success("Cerrado.")
                                 time.sleep(1)
                                 st.rerun()
             else:
