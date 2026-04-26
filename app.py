@@ -627,10 +627,79 @@ def main_app():
         except Exception as e:
             st.error(f"Error de conexión: {e}")
 
-    # # SECCIONES VACÍAS PARA FUTURO
-    elif menu == "📈 Reportes":
-        st.header("📈 Reportes de Rendimiento")
-        st.write("Próximamente: Estadísticas detalladas de tu operativa.")
+# =========================================================
+    # # SECCIÓN: REPORTES (ESTRUCTURA MASTER)
+    # =========================================================
+    elif menu == "📊 Reportes":
+        st.header("📊 Centro de Análisis de Rendimiento")
+
+        try:
+            hoja_b = doc.worksheet("Bitacora")
+            df_b = pd.DataFrame(hoja_b.get_all_records())
+            # Normalizamos nombres y formatos
+            df_b.columns = df_b.columns.str.strip().str.upper()
+            df_b['FECHA'] = pd.to_datetime(df_b['FECHA']).dt.date
+            df_b['RESULTADO_DINERO'] = pd.to_numeric(df_b['RESULTADO_DINERO'], errors='coerce').fillna(0)
+        except Exception as e:
+            st.error(f"Error al cargar datos: {e}"); st.stop()
+
+        # --- 1. FILTROS INTELIGENTES (Mobile Friendly) ---
+        with st.expander("🔍 Filtros de Búsqueda", expanded=True):
+            col_f1, col_f2 = st.columns(2)
+            
+            # Selector de periodo
+            periodo = col_f1.selectbox("Ventana de Tiempo", 
+                ["Hoy", "Últimos 7 días", "Mes Actual", "Todo el historial"])
+            
+            # Filtro de Instrumento
+            todos_ins = ["Todos"] + sorted(df_b['INSTRUMENTO'].unique().tolist())
+            ins_sel = col_f2.selectbox("Filtrar por Activo", todos_ins)
+
+        # Lógica de fechas
+        hoy = date.today()
+        if periodo == "Hoy": fecha_inicio = hoy
+        elif periodo == "Últimos 7 días": fecha_inicio = hoy - timedelta(days=7)
+        elif periodo == "Mes Actual": fecha_inicio = hoy.replace(day=1)
+        else: fecha_inicio = df_b['FECHA'].min()
+
+        # --- APLICAR FILTROS ---
+        df_rep = df_b[(df_b['FECHA'] >= fecha_inicio) & (df_b['ID_USUARIO'].astype(str) == str(user["ID_USUARIO"]))]
+        if ins_sel != "Todos":
+            df_rep = df_rep[df_rep['INSTRUMENTO'] == ins_sel]
+
+        if df_rep.empty:
+            st.warning("Socio, no hay datos para este periodo."); st.stop()
+
+        # --- 2. KPIs DE IMPACTO (Tarjetas de Colores) ---
+        total_p = df_rep['RESULTADO_DINERO'].sum()
+        total_trades = len(df_rep)
+        ganadores = len(df_rep[df_rep['ESTADO_RESULTADO'] == "TP"])
+        win_rate = (ganadores / total_trades) * 100 if total_trades > 0 else 0
+
+        st.divider()
+        kpi1, kpi2, kpi3 = st.columns(3)
+        
+        # Estilo para el color del balance
+        color_b = "green" if total_p >= 0 else "red"
+        kpi1.markdown(f"### Balance\n<h2 style='color:{color_b}'>${total_p:,.2f}</h2>", unsafe_allow_html=True)
+        kpi2.metric("Total Trades", f"{total_trades}")
+        kpi3.metric("Win Rate", f"{win_rate:.1f}%")
+
+        # --- 3. LA GALERÍA CLASIFICADA (PRÓXIMO PASO) ---
+        st.divider()
+        tab_tp, tab_sl, tab_be = st.tabs(["🏆 Victorias (TP)", "⚠️ Aprendizaje (SL)", "⚖️ Gestión (BE)"])
+
+        with tab_tp:
+            st.subheader("Análisis de Aciertos")
+            # Aquí vendrá el código de las fotos de los TP
+            
+        with tab_sl:
+            st.subheader("Análisis de Fallas")
+            # Aquí vendrá el código de las fotos de los SL
+            
+        with tab_be:
+            st.subheader("Análisis de Gestión")
+            # Aquí vendrá el código de las fotos de los BE
 
     elif menu == "💬 Forum":
         st.header("💬 Forum de la Academia")
