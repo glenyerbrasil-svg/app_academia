@@ -452,142 +452,131 @@ def main_app():
                     limpiar_todo_al_final()
 
 # =========================================================
-    # # SECCIÓN 8: EDITAR (CLON DE BITÁCORA CON BUSCADOR)
+    # # SECCIÓN 8: CIERRE DE OPERACIONES (REINGENIERÍA TOTAL)
     # =========================================================
     elif menu == "✏️ Editar":
         from datetime import datetime
-        st.header("✏️ Editar Operaciones")
+        st.header("🏁 Cierre de Ciclo de Trade")
 
-        # 1. MOTOR DE LIMPIEZA
-        if 'v_edit' not in st.session_state:
-            st.session_state.v_edit = 0
+        # 1. MOTOR DE REFRESCO
+        if 'v_cierre' not in st.session_state:
+            st.session_state.v_cierre = 0
 
-        def limpiar_edicion():
-            st.session_state.v_edit += 1
+        def refrescar_cierre():
+            st.session_state.v_cierre += 1
             st.rerun()
 
-        # 2. CONEXIÓN
+        # 2. CONEXIÓN DIRECTA
         try:
-            hoja_f = doc.worksheet("Finanzas")
             hoja_b = doc.worksheet("Bitacora")
-            
-            # Cargamos todos los datos para buscar
-            datos_b = hoja_b.get_all_records()
+            hoja_f = doc.worksheet("Finanzas")
+            datos = hoja_b.get_all_records()
             df_f = pd.DataFrame(hoja_f.get_all_records())
             saldo_actual = float(df_f.iloc[-1].get("SALDO_FINAL", 0)) if not df_f.empty else 0.0
         except Exception as e:
             st.error(f"Error de conexión: {e}")
             st.stop()
 
-        # --- 3. BUSCADOR (FECHA ACTUAL POR DEFECTO) ---
+        # --- 3. BUSCADOR ENFOCADO (HOY POR DEFECTO) ---
         with st.container(border=True):
-            f_busq = st.date_input("📅 Selecciona el día a editar", value=date.today())
+            col_busq1, col_busq2 = st.columns([2, 1])
+            f_busq = col_busq1.date_input("📅 Fecha de operativa", value=date.today())
+            solo_pendientes = col_busq2.toggle("Solo Pendientes", value=True)
+
+        if datos:
+            df = pd.DataFrame(datos)
+            df.columns = df.columns.str.strip().str.upper()
             str_f = f_busq.strftime("%Y-%m-%d")
-
-        if datos_b:
-            df_b = pd.DataFrame(datos_b)
-            # Normalizamos nombres de columnas para evitar el KeyError
-            df_b.columns = df_b.columns.str.strip().str.upper()
             
-            # Filtramos por usuario y fecha
-            df_dia = df_b[(df_b["ID_USUARIO"] == user["ID_USUARIO"]) & 
-                          (df_b["FECHA"].astype(str).str.contains(str_f))].copy()
+            # Filtro base: Usuario + Fecha
+            mask = (df["ID_USUARIO"] == user["ID_USUARIO"]) & (df["FECHA"].astype(str).str.contains(str_f))
+            # Filtro adicional: Pendientes
+            if solo_pendientes:
+                mask = mask & (df["ESTADO_RESULTADO"] == "PENDIENTE")
+            
+            df_filtrado = df[mask].copy()
 
-            if df_dia.empty:
-                st.info(f"No hay trades registrados para el {str_f}.")
+            if df_filtrado.empty:
+                st.info(f"No hay operaciones {'pendientes ' if solo_pendientes else ''}para el {str_f}.")
                 st.stop()
 
-            # --- 4. JERARQUIZACIÓN SIMPLE ---
-            # Ponemos PENDIENTE al inicio de la lista de selección
-            df_dia['PRIO'] = df_dia['ESTADO_RESULTADO'].apply(lambda x: 0 if x == "PENDIENTE" else 1)
-            df_dia = df_dia.sort_values(by='PRIO')
+            # --- 4. SELECTOR DE TRADE ---
+            # Jerarquizamos: Pendientes arriba
+            df_filtrado['PRIO'] = df_filtrado['ESTADO_RESULTADO'].apply(lambda x: 0 if x == "PENDIENTE" else 1)
+            df_filtrado = df_filtrado.sort_values(by='PRIO')
 
             opciones = []
-            for idx, fila in df_dia.iterrows():
-                # La fila real en Sheets es el índice + 2
+            for idx, fila in df_filtrado.iterrows():
                 label = f"Fila {idx+2} | {fila.get('INSTRUMENTO')} | {fila.get('ACCION')} | {fila.get('ESTADO_RESULTADO')}"
                 opciones.append((label, idx + 2, fila))
 
-            seleccion = st.selectbox("🎯 Operación encontrada:", opciones, format_func=lambda x: x[0])
+            sel = st.selectbox("🎯 Selecciona el trade para cerrar:", opciones, format_func=lambda x: x[0])
             
-            if seleccion:
-                fila_idx = seleccion[1]
-                d = seleccion[2]
-                v = st.session_state.v_edit
-
+            if sel:
+                f_idx, d = sel[1], sel[2]
+                v = st.session_state.v_cierre
                 st.divider()
-                st.subheader(f"📝 Editando Registro #{fila_idx}")
 
-                # --- 5. FORMULARIO REUTILIZADO (MISMA LÓGICA DE BITÁCORA) ---
-                with st.form(key=f"form_edit_final_{v}"):
-                    c1, c2, c3 = st.columns(3)
-                    list_ins = ["FLIPX1", "FLIPX2", "FLIPX3", "FLIPX4", "FLIPX5", "FXVOL20", "FXVOL40", "FXVOL60", "FXVOL80", "FXVOL99", "SFXVOL20", "SFXVOL40", "SFXVOL60", "SFXVOL80", "SFXVOL99"]
+                # --- 5. FORMULARIO DE CIERRE (LOS NO NEGOCIABLES) ---
+                with st.form(key=f"cierre_trade_{f_idx}_{v}"):
+                    st.subheader(f"📝 Resultado de: {d.get('INSTRUMENTO')}")
                     
-                    ins = c1.selectbox("Instrumento", list_ins, index=list_ins.index(d['INSTRUMENTO']) if d['INSTRUMENTO'] in list_ins else 0)
-                    acc = c2.selectbox("Acción", ["COMPRA", "VENTA"], index=0 if d['ACCION'] == "COMPRA" else 1)
-                    bala = c3.number_input("Valor de la Bala ($)", value=float(d.get('VALOR_BALA', 0.0)), step=0.5, format="%.2f")
-
-                    c_rat, c_ent, c_sl = st.columns(3)
-                    ratio = c_rat.number_input("1) Ratio Objetivo (1:X)", min_value=0.1, value=1.0, step=0.1)
-                    p_ent = c_ent.number_input("2) Precio de Entrada", value=float(d.get('PRECIO_ENTRADA', 0.0)), format="%.4f")
-                    p_sl = c_sl.number_input("3) Precio de SL", value=float(d.get('PRECIO_SL', 0.0)), format="%.4f")
-
-                    # Cálculos idénticos a Bitácora
-                    distancia = abs(p_ent - p_sl)
-                    lotaje = bala / distancia if distancia > 0 else 0.0
-                    tp_sugerido = p_ent + (distancia * ratio) if acc == "COMPRA" else p_ent - (distancia * ratio)
-
-                    st.info(f"Lotaje calculado: {lotaje:.2f} | TP Sugerido: {tp_sugerido:.4f}")
-
-                    st.divider()
-                    col_e, col_r = st.columns(2)
-                    opciones_emo = ["🟢 Calma", "🔵 Zen", "🟡 Neutral", "🟠 Nervioso", "🔴 Ansioso"]
-                    semaforo = col_e.select_slider("Semáforo Emocional", options=opciones_emo, value=d.get('SEMAFORO_EMOCIONAL', "🟢 Calma"))
+                    # Datos de solo lectura para referencia
+                    st.caption(f"Bala: ${d.get('VALOR_BALA')} | Entrada: {d.get('PRECIO_ENTRADA')} | SL: {d.get('PRECIO_SL')}")
                     
-                    tipo_final = col_r.selectbox("Estado Final", ["PENDIENTE", "TP", "SL", "BE"], 
-                                               index=["PENDIENTE", "TP", "SL", "BE"].index(d.get('ESTADO_RESULTADO', 'PENDIENTE')))
+                    c1, c2 = st.columns(2)
+                    # El no negociable: Estado y Monto
+                    nuevo_estado = c1.selectbox("Estado Final", ["PENDIENTE", "TP", "SL", "BE"], 
+                                              index=["PENDIENTE", "TP", "SL", "BE"].index(d.get('ESTADO_RESULTADO', 'PENDIENTE')))
                     
-                    # Cálculo automático del monto según estado
-                    monto_sug = 0.0
-                    if tipo_final == "TP": monto_sug = float(abs(tp_sugerido - p_ent) * lotaje)
-                    elif tipo_final == "SL": monto_sug = -float(bala)
-                    elif tipo_final == "BE": monto_sug = 0.0
-                    else: monto_sug = float(d.get('MONTO_RESULTADO', 0.0))
+                    # Lógica de cálculo automático (Tu motor de Bitácora)
+                    p_ent = float(d.get('PRECIO_ENTRADA', 0))
+                    p_tp = float(d.get('PRECIO_TP', 0))
+                    lotaje = float(d.get('LOTAJES', 0)) # Asegúrate que tu columna se llame LOTAJES
+                    bala = float(d.get('VALOR_BALA', 0))
 
-                    monto_final = st.number_input("Monto Resultante ($)", value=monto_sug, format="%.2f")
-                    observaciones = st.text_area("Observaciones", value=str(d.get('OBSERVACIONES', '')))
+                    monto_sugerido = 0.0
+                    if nuevo_estado == "TP":
+                        monto_sugerido = abs(p_tp - p_ent) * lotaje
+                    elif nuevo_estado == "SL":
+                        monto_sugerido = -bala
+                    elif nuevo_estado == "BE":
+                        monto_sugerido = float(d.get('MONTO_RESULTADO', 0.0)) # Manual para BE
+                    
+                    monto_final = c2.number_input("Monto Final ($)", value=float(monto_sugerido), format="%.2f")
 
-                    # BOTÓN DE GUARDAR
-                    if st.form_submit_button("💾 ACTUALIZAR REGISTRO", use_container_width=True):
+                    # El otro no negociable: Gráfico de Resultado
+                    st.write("🖼️ **Evidencia del Resultado**")
+                    img_res = st.file_uploader("Subir Gráfico Final", type=['png', 'jpg', 'jpeg'], key=f"img_res_{f_idx}")
+                    
+                    obs = st.text_area("Observaciones Finales", value=str(d.get('OBSERVACIONES', '')))
+
+                    # BOTÓN MAESTRO
+                    if st.form_submit_button("💾 CERRAR CICLO Y GUARDAR", use_container_width=True):
                         try:
-                            # Actualización directa por número de columna
-                            hoja_b.update_cell(fila_idx, 4, ins)
-                            hoja_b.update_cell(fila_idx, 5, acc)
-                            hoja_b.update_cell(fila_idx, 6, float(bala))
-                            hoja_b.update_cell(fila_idx, 7, float(p_ent))
-                            hoja_b.update_cell(fila_idx, 8, float(p_sl))
-                            hoja_b.update_cell(fila_idx, 9, float(tp_sugerido))
-                            hoja_b.update_cell(fila_idx, 10, round(float(lotaje), 2))
-                            hoja_b.update_cell(fila_idx, 21, tipo_final)
-                            hoja_b.update_cell(fila_idx, 22, float(monto_final))
-                            hoja_b.update_cell(fila_idx, 26, observaciones)
-                            hoja_b.update_cell(fila_idx, 27, semaforo)
-
-                            # Si cerramos una operación PENDIENTE, registrar en Finanzas
-                            if d['ESTADO_RESULTADO'] == "PENDIENTE" and tipo_final != "PENDIENTE":
+                            # 1. Actualizamos la Bitácora (Solo las columnas de resultado)
+                            # U=21(Estado), V=22(Monto), P=16(Img Resultado), Z=26(Obs)
+                            hoja_b.update_cell(f_idx, 21, nuevo_estado)
+                            hoja_b.update_cell(f_idx, 22, float(monto_final))
+                            hoja_b.update_cell(f_idx, 26, obs)
+                            if img_res:
+                                hoja_b.update_cell(f_idx, 16, img_res.name)
+                            
+                            # 2. Si pasó de PENDIENTE a cerrado, afectamos Finanzas
+                            if d.get('ESTADO_RESULTADO') == "PENDIENTE" and nuevo_estado != "PENDIENTE":
                                 ing = monto_final if monto_final > 0 else 0
                                 egr = abs(monto_final) if monto_final < 0 else 0
                                 hoja_f.append_row([
                                     len(hoja_f.get_all_values()), str(date.today()), user["ID_USUARIO"],
-                                    f"CIERRE {ins} (EDIT)", float(saldo_actual), float(ing), float(egr), 
+                                    f"CIERRE {d.get('INSTRUMENTO')}", float(saldo_actual), float(ing), float(egr), 
                                     float(saldo_actual + monto_final), "APP"
                                 ])
-
-                            st.success("✅ ¡Operación actualizada!")
-                            time.sleep(1)
-                            limpiar_edicion()
-                        except Exception as e_upd:
-                            st.error(f"Error al guardar: {e_upd}")
+                            
+                            st.success(f"✅ Ciclo cerrado. Balance: ${monto_final:.2f}")
+                            time.sleep(1.5)
+                            refrescar_cierre()
+                        except Exception as e_final:
+                            st.error(f"Error al sincronizar: {e_final}")
 
     # # SECCION 9: BACKTESTING
     elif menu == "📊 Backtesting":
