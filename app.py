@@ -381,15 +381,38 @@ def main_app():
         if p_ent > 0 and p_sl > 0:
             st.success(f"📊 **Cálculo:** Lotaje: **{lotaje:.2f}** | TP Sugerido: **{tp_sugerido:.4f}**")
 
-        # --- 4. EVIDENCIA VISUAL ---
+# --- 4. EVIDENCIA VISUAL (CON CÁMARA Y ARCHIVO) ---
         st.divider()
-        st.write("🖼️ **Evidencia Visual**")
+        st.write("🖼️ **Evidencia Visual (Cámara o Archivo)**")
+        
+        def capturar_imagen(label, key_base):
+            """Función auxiliar para manejar cámara y archivo en la misma columna"""
+            col_a, col_b = st.columns([1, 1])
+            foto = col_a.camera_input(f"📸 {label}", key=f"cam_{key_base}_{v}")
+            archivo = col_b.file_uploader(f"📂 O sube {label}", type=['png', 'jpg', 'jpeg'], key=f"file_{key_base}_{v}")
+            
+            # Prioridad a la cámara, luego al archivo
+            if foto:
+                return foto, f"cam_{key_base}_{datetime.now().strftime('%H%M%S')}.png"
+            elif archivo:
+                return archivo, archivo.name
+            return None, "N/A"
+
+        # Fila 1: Gráfico Mayor y Menor
         g_c1, g_c2 = st.columns(2)
-        img_may = g_c1.file_uploader("Gráfico Mayor", type=['png', 'jpg', 'jpeg'], key=f"img1_{v}")
-        img_men = g_c2.file_uploader("Gráfico Menor", type=['png', 'jpg', 'jpeg'], key=f"img2_{v}")
+        with g_c1:
+            obj_may, nombre_may = capturar_imagen("Gráfico Mayor", "may")
+        with g_c2:
+            obj_men, nombre_men = capturar_imagen("Gráfico Menor", "men")
+
+        # Fila 2: Gráfico Entrada y Resultado
         g_c3, g_c4 = st.columns(2)
-        img_ent = g_c3.file_uploader("Gráfico Entrada", type=['png', 'jpg', 'jpeg'], key=f"img3_{v}")
-        img_res = g_c4.file_uploader("Gráfico Resultado", type=['png', 'jpg', 'jpeg'], key=f"img4_{v}")
+        with g_c3:
+            obj_ent, nombre_ent = capturar_imagen("Gráfico Entrada", "ent")
+        with g_c4:
+            obj_res, nombre_res = capturar_imagen("Gráfico Resultado", "res")
+
+        # Nota: En el botón de GUARDAR REGISTRO, ahora usamos 'nombre_may', 'nombre_men', etc.
 
 # --- 5. PSICOLOGÍA Y RESULTADO (CORRECCIÓN DEFINITIVA DE CÁLCULO) ---
         st.divider()
