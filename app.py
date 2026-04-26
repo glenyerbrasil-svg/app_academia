@@ -381,108 +381,75 @@ def main_app():
         if p_ent > 0 and p_sl > 0:
             st.success(f"📊 **Cálculo:** Lotaje: **{lotaje:.2f}** | TP Sugerido: **{tp_sugerido:.4f}**")
 
-# --- 4. EVIDENCIA VISUAL (CORREGIDA) ---
-st.divider()
-st.write("🖼️ **Evidencia Visual**")
+        # --- 4. EVIDENCIA VISUAL ---
+        st.divider()
+        st.write("🖼️ **Evidencia Visual**")
+        g_c1, g_c2 = st.columns(2)
+        img_may = g_c1.file_uploader("Gráfico Mayor", type=['png', 'jpg', 'jpeg'], key=f"img1_{v}")
+        img_men = g_c2.file_uploader("Gráfico Menor", type=['png', 'jpg', 'jpeg'], key=f"img2_{v}")
+        g_c3, g_c4 = st.columns(2)
+        img_ent = g_c3.file_uploader("Gráfico Entrada", type=['png', 'jpg', 'jpeg'], key=f"img3_{v}")
+        img_res = g_c4.file_uploader("Gráfico Resultado", type=['png', 'jpg', 'jpeg'], key=f"img4_{v}")
 
-def capturar_evidencia(label, key_base):
-    with st.container(border=True):
-        st.write(f"**{label}**")
-        opcion = st.radio(f"Fuente para {label}", 
-                        ["📂 Archivo", "📸 Cámara", "❌ Sin imagen"], 
-                        horizontal=True, key=f"rad_{key_base}_{v}")
+# --- 5. PSICOLOGÍA Y RESULTADO (CORRECCIÓN DEFINITIVA DE CÁLCULO) ---
+        st.divider()
+        col_e, col_r = st.columns(2)
+        opciones_emo = ["🟢 Calma", "🔵 Zen", "🟡 Neutral", "🟠 Nervioso", "🔴 Ansioso"]
+        semaforo = col_e.select_slider("Semáforo Emocional", options=opciones_emo, value="🟢 Calma", key=f"emo_{v}")
         
-        if opcion == "📸 Cámara":
-            foto = st.camera_input(f"Capturar {label}", key=f"cam_{key_base}_{v}")
-            if foto:
-                return foto, f"cam_{key_base}_{datetime.now().strftime('%H%M%S')}.png"
+        # 1. Selector de estado
+        tipo_final = col_r.selectbox("Estado Final", ["PENDIENTE", "TP", "SL", "BE"], key=f"tipo_{v}")
         
-        elif opcion == "📂 Archivo":
-            archivo = st.file_uploader(f"Subir {label}", type=['png', 'jpg', 'jpeg'], key=f"file_{key_base}_{v}")
-            if archivo:
-                return archivo, archivo.name
-        
-        return None, "N/A"
+        # 2. LÓGICA DE INYECCIÓN: Calculamos y metemos el valor en el estado del input
+        monto_key = f"monto_{v}"
+        if tipo_final == "TP":
+            valor_calculado = float(abs(tp_sugerido - p_ent) * lotaje)
+            st.session_state[monto_key] = valor_calculado
+        elif tipo_final == "SL":
+            valor_calculado = -float(bala)
+            st.session_state[monto_key] = valor_calculado
+        elif tipo_final == "BE":
+            st.session_state[monto_key] = 0.0
+        elif tipo_final == "PENDIENTE" and monto_key not in st.session_state:
+            st.session_state[monto_key] = 0.0
 
-col_izq, col_der = st.columns(2)
-with col_izq:
-    obj_may, nombre_may = capturar_evidencia("Gráfico Mayor", "may")
-    obj_ent, nombre_ent = capturar_evidencia("Gráfico Entrada", "ent")
-with col_der:
-    obj_men, nombre_men = capturar_evidencia("Gráfico Menor", "men")
-    obj_res, nombre_res = capturar_evidencia("Gráfico Resultado", "res")
+        # 3. El input ahora lee directamente de la sesión actualizada
+        monto_final = st.number_input("Monto Resultante ($)", format="%.2f", key=monto_key)
+        observaciones = st.text_area("Observaciones", key=f"obs_{v}")
 
-# --- 5. PSICOLOGÍA Y RESULTADO ---
-st.divider()
-col_e, col_r = st.columns(2)
-opciones_emo = ["🟢 Calma", "🔵 Zen", "🟡 Neutral", "🟠 Nervioso", "🔴 Ansioso"]
-semaforo = col_e.select_slider("Semáforo Emocional", options=opciones_emo, value="🟢 Calma", key=f"emo_{v}")
-
-tipo_final = col_r.selectbox("Estado Final", ["PENDIENTE", "TP", "SL", "BE"], key=f"tipo_{v}")
-
-monto_key = f"monto_{v}"
-# Lógica de cálculo automático
-if tipo_final == "TP":
-    st.session_state[monto_key] = float(abs(tp_sugerido - p_ent) * lotaje)
-elif tipo_final == "SL":
-    st.session_state[monto_key] = -float(bala)
-elif tipo_final == "BE":
-    st.session_state[monto_key] = 0.0
-elif monto_key not in st.session_state:
-    st.session_state[monto_key] = 0.0
-
-monto_final = st.number_input("Monto Resultante ($)", format="%.2f", key=monto_key)
-observaciones = st.text_area("Observaciones", key=f"obs_{v}")
-
-# --- 6. BOTÓN DE GUARDAR (ELIMINADO EL NAMEERROR) ---
-if st.button("💾 GUARDAR REGISTRO", use_container_width=True, key=f"btn_save_{v}"):
-    if p_ent == 0 or p_sl == 0 or bala == 0:
-        st.warning("⚠️ Socio, faltan datos técnicos.")
-    else:
-        with st.spinner("Sincronizando con Google Sheets..."):
-            # AQUÍ ESTÁ LA CORRECCIÓN: Usamos 'monto_final' directamente
-            nueva_fila = [
-                len(hoja_b.get_all_values()), 
-                user["ID_USUARIO"], 
-                str(date.today()),
-                ins, 
-                acc, 
-                float(bala), 
-                float(p_ent), 
-                float(p_sl), 
-                float(tp_sugerido), 
-                round(float(lotaje), 2),
-                0, 
-                datetime.now().strftime("%H:%M:%S"),
-                nombre_may, 
-                nombre_men, 
-                nombre_ent, 
-                nombre_res,
-                "N/A", "N/A", "N/A", "N/A",
-                tipo_final, 
-                float(monto_final), # <--- Cambiado de monto_final_val a monto_final
-                "NO", 
-                0, 
-                "N/A", 
-                observaciones, 
-                semaforo
-            ]
-            
-            hoja_b.append_row(nueva_fila)
-            
-            # Registro en Finanzas si no es pendiente
-            if tipo_final != "PENDIENTE":
-                ing = monto_final if monto_final > 0 else 0
-                egr = abs(monto_final) if monto_final < 0 else 0
-                hoja_f.append_row([
-                    len(hoja_f.get_all_values()), str(date.today()), user["ID_USUARIO"],
-                    f"CIERRE {ins}", float(saldo_actual), float(ing), float(egr), 
-                    float(saldo_actual + monto_final), "APP"
-                ])
-            
-            st.success(f"✅ ¡Registro guardado con éxito, socio!")
-            time.sleep(1)
-            limpiar_todo_al_final()
+        # --- 6. BOTÓN DE GUARDAR ---
+        if st.button("💾 GUARDAR REGISTRO", use_container_width=True, key=f"btn_save_{v}"):
+            if p_ent == 0 or p_sl == 0 or bala == 0:
+                st.warning("⚠️ Socio, faltan datos técnicos.")
+            else:
+                with st.spinner("Sincronizando..."):
+                    # Usamos el valor que quedó en el input
+                    monto_final_val = float(monto_final)
+                    
+                    nueva_fila = [
+                        len(hoja_b.get_all_values()), user["ID_USUARIO"], str(date.today()),
+                        ins, acc, float(bala), float(p_ent), float(p_sl), float(tp_sugerido), 
+                        round(float(lotaje), 2),
+                        0, datetime.now().strftime("%H:%M:%S"),
+                        img_may.name if img_may else "N/A", img_men.name if img_men else "N/A",
+                        img_ent.name if img_ent else "N/A", img_res.name if img_res else "N/A",
+                        "N/A", "N/A", "N/A", "N/A",
+                        tipo_final, monto_final_val, "NO", 0, "N/A", observaciones, semaforo
+                    ]
+                    hoja_b.append_row(nueva_fila)
+                    
+                    if tipo_final != "PENDIENTE":
+                        ing = monto_final_val if monto_final_val > 0 else 0
+                        egr = abs(monto_final_val) if monto_final_val < 0 else 0
+                        hoja_f.append_row([
+                            len(hoja_f.get_all_values()), str(date.today()), user["ID_USUARIO"],
+                            f"CIERRE {ins}", float(saldo_actual), float(ing), float(egr), 
+                            float(saldo_actual + monto_final_val), "APP"
+                        ])
+                    
+                    st.success(f"✅ ¡Guardado! Resultado: ${monto_final_val:.2f}")
+                    time.sleep(1)
+                    limpiar_todo_al_final()
 
 # =========================================================
     # # SECCIÓN 8: CIERRE DE CICLO (CON CÁMARA INTEGRADA - 100%)
