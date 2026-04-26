@@ -452,24 +452,25 @@ def main_app():
                     limpiar_todo_al_final()
 
 # =========================================================
-# # SECCIÓN 8: AUDITORÍA CON COLORES (ESTILO TRADING PRO)
+# # SECCIÓN 8: AUDITORÍA Y EDICIÓN (SISTEMA INTEGRAL)
 # =========================================================
     elif menu == "✏️ Editar":
-        st.header("🔍 Auditoría de Operaciones")
+        st.header("🔍 Auditoría y Edición de Operaciones")
         
         try:
             hoja_b = doc.worksheet("Bitacora")
+            hoja_f = doc.worksheet("Finanzas")
             datos = hoja_b.get_all_records()
             
             if not datos:
-                st.warning("Aún no hay datos para mostrar, socio.")
+                st.warning("No hay datos registrados aún.")
                 st.stop()
                 
             df = pd.DataFrame(datos)
             df.columns = df.columns.str.strip().str.upper()
             df = df[df["ID_USUARIO"] == user["ID_USUARIO"]]
 
-            # --- FILTROS ---
+            # --- PANEL DE FILTROS ---
             with st.container(border=True):
                 c1, c2 = st.columns(2)
                 fecha_sel = c1.date_input("📅 Selecciona el día", value=date.today(), key="audit_date")
@@ -478,52 +479,87 @@ def main_app():
             # --- LÓGICA FILTRADO ---
             str_fecha = fecha_sel.strftime("%Y-%m-%d")
             df_filtrado = df.copy()
-            
             if "FECHA" in df_filtrado.columns:
                 df_filtrado = df_filtrado[df_filtrado["FECHA"].astype(str).str.contains(str_fecha)]
-            
             if res_sel != "TODOS" and "ESTADO_RESULTADO" in df_filtrado.columns:
                 df_filtrado = df_filtrado[df_filtrado["ESTADO_RESULTADO"] == res_sel]
 
             # --- FUNCIÓN DE COLOR ---
             def color_filas(row):
-                # Extraemos el estado para decidir el color
-                estado = row.get("ESTADO_RESULTADO", "")
-                if estado == "TP":
-                    return ['background-color: rgba(0, 255, 0, 0.2)'] * len(row) # Verde suave
-                elif estado == "SL":
-                    return ['background-color: rgba(255, 0, 0, 0.2)'] * len(row) # Rojo suave
-                elif estado == "BE":
-                    return ['background-color: rgba(255, 255, 0, 0.2)'] * len(row) # Amarillo suave
+                est = row.get("ESTADO_RESULTADO", "")
+                if est == "TP": return ['background-color: rgba(0, 255, 0, 0.15)'] * len(row)
+                elif est == "SL": return ['background-color: rgba(255, 0, 0, 0.15)'] * len(row)
+                elif est == "BE": return ['background-color: rgba(255, 255, 0, 0.15)'] * len(row)
                 return [''] * len(row)
 
-            # --- VISTA ---
-            st.divider()
+            # --- VISTA DE TABLA ---
             if not df_filtrado.empty:
-                # Columnas a mostrar
-                columnas_vista = ["FECHA", "INSTRUMENTO", "ACCION", "VALOR_BALA", "ESTADO_RESULTADO"]
-                
-                # Buscamos la columna de dinero dinámicamente
                 col_dinero = next((n for n in ["MONTO_RESULTADO", "RESULTADO", "MONTO"] if n in df_filtrado.columns), None)
-                if col_dinero:
-                    columnas_vista.append(col_dinero)
+                cols_mostrar = ["FECHA", "INSTRUMENTO", "ACCION", "VALOR_BALA", "ESTADO_RESULTADO"]
+                if col_dinero: cols_mostrar.append(col_dinero)
 
-                # Aplicamos el estilo y mostramos
-                df_estilado = df_filtrado[columnas_vista].sort_index(ascending=False).style.apply(color_filas, axis=1)
-                
+                st.subheader(f"📊 Resumen del día")
+                df_estilado = df_filtrado[cols_mostrar].sort_index(ascending=False).style.apply(color_filas, axis=1)
                 st.dataframe(df_estilado, use_container_width=True)
+
+                # --- PANEL DE EDICIÓN ---
+                st.divider()
+                st.subheader("🛠️ Modificar Operación")
                 
-                # Resumen de caja
-                if col_dinero:
-                    try:
-                        total = pd.to_numeric(df_filtrado[col_dinero]).sum()
-                        st.metric("Balance del Día", f"${total:.2f}", delta=float(total))
-                    except: pass
+                # Preparamos opciones para el selector de edición
+                opciones_edicion = []
+                for idx, fila in df_filtrado.iterrows():
+                    label = f"Fila {idx+2} | {fila.get('INSTRUMENTO')} | {fila.get('ACCION')} | ${fila.get('VALOR_BALA')}"
+                    opciones_edicion.append((label, idx + 2, fila))
+
+                seleccion = st.selectbox("Selecciona cuál quieres editar:", opciones_edicion, format_func=lambda x: x[0], key="sel_edit_pro")
+                
+                if seleccion:
+                    fila_idx = seleccion[1]
+                    d = seleccion[2]
+
+                    with st.form(key=f"form_edicion_final_{fila_idx}"):
+                        st.info(f"Editando la fila {fila_idx} del Google Sheets")
+                        e1, e2, e3 = st.columns(3)
+                        n_ins = e1.text_input("Instrumento", value=str(d.get('INSTRUMENTO', '')))
+                        n_acc = e2.selectbox("Acción", ["COMPRA", "VENTA"], index=0 if d.get('ACCION') == "COMPRA" else 1)
+                        n_bala = e3.number_input("Bala ($)", value=float(d.get('VALOR_BALA', 0.0)))
+
+                        e4, e5 = st.columns(2)
+                        n_est = e4.selectbox("Estado", ["PENDIENTE", "TP", "SL", "BE", "N/A"], 
+                                           index=["PENDIENTE", "TP", "SL", "BE", "N/A"].index(d.get('ESTADO_RESULTADO', 'PENDIENTE')))
+                        n_monto = e5.number_input("Monto Final ($)", value=float(d.get(col_dinero, 0.0)) if col_dinero else 0.0)
+                        
+                        n_obs = st.text_area("Observaciones", value=str(d.get('OBSERVACIONES', '')))
+
+                        if st.form_submit_button("💾 ACTUALIZAR EN GOOGLE SHEETS", use_container_width=True):
+                            # Actualización directa de celdas (basado en tu estructura estándar)
+                            # D=4 (Ins), E=5 (Acc), F=6 (Bala), U=21 (Estado), V=22 (Monto), Z=26 (Obs)
+                            hoja_b.update_cell(fila_idx, 4, n_ins)
+                            hoja_b.update_cell(fila_idx, 5, n_acc)
+                            hoja_b.update_cell(fila_idx, 6, n_bala)
+                            hoja_b.update_cell(fila_idx, 21, n_est)
+                            hoja_b.update_cell(fila_idx, 22, n_monto)
+                            hoja_b.update_cell(fila_idx, 26, n_obs)
+
+                            # Lógica para reflejar en Finanzas si era pendiente y cerró
+                            if d.get('ESTADO_RESULTADO') == "PENDIENTE" and n_est != "PENDIENTE":
+                                df_f = pd.DataFrame(hoja_f.get_all_records())
+                                s_act = float(df_f.iloc[-1].get("SALDO_FINAL", 0)) if not df_f.empty else 0.0
+                                hoja_f.append_row([
+                                    len(hoja_f.get_all_values()), str(date.today()), user["ID_USUARIO"],
+                                    f"CIERRE EDIT {n_ins}", s_act, (n_monto if n_monto > 0 else 0),
+                                    (abs(n_monto) if n_monto < 0 else 0), (s_act + n_monto), "APP"
+                                ])
+                            
+                            st.success("✅ ¡Sincronizado! Los cambios ya están en la nube.")
+                            time.sleep(1)
+                            st.rerun()
             else:
-                st.info(f"Sin operaciones registradas para el {str_fecha}.")
+                st.info(f"No hay nada registrado para el {str_fecha}, socio.")
 
         except Exception as e:
-            st.error(f"Socio, algo saltó aquí: {e}")
+            st.error(f"Error en el sistema: {e}")
 
     # # SECCION 9: BACKTESTING
     elif menu == "📊 Backtesting":
