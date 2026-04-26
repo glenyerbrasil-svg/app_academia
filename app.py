@@ -381,42 +381,40 @@ def main_app():
         if p_ent > 0 and p_sl > 0:
             st.success(f"📊 **Cálculo:** Lotaje: **{lotaje:.2f}** | TP Sugerido: **{tp_sugerido:.4f}**")
 
-# --- 4. EVIDENCIA VISUAL (OPTIMIZADA PARA CELULAR) ---
+# --- 4. EVIDENCIA VISUAL (INTERFAZ DE SELECCIÓN PROFESIONAL) ---
         st.divider()
         st.write("🖼️ **Evidencia Visual**")
         
-        def capturar_imagen_pro(label, key_base):
-            """Función con interruptor para no prender la cámara de una vez"""
-            # Usamos un contenedor para agrupar las opciones
+        def capturar_evidencia(label, key_base):
             with st.container(border=True):
                 st.write(f"**{label}**")
+                # El socio elige qué quiere usar
+                opcion = st.radio(f"Fuente para {label}", 
+                                ["📂 Archivo", "📸 Cámara", "❌ Sin imagen"], 
+                                horizontal=True, key=f"rad_{key_base}_{v}")
                 
-                # Vía 1: Archivo (siempre visible)
-                archivo = st.file_uploader(f"📂 Subir {label}", type=['png', 'jpg', 'jpeg'], key=f"file_{key_base}_{v}")
-                
-                # Vía 2: Cámara con interruptor
-                usar_camara = st.toggle(f"📸 Activar Cámara para {label}", key=f"tog_{key_base}_{v}")
-                
-                foto = None
-                if usar_camara:
-                    # 'label' oculto para que no ocupe espacio, pero ayuda al sistema
+                if opcion == "📸 Cámara":
+                    # Intentamos forzar la cámara trasera con 'facingMode' si el navegador lo permite
+                    # En Streamlit esto activa el componente solo cuando se selecciona
                     foto = st.camera_input(f"Capturar {label}", key=f"cam_{key_base}_{v}")
+                    if foto:
+                        return foto, f"cam_{key_base}_{datetime.now().strftime('%H%M%S')}.png"
                 
-                # Prioridad Lógica
-                if foto:
-                    return foto, f"cam_{key_base}_{datetime.now().strftime('%H%M%S')}.png"
-                elif archivo:
-                    return archivo, archivo.name
+                elif opcion == "📂 Archivo":
+                    archivo = st.file_uploader(f"Subir {label}", type=['png', 'jpg', 'jpeg'], key=f"file_{key_base}_{v}")
+                    if archivo:
+                        return archivo, archivo.name
+                
                 return None, "N/A"
 
-        # Distribución en columnas para que no ocupe toda la pantalla hacia abajo
-        col_g1, col_g2 = st.columns(2)
-        with col_g1:
-            obj_may, nombre_may = capturar_imagen_pro("Gráfico Mayor", "may")
-            obj_ent, nombre_ent = capturar_imagen_pro("Gráfico Entrada", "ent")
-        with col_g2:
-            obj_men, nombre_men = capturar_imagen_pro("Gráfico Menor", "men")
-            obj_res, nombre_res = capturar_imagen_pro("Gráfico Resultado", "res")
+        # Distribución limpia
+        col_izq, col_der = st.columns(2)
+        with col_izq:
+            obj_may, nombre_may = capturar_evidencia("Gráfico Mayor", "may")
+            obj_ent, nombre_ent = capturar_evidencia("Gráfico Entrada", "ent")
+        with col_der:
+            obj_men, nombre_men = capturar_evidencia("Gráfico Menor", "men")
+            obj_res, nombre_res = capturar_evidencia("Gráfico Resultado", "res")
 
 # --- 5. PSICOLOGÍA Y RESULTADO (CORRECCIÓN DEFINITIVA DE CÁLCULO) ---
         st.divider()
@@ -444,39 +442,20 @@ def main_app():
         monto_final = st.number_input("Monto Resultante ($)", format="%.2f", key=monto_key)
         observaciones = st.text_area("Observaciones", key=f"obs_{v}")
 
-        # --- 6. BOTÓN DE GUARDAR ---
+# --- 6. BOTÓN DE GUARDAR ---
         if st.button("💾 GUARDAR REGISTRO", use_container_width=True, key=f"btn_save_{v}"):
-            if p_ent == 0 or p_sl == 0 or bala == 0:
-                st.warning("⚠️ Socio, faltan datos técnicos.")
-            else:
-                with st.spinner("Sincronizando..."):
-                    # Usamos el valor que quedó en el input
-                    monto_final_val = float(monto_final)
-                    
-                    nueva_fila = [
-                        len(hoja_b.get_all_values()), user["ID_USUARIO"], str(date.today()),
-                        ins, acc, float(bala), float(p_ent), float(p_sl), float(tp_sugerido), 
-                        round(float(lotaje), 2),
-                        0, datetime.now().strftime("%H:%M:%S"),
-                        img_may.name if img_may else "N/A", img_men.name if img_men else "N/A",
-                        img_ent.name if img_ent else "N/A", img_res.name if img_res else "N/A",
-                        "N/A", "N/A", "N/A", "N/A",
-                        tipo_final, monto_final_val, "NO", 0, "N/A", observaciones, semaforo
-                    ]
-                    hoja_b.append_row(nueva_fila)
-                    
-                    if tipo_final != "PENDIENTE":
-                        ing = monto_final_val if monto_final_val > 0 else 0
-                        egr = abs(monto_final_val) if monto_final_val < 0 else 0
-                        hoja_f.append_row([
-                            len(hoja_f.get_all_values()), str(date.today()), user["ID_USUARIO"],
-                            f"CIERRE {ins}", float(saldo_actual), float(ing), float(egr), 
-                            float(saldo_actual + monto_final_val), "APP"
-                        ])
-                    
-                    st.success(f"✅ ¡Guardado! Resultado: ${monto_final_val:.2f}")
-                    time.sleep(1)
-                    limpiar_todo_al_final()
+            # ... validaciones ...
+            nueva_fila = [
+                len(hoja_b.get_all_values()), user["ID_USUARIO"], str(date.today()),
+                ins, acc, float(bala), float(p_ent), float(p_sl), float(tp_sugerido), 
+                round(float(lotaje), 2),
+                0, datetime.now().strftime("%H:%M:%S"),
+                nombre_may, nombre_men, # <--- USAR 'nombre_xxx'
+                nombre_ent, nombre_res, # <--- USAR 'nombre_xxx'
+                "N/A", "N/A", "N/A", "N/A",
+                tipo_final, monto_final_val, "NO", 0, "N/A", observaciones, semaforo
+            ]
+            # ... resto del guardado ...
 
 # =========================================================
     # # SECCIÓN 8: CIERRE DE CICLO (CON CÁMARA INTEGRADA - 100%)
