@@ -452,133 +452,103 @@ def main_app():
                     limpiar_todo_al_final()
 
 # =========================================================
-# # SECCIÓN 8: AUDITORÍA Y EDICIÓN TOTAL (V4 - ULTRA)
+# # SECCIÓN 8: EDICIÓN MAESTRA (REUTILIZANDO LÓGICA DE INGRESO)
 # =========================================================
     elif menu == "✏️ Editar":
-        st.header("🔍 Auditoría y Edición Maestra")
+        st.header("✏️ Modificar Operación Existente")
         
         try:
             hoja_b = doc.worksheet("Bitacora")
-            hoja_f = doc.worksheet("Finanzas")
             datos = hoja_b.get_all_records()
             
             if not datos:
-                st.warning("Bitácora vacía.")
+                st.warning("No hay operaciones registradas.")
                 st.stop()
                 
             df = pd.DataFrame(datos)
             df.columns = df.columns.str.strip().str.upper()
             df = df[df["ID_USUARIO"] == user["ID_USUARIO"]]
 
-            # --- FILTROS DE BÚSQUEDA ---
+            # --- 1. BUSCADOR POR DÍA (TU IDEA) ---
             with st.container(border=True):
                 c1, c2 = st.columns(2)
-                fecha_sel = c1.date_input("📅 Día de la Operación", value=date.today(), key="audit_date")
-                res_sel = c2.selectbox("🎯 Filtrar por Resultado", ["TODOS", "TP", "SL", "BE", "PENDIENTE"], key="audit_res")
+                f_busqueda = c1.date_input("📅 ¿Qué día operaste?", value=date.today())
+                # Filtramos el DF por esa fecha
+                str_f = f_busqueda.strftime("%Y-%m-%d")
+                df_dia = df[df["FECHA"].astype(str).str.contains(str_f)]
 
-            # --- LÓGICA DE FILTRADO ---
-            str_fecha = fecha_sel.strftime("%Y-%m-%d")
-            df_filtrado = df.copy()
-            if "FECHA" in df_filtrado.columns:
-                df_filtrado = df_filtrado[df_filtrado["FECHA"].astype(str).str.contains(str_fecha)]
-            if res_sel != "TODOS" and "ESTADO_RESULTADO" in df_filtrado.columns:
-                df_filtrado = df_filtrado[df_filtrado["ESTADO_RESULTADO"] == res_sel]
+            if df_dia.empty:
+                st.info(f"No hay trades registrados el {str_f}")
+                st.stop()
 
-            # --- VISTA PREVIA (CON COLORES) ---
-            if not df_filtrado.empty:
-                st.subheader("📊 Operaciones Encontradas")
-                
-                def color_filas(row):
-                    est = row.get("ESTADO_RESULTADO", "")
-                    if est == "TP": return ['background-color: rgba(0, 255, 0, 0.1)'] * len(row)
-                    elif est == "SL": return ['background-color: rgba(255, 0, 0, 0.1)'] * len(row)
-                    return [''] * len(row)
+            # --- 2. SELECCIÓN DE LA OPERACIÓN ESPECÍFICA ---
+            opciones = []
+            for idx, fila in df_dia.iterrows():
+                label = f"ID: {fila.get('ID', idx)} | {fila.get('INSTRUMENTO')} | {fila.get('ACCION')} | {fila.get('ESTADO_RESULTADO')}"
+                opciones.append((label, idx + 2, fila)) # Guardamos el índice real de la fila (idx+2)
 
-                # Definimos columnas para la tabla
-                col_dinero = "RESULTADO_DINERO" if "RESULTADO_DINERO" in df_filtrado.columns else "MONTO_RESULTADO"
-                cols_vista = ["FECHA", "INSTRUMENTO", "ACCION", "ESTADO_RESULTADO", col_dinero]
-                
-                st.dataframe(df_filtrado[cols_vista].sort_index(ascending=False).style.apply(color_filas, axis=1), use_container_width=True)
+            seleccion = st.selectbox("🎯 Selecciona la operación a editar:", opciones, format_func=lambda x: x[0])
+            
+            if seleccion:
+                fila_real = seleccion[1]
+                d = seleccion[2] # Los datos actuales de la fila
 
-                # --- SELECTOR DE EDICIÓN MEJORADO ---
                 st.divider()
-                st.subheader("🛠️ Panel de Edición Detallada")
-                
-                opciones_edicion = []
-                for idx, fila in df_filtrado.iterrows():
-                    # Creamos una etiqueta súper descriptiva
-                    label = (f"Fila {idx+2} | {fila.get('INSTRUMENTO')} | {fila.get('ACCION')} | "
-                             f"Estado: {fila.get('ESTADO_RESULTADO')} | Dinero: ${fila.get(col_dinero)}")
-                    opciones_edicion.append((label, idx + 2, fila))
+                st.subheader(f"📝 Editando Registro de {d.get('INSTRUMENTO')}")
 
-                seleccion = st.selectbox("🎯 ¿Cuál operación deseas corregir?", 
-                                        opciones_edicion, 
-                                        format_func=lambda x: x[0], 
-                                        key="sel_edit_v4")
-                
-                if seleccion:
-                    fila_idx = seleccion[1]
-                    d = seleccion[2]
+                # --- 3. FORMULARIO (MISMA LÓGICA QUE EL DE INGRESO) ---
+                with st.form("form_edit_reutilizado"):
+                    col1, col2, col3 = st.columns(3)
+                    
+                    # Cargamos los valores con 'value=' usando lo que ya hay en el Sheets
+                    n_ins = col1.text_input("Instrumento", value=str(d.get('INSTRUMENTO', '')))
+                    n_acc = col2.selectbox("Acción", ["COMPRA", "VENTA"], 
+                                         index=0 if d.get('ACCION') == "COMPRA" else 1)
+                    n_bala = col3.number_input("Bala ($)", value=float(d.get('VALOR_BALA', 0.0)))
 
-                    # --- FORMULARIO DE EDICIÓN TOTAL ---
-                    with st.form(key=f"form_total_{fila_idx}"):
-                        st.write(f"📝 **Editando Registro en Fila {fila_idx}**")
-                        
-                        # Bloque 1: Datos Técnicos
-                        t1, t2, t3 = st.columns(3)
-                        n_ins = t1.text_input("Instrumento", value=str(d.get('INSTRUMENTO', '')))
-                        n_acc = t2.selectbox("Acción", ["COMPRA", "VENTA"], index=0 if d.get('ACCION') == "COMPRA" else 1)
-                        n_bala = t3.number_input("Bala ($)", value=float(d.get('VALOR_BALA', 0.0)))
+                    col4, col5, col6 = st.columns(3)
+                    n_ent = col4.number_input("Entrada", value=float(d.get('PRECIO_ENTRADA', 0.0)), format="%.4f")
+                    n_sl = col5.number_input("SL", value=float(d.get('PRECIO_SL', 0.0)), format="%.4f")
+                    n_tp = col6.number_input("TP", value=float(d.get('PRECIO_TP', 0.0)), format="%.4f")
 
-                        # Bloque 2: Precios
-                        p1, p2, p3 = st.columns(3)
-                        n_ent = p1.number_input("Entrada", value=float(d.get('PRECIO_ENTRADA', 0.0)), format="%.4f")
-                        n_sl = p2.number_input("Stop Loss", value=float(d.get('PRECIO_SL', 0.0)), format="%.4f")
-                        n_tp = p3.number_input("Take Profit", value=float(d.get('PRECIO_TP', 0.0)), format="%.4f")
+                    st.markdown("---")
+                    col7, col8, col9 = st.columns(3)
+                    
+                    # Lista de estados para el selectbox
+                    estados = ["PENDIENTE", "TP", "SL", "BE", "N/A"]
+                    est_actual = d.get('ESTADO_RESULTADO', 'PENDIENTE')
+                    n_est = col7.selectbox("Estado", estados, 
+                                         index=estados.index(est_actual) if est_actual in estados else 0)
+                    
+                    n_monto = col8.number_input("Resultado ($)", value=float(d.get('RESULTADO_DINERO', 0.0)))
+                    
+                    opciones_si_no = ["NO", "SI"]
+                    llego_actual = d.get('LLEGO_11', 'NO')
+                    n_11 = col9.selectbox("¿Llegó 1:1?", opciones_si_no, 
+                                        index=opciones_si_no.index(llego_actual) if llego_actual in opciones_si_no else 0)
 
-                        # Bloque 3: Resultados (Los de tu imagen)
-                        st.markdown("---")
-                        r1, r2, r3 = st.columns(3)
-                        n_est = r1.selectbox("ESTADO_RESULTADO", ["PENDIENTE", "TP", "SL", "BE", "N/A"], 
-                                           index=["PENDIENTE", "TP", "SL", "BE", "N/A"].index(d.get('ESTADO_RESULTADO', 'PENDIENTE')))
-                        n_dinero = r2.number_input("RESULTADO_DINERO ($)", value=float(d.get('RESULTADO_DINERO', 0.0)))
-                        n_llegoll = r3.selectbox("LLEGO_11", ["NO", "SI"], index=0 if d.get('LLEGO_11') == "NO" else 1)
+                    n_obs = st.text_area("Observaciones", value=str(d.get('OBSERVACIONES', '')))
 
-                        # Bloque 4: Otros campos
-                        n_obs = st.text_area("Observaciones / Notas", value=str(d.get('OBSERVACIONES', '')))
+                    # BOTÓN DE GUARDADO
+                    if st.form_submit_button("💾 ACTUALIZAR OPERACIÓN", use_container_width=True):
+                        # Usamos la misma estructura de columnas que tu código de ingreso
+                        hoja_b.update_cell(fila_real, 4, n_ins)
+                        hoja_b.update_cell(fila_real, 5, n_acc)
+                        hoja_b.update_cell(fila_real, 6, n_bala)
+                        hoja_b.update_cell(fila_real, 7, n_ent)
+                        hoja_b.update_cell(fila_real, 8, n_sl)
+                        hoja_b.update_cell(fila_real, 9, n_tp)
+                        hoja_b.update_cell(fila_real, 21, n_est)
+                        hoja_b.update_cell(fila_real, 22, n_monto)
+                        hoja_b.update_cell(fila_real, 23, n_11)
+                        hoja_b.update_cell(fila_real, 26, n_obs)
 
-                        if st.form_submit_button("💾 GUARDAR CAMBIOS TOTALES", use_container_width=True):
-                            # Sincronización exacta con las columnas de tu Sheets:
-                            # D=4(Ins), E=5(Acc), F=6(Bala), G=7(Ent), H=8(SL), I=9(TP), U=21(Estado), V=22(Dinero), W=23(Llego11), Z=26(Obs)
-                            hoja_b.update_cell(fila_idx, 4, n_ins)
-                            hoja_b.update_cell(fila_idx, 5, n_acc)
-                            hoja_b.update_cell(fila_idx, 6, n_bala)
-                            hoja_b.update_cell(fila_idx, 7, n_ent)
-                            hoja_b.update_cell(fila_idx, 8, n_sl)
-                            hoja_b.update_cell(fila_idx, 9, n_tp)
-                            hoja_b.update_cell(fila_idx, 21, n_est)
-                            hoja_b.update_cell(fila_idx, 22, n_dinero)
-                            hoja_b.update_cell(fila_idx, 23, n_llegoll)
-                            hoja_b.update_cell(fila_idx, 26, n_obs)
-
-                            # Actualizar saldo en Finanzas si cerramos operación
-                            if d.get('ESTADO_RESULTADO') == "PENDIENTE" and n_est != "PENDIENTE":
-                                df_f = pd.DataFrame(hoja_f.get_all_records())
-                                s_act = float(df_f.iloc[-1].get("SALDO_FINAL", 0)) if not df_f.empty else 0.0
-                                hoja_f.append_row([
-                                    len(hoja_f.get_all_values()), str(date.today()), user["ID_USUARIO"],
-                                    f"EDIT {n_ins}", s_act, (n_dinero if n_dinero > 0 else 0),
-                                    (abs(n_dinero) if n_dinero < 0 else 0), (s_act + n_dinero), "APP"
-                                ])
-                            
-                            st.success("✅ ¡Base de datos actualizada, socio!")
-                            time.sleep(1)
-                            st.rerun()
-            else:
-                st.info(f"Sin registros para el {str_fecha}.")
+                        st.success("✅ ¡Operación actualizada perfectamente, socio!")
+                        time.sleep(1)
+                        st.rerun()
 
         except Exception as e:
-            st.error(f"Socio, revisa esto: {e}")
+            st.error(f"Error al intentar editar: {e}")
 
     # # SECCION 9: BACKTESTING
     elif menu == "📊 Backtesting":
