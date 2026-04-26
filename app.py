@@ -452,121 +452,67 @@ def main_app():
                     limpiar_todo_al_final()
 
 # =========================================================
-# # SECCIÓN 8: EDICIÓN DE OPERACIONES (VERSIÓN BLINDADA)
+# # SECCIÓN 8: BUSCADOR DE OPERACIONES (AUDITORÍA RÁPIDA)
 # =========================================================
     elif menu == "✏️ Editar":
-        st.header("✏️ Panel de Edición y Control")
+        st.header("🔍 Buscador y Auditoría de Operaciones")
         
         try:
+            # Conexión limpia
             hoja_b = doc.worksheet("Bitacora")
-            hoja_f = doc.worksheet("Finanzas")
-            datos_b = hoja_b.get_all_records()
+            datos = hoja_b.get_all_records()
             
-            if not datos_b:
-                st.warning("La bitácora está vacía, socio.")
+            if not datos:
+                st.warning("No hay datos en la bitácora todavía.")
                 st.stop()
                 
-            df_b = pd.DataFrame(datos_b)
+            df = pd.DataFrame(datos)
+            df.columns = df.columns.str.strip() # Limpieza de nombres de columnas
             
-            # Limpiamos nombres de columnas por si acaso hay espacios invisibles
-            df_b.columns = df_b.columns.str.strip()
+            # Filtro inicial por tu usuario
+            df = df[df["ID_USUARIO"] == user["ID_USUARIO"]]
 
-            # Filtro por usuario
-            df_edit = df_b[df_b["ID_USUARIO"] == user["ID_USUARIO"]].copy()
-
-            # --- BUSCADOR ---
-            with st.expander("🔍 Buscador", expanded=True):
-                f1, f2 = st.columns(2)
-                s_tipo = f1.selectbox("Estado", ["TODOS", "PENDIENTE", "TP", "SL", "BE"], key="edit_f_tipo")
-                s_ins = f2.text_input("Instrumento", key="edit_f_ins").upper()
-
-            if s_tipo != "TODOS":
-                df_edit = df_edit[df_edit["ESTADO_RESULTADO"] == s_tipo]
-            if s_ins:
-                df_edit = df_edit[df_edit["INSTRUMENTO"].str.contains(s_ins, na=False)]
-
-            # Ordenar: Pendientes primero y más recientes arriba
-            df_final = pd.concat([
-                df_edit[df_edit["ESTADO_RESULTADO"] == "PENDIENTE"].sort_index(ascending=False),
-                df_edit[df_edit["ESTADO_RESULTADO"] != "PENDIENTE"].sort_index(ascending=False)
-            ])
-
-            if df_final.empty:
-                st.info("No hay coincidencias.")
-                st.stop()
-
-            # --- SELECTOR ---
-            opciones = []
-            for idx, fila in df_final.iterrows():
-                # Buscamos el ID o usamos el índice como respaldo
-                id_lab = fila.get('ID', idx)
-                label = f"Fila {idx+2} | {fila.get('ESTADO_RESULTADO')} | {fila.get('INSTRUMENTO')} | ${fila.get('VALOR_BALA')}"
-                opciones.append((label, idx + 2, fila))
-
-            seleccion = st.selectbox("Selecciona la operación:", opciones, format_func=lambda x: x[0], key="sel_edit_final")
+            # --- PANEL DE FILTROS ---
+            st.write("Configura tu búsqueda:")
+            c1, c2 = st.columns(2)
             
-            fila_idx = seleccion[1]
-            d = seleccion[2]
+            # 1. Filtro por Fecha (Input de texto para máxima flexibilidad)
+            f_fecha = c1.text_input("📅 Fecha (YYYY-MM-DD)", placeholder="Ej: 2026-04-25")
+            
+            # 2. Filtro por Resultado
+            f_resultado = c2.selectbox("🎯 Resultado", ["TODOS", "TP", "SL", "BE", "PENDIENTE"])
 
-            # --- FORMULARIO BLINDADO ---
+            # --- LÓGICA DE FILTRADO ---
+            df_filtrado = df.copy()
+
+            if f_fecha:
+                # Buscamos coincidencias en la columna FECHA
+                df_filtrado = df_filtrado[df_filtrado["FECHA"].astype(str).str.contains(f_fecha)]
+
+            if f_resultado != "TODOS":
+                # Filtramos por el estado seleccionado
+                df_filtrado = df_filtrado[df_filtrado["ESTADO_RESULTADO"] == f_resultado]
+
+            # --- RESULTADOS ---
             st.divider()
-            st.subheader(f"🛠️ Editando Registro en Fila {fila_idx}")
+            num_res = len(df_filtrado)
+            st.subheader(f"📊 Resultados encontrados: {num_res}")
 
-            # IMPORTANTE: Todo debe estar dentro del 'with'
-            with st.form(key=f"form_v3_{fila_idx}"):
-                c1, c2, c3 = st.columns(3)
-                # Usamos .get(columna, default) para evitar el KeyError
-                n_ins = c1.text_input("Instrumento", value=str(d.get('INSTRUMENTO', '')))
-                n_acc = c2.selectbox("Acción", ["COMPRA", "VENTA"], index=0 if d.get('ACCION') == "COMPRA" else 1)
-                n_bala = c3.number_input("Bala ($)", value=float(d.get('VALOR_BALA', 0.0)))
-
-                c4, c5, c6 = st.columns(3)
-                n_ent = c4.number_input("Entrada", value=float(d.get('PRECIO_ENTRADA', 0.0)), format="%.4f")
-                n_sl = c5.number_input("SL", value=float(d.get('PRECIO_SL', 0.0)), format="%.4f")
-                n_tp = c6.number_input("TP", value=float(d.get('PRECIO_TP', 0.0)), format="%.4f")
-
-                st.divider()
-                ce1, ce2 = st.columns(2)
-                lista_est = ["PENDIENTE", "TP", "SL", "BE", "N/A"]
-                est_act = d.get('ESTADO_RESULTADO', 'PENDIENTE')
-                n_est = ce1.selectbox("Nuevo Estado", lista_est, index=lista_est.index(est_act) if est_act in lista_est else 0)
-                n_monto = ce2.number_input("Monto Resultante ($)", value=float(d.get('MONTO_RESULTADO', 0.0)))
+            if not df_filtrado.empty:
+                # Mostramos solo las columnas clave para que sea fácil de leer
+                columnas_vista = ["FECHA", "INSTRUMENTO", "ACCION", "VALOR_BALA", "ESTADO_RESULTADO", "MONTO_RESULTADO"]
                 
-                n_obs = st.text_area("Notas", value=str(d.get('OBSERVACIONES', '')))
-
-                # El botón de guardado SIEMPRE dentro del bloque 'with'
-                btn_save = st.form_submit_button("💾 GUARDAR CAMBIOS", use_container_width=True)
-
-                if btn_save:
-                    with st.spinner("Actualizando Google Sheets..."):
-                        # Mapeo de columnas según tu captura de Excel:
-                        # D=4, E=5, F=6, G=7, H=8, I=9, U=21, V=22, Z=26
-                        hoja_b.update_cell(fila_idx, 4, n_ins)
-                        hoja_b.update_cell(fila_idx, 5, n_acc)
-                        hoja_b.update_cell(fila_idx, 6, n_bala)
-                        hoja_b.update_cell(fila_idx, 7, n_ent)
-                        hoja_b.update_cell(fila_idx, 8, n_sl)
-                        hoja_b.update_cell(fila_idx, 9, n_tp)
-                        hoja_b.update_cell(fila_idx, 21, n_est)
-                        hoja_b.update_cell(fila_idx, 22, n_monto)
-                        hoja_b.update_cell(fila_idx, 26, n_obs)
-
-                        # Si cerramos una pendiente, inyectamos en Finanzas
-                        if est_act == "PENDIENTE" and n_est != "PENDIENTE":
-                            df_f = pd.DataFrame(hoja_f.get_all_records())
-                            s_act = float(df_f.iloc[-1].get("SALDO_FINAL", 0)) if not df_f.empty else 0.0
-                            hoja_f.append_row([
-                                len(hoja_f.get_all_values()), str(date.today()), user["ID_USUARIO"],
-                                f"CIERRE {n_ins} (EDIT)", s_act, (n_monto if n_monto > 0 else 0),
-                                (abs(n_monto) if n_monto < 0 else 0), (s_act + n_monto), "APP"
-                            ])
-                        
-                        st.success("✅ ¡Registro actualizado, socio!")
-                        time.sleep(1)
-                        st.rerun()
+                # Usamos st.dataframe para que puedas ordenar haciendo clic en las columnas
+                st.dataframe(
+                    df_filtrado[columnas_vista].sort_index(ascending=False),
+                    use_container_width=True,
+                    hide_index=True
+                )
+            else:
+                st.info("No hay operaciones que coincidan con esos filtros hoy, socio.")
 
         except Exception as e:
-            st.error(f"Error detectado: {e}")
+            st.error(f"Error en el buscador: {e}")
 
     # # SECCION 9: BACKTESTING
     elif menu == "📊 Backtesting":
