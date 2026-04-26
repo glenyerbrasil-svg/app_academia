@@ -452,7 +452,7 @@ def main_app():
                     limpiar_todo_al_final()
 
 # =========================================================
-    # # SECCIÓN 8: CIERRE DE CICLO (NOMBRES DE COLUMNAS REALES)
+    # # SECCIÓN 8: CIERRE DE CICLO (CORRECCIÓN DE LOTAJE)
     # =========================================================
     elif menu == "✏️ Editar":
         from datetime import datetime
@@ -462,9 +462,9 @@ def main_app():
             hoja_b = doc.worksheet("Bitacora")
             hoja_f = doc.worksheet("Finanzas")
             
-            # Leemos como DataFrame y normalizamos nombres
+            # Cargamos y normalizamos nombres de columnas (quitar espacios y poner mayúsculas)
             df_b = pd.DataFrame(hoja_b.get_all_records())
-            df_b.columns = df_b.columns.str.strip() # Limpiamos espacios
+            df_b.columns = df_b.columns.str.strip().str.upper()
             
             df_f = pd.DataFrame(hoja_f.get_all_records())
             saldo_actual = float(df_f.iloc[-1].get("SALDO_FINAL", 0)) if not df_f.empty else 0.0
@@ -477,90 +477,81 @@ def main_app():
             solo_p = col_b2.toggle("Solo Pendientes", value=True)
 
         str_f = f_busq.strftime("%Y-%m-%d")
-        
-        # Filtro usando tus nombres reales
         mask = (df_b["ID_USUARIO"].astype(str) == str(user["ID_USUARIO"])) & (df_b["FECHA"].astype(str).str.contains(str_f))
-        if solo_p: 
-            mask = mask & (df_b["ESTADO_RESULTADO"] == "PENDIENTE")
+        if solo_p: mask = mask & (df_b["ESTADO_RESULTADO"] == "PENDIENTE")
         
         df_filtrado = df_b[mask].copy()
-
         if df_filtrado.empty:
-            st.info("Socio, no veo trades con esos criterios."); st.stop()
+            st.info("No hay trades para hoy."); st.stop()
 
-        # --- SELECTOR CON TUS COLUMNAS ---
         opciones = []
         for i, r in df_filtrado.iterrows():
-            # Usamos tus nombres: ID_BITACORA, HORA_ENTRADA, VALOR_BALA
-            f_id = r.get('ID_BITACORA', 'N/A')
-            f_hora = r.get('HORA_ENTRADA', '--:--')
-            f_inst = r.get('INSTRUMENTO', '???')
-            f_bala = r.get('VALOR_BALA', 0)
-            
-            label = f"📝 Fila {i+2} | ID: {f_id} | {f_inst} | 🕒 {f_hora} | 💰 ${f_bala}"
+            label = f"📝 Fila {i+2} | ID: {r.get('ID_BITACORA')} | {r.get('INSTRUMENTO')} | 🕒 {r.get('HORA_ENTRADA')} | 💰 ${r.get('VALOR_BALA')}"
             opciones.append((label, i+2, r.to_dict()))
 
-        sel = st.selectbox("🎯 Selecciona el trade exacto para cerrar:", opciones, format_func=lambda x: x[0])
+        sel = st.selectbox("🎯 Selecciona el trade:", opciones, format_func=lambda x: x[0])
         
         if sel:
             f_idx, d = sel[1], sel[2]
             st.divider()
 
-            # Función para limpiar los datos que vienen del Sheets
             def clean(val):
                 try:
                     if val is None or str(val).strip() in ["", "None", "nan"]: return 0.0
                     return float(str(val).replace(',', '.'))
                 except: return 0.0
 
-            # Mapeo de tus variables para el cálculo
+            # --- LÓGICA DETECTIVE PARA EL LOTAJE ---
+            # Buscamos en 'LOTAJEMARGEN' o 'LOTAJE' o 'LOTAJES'
             p_ent = clean(d.get('PRECIO_ENT'))
             p_tp = clean(d.get('PRECIO_TP'))
-            lotaje = clean(d.get('LOTAJEMARGEN')) # Ajustado al nombre pegado que pasaste
             bala = clean(d.get('VALOR_BALA'))
+            
+            # Intentamos varias combinaciones por si el nombre cambió en el Excel
+            lotaje = clean(d.get('LOTAJEMARGEN'))
+            if lotaje == 0.0: lotaje = clean(d.get('LOTAJE'))
+            if lotaje == 0.0: lotaje = clean(d.get('LOTAJES'))
 
             col_c1, col_c2 = st.columns(2)
             nuevo_estado = col_c1.selectbox("Estado Final", ["PENDIENTE", "TP", "SL", "BE"], 
                                           index=["PENDIENTE", "TP", "SL", "BE"].index(d.get('ESTADO_RESULTADO', 'PENDIENTE')))
             
-            # Recálculo automático
-            monto_sug = 0.0
+            # CÁLCULO DINÁMICO (Sin st.form para que se actualice al momento)
+            monto_final_calc = 0.0
             if nuevo_estado == "TP":
-                monto_sug = abs(p_tp - p_ent) * lotaje
+                monto_final_calc = abs(p_tp - p_ent) * lotaje
             elif nuevo_estado == "SL":
-                monto_sug = -bala
+                monto_final_calc = -bala
             elif nuevo_estado == "BE":
-                monto_sug = 0.0
+                monto_final_calc = 0.0
             else:
-                monto_sug = clean(d.get('RESULTADO_DINERO'))
+                monto_final_calc = clean(d.get('RESULTADO_DINERO'))
 
-            monto_final = col_c2.number_input("Monto Final ($)", value=float(monto_sug), format="%.2f")
+            monto_usuario = col_c2.number_input("Monto Final ($)", value=float(monto_final_calc), format="%.2f")
 
-            with st.form(key=f"cierre_form_{f_idx}"):
-                st.info(f"ID: {d.get('ID_BITACORA')} | Entrada: {p_ent} | TP: {p_tp} | Lotaje: {lotaje}")
-                img_res = st.file_uploader("Gráfico de Resultado (IMAGEN_RESULTADO)", type=['png', 'jpg', 'jpeg'])
+            with st.form(key=f"cierre_{f_idx}"):
+                # Mostramos los datos cargados para que el socio vea qué está pasando
+                st.info(f"🔍 Datos: Entrada {p_ent} | TP {p_tp} | Lotaje {lotaje}")
+                
+                img_res = st.file_uploader("Gráfico de Resultado", type=['png', 'jpg', 'jpeg'])
                 obs = st.text_area("Observaciones", value=str(d.get('OBSERVACIONES', '')))
                 
                 if st.form_submit_button("💾 ACTUALIZAR Y CERRAR", use_container_width=True):
-                    # Actualización por posición para no fallar (U=21, V=22, Y=25, Z=26)
-                    # Nota: Según tu lista, IMAGEN_RESULTADO es la 25 y OBSERVACIONES la 26
-                    hoja_b.update_cell(f_idx, 21, nuevo_estado)       # ESTADO_RESULTADO
-                    hoja_b.update_cell(f_idx, 22, float(monto_final))  # RESULTADO_DINERO
-                    hoja_b.update_cell(f_idx, 26, obs)                 # OBSERVACIONES
-                    if img_res:
-                        hoja_b.update_cell(f_idx, 25, img_res.name)    # IMAGEN_RESULTADO
+                    # Actualización física en Sheets
+                    hoja_b.update_cell(f_idx, 21, nuevo_estado)
+                    hoja_b.update_cell(f_idx, 22, float(monto_usuario))
+                    hoja_b.update_cell(f_idx, 26, obs)
+                    if img_res: hoja_b.update_cell(f_idx, 25, img_res.name)
                     
-                    # Registro en Finanzas si cierra ciclo
+                    # Finanzas
                     if d.get('ESTADO_RESULTADO') == "PENDIENTE" and nuevo_estado != "PENDIENTE":
                         hoja_f.append_row([
                             len(hoja_f.get_all_values()), str(date.today()), user["ID_USUARIO"],
                             f"CIERRE {d.get('INSTRUMENTO')}", float(saldo_actual), 
-                            monto_final if monto_final > 0 else 0, abs(monto_final) if monto_final < 0 else 0, 
-                            float(saldo_actual + monto_final), "APP"
+                            monto_usuario if monto_usuario > 0 else 0, abs(monto_usuario) if monto_usuario < 0 else 0, 
+                            float(saldo_actual + monto_usuario), "APP"
                         ])
-                    
-                    st.success("✅ Trade actualizado con éxito socio.")
-                    time.sleep(1); st.rerun()
+                    st.success("¡Trade cerrado!"); time.sleep(1); st.rerun()
 
     # # SECCION 9: BACKTESTING
     elif menu == "📊 Backtesting":
