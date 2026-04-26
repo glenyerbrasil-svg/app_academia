@@ -635,88 +635,82 @@ def main_app():
 
         try:
             hoja_b = doc.worksheet("Bitacora")
-            data_b = hoja_b.get_all_records()
-            
-            if not data_b:
+            # Obtenemos datos del usuario actual
+            data_raw = hoja_b.get_all_records()
+            if not data_raw:
                 st.warning("La bitácora está vacía, socio. ¡A meterle balas!")
             else:
-                df_b = pd.DataFrame(data_b)
-                # Normalizamos nombres y formatos
+                df_b = pd.DataFrame(data_raw)
                 df_b.columns = df_b.columns.str.strip().str.upper()
                 
-                # Convertimos fecha y dinero con seguridad
-                df_b['FECHA'] = pd.to_datetime(df_b['FECHA'], errors='coerce').dt.date
-                df_b['RESULTADO_DINERO'] = pd.to_numeric(df_b['RESULTADO_DINERO'], errors='coerce').fillna(0)
+                # Filtro de usuario inmediato para no procesar basura
+                df_b = df_b[df_b['ID_USUARIO'].astype(str) == str(user["ID_USUARIO"])]
 
-                # --- 1. FILTROS INTELIGENTES ---
-                with st.expander("🔍 Filtros de Búsqueda", expanded=True):
-                    col_f1, col_f2 = st.columns(2)
-                    periodo = col_f1.selectbox("Ventana de Tiempo", 
-                        ["Hoy", "Últimos 7 días", "Mes Actual", "Todo el historial"], index=2)
-                    
-                    lista_ins = sorted(df_b['INSTRUMENTO'].unique().tolist()) if 'INSTRUMENTO' in df_b.columns else []
-                    todos_ins = ["Todos"] + lista_ins
-                    ins_sel = col_f2.selectbox("Filtrar por Activo", todos_ins)
-
-                # Lógica de fechas
-                hoy = date.today()
-                if periodo == "Hoy": fecha_inicio = hoy
-                elif periodo == "Últimos 7 días": fecha_inicio = hoy - timedelta(days=7)
-                elif periodo == "Mes Actual": fecha_inicio = hoy.replace(day=1)
-                else: fecha_inicio = df_b['FECHA'].min() if not df_b['FECHA'].isnull().all() else hoy
-
-                # --- APLICAR FILTROS (POR USUARIO Y FECHA) ---
-                df_rep = df_b[(df_b['FECHA'] >= fecha_inicio) & (df_b['ID_USUARIO'].astype(str) == str(user["ID_USUARIO"]))]
-                
-                if ins_sel != "Todos":
-                    df_rep = df_rep[df_rep['INSTRUMENTO'] == ins_sel]
-
-                if df_rep.empty:
-                    st.info(f"Socio, no hay operaciones registradas para: {periodo}")
+                if df_b.empty:
+                    st.info("Socio, aún no tienes trades registrados en tu cuenta.")
                 else:
-                    # --- 2. KPIs DE IMPACTO ---
+                    # Formateo de fechas y números
+                    df_b['FECHA'] = pd.to_datetime(df_b['FECHA'], errors='coerce').dt.date
+                    df_b['RESULTADO_DINERO'] = pd.to_numeric(df_b['RESULTADO_DINERO'], errors='coerce').fillna(0)
+
+                    # --- 1. FILTROS ---
+                    with st.expander("🔍 Filtros de Búsqueda", expanded=True):
+                        col_f1, col_f2 = st.columns(2)
+                        periodo = col_f1.selectbox("Ventana de Tiempo", 
+                            ["Hoy", "Últimos 7 días", "Mes Actual", "Todo el historial"], index=2)
+                        
+                        lista_ins = sorted(df_b['INSTRUMENTO'].unique().tolist())
+                        todos_ins = ["Todos"] + lista_ins
+                        ins_sel = col_f2.selectbox("Filtrar por Activo", todos_ins)
+
+                    # Lógica de fechas
+                    hoy = date.today()
+                    if periodo == "Hoy": fecha_inicio = hoy
+                    elif periodo == "Últimos 7 días": fecha_inicio = hoy - timedelta(days=7)
+                    elif periodo == "Mes Actual": fecha_inicio = hoy.replace(day=1)
+                    else: fecha_inicio = df_b['FECHA'].min()
+
+                    # Aplicar filtros
+                    df_rep = df_b[df_b['FECHA'] >= fecha_inicio]
+                    if ins_sel != "Todos":
+                        df_rep = df_rep[df_rep['INSTRUMENTO'] == ins_sel]
+
+                    # --- 2. KPIs ---
                     total_p = df_rep['RESULTADO_DINERO'].sum()
                     total_trades = len(df_rep)
                     ganadores = len(df_rep[df_rep['ESTADO_RESULTADO'] == "TP"])
-                    win_rate = (ganadores / total_trades) * 100 if total_trades > 0 else 0
+                    win_rate = (ganadores / total_trades * 100) if total_trades > 0 else 0
 
                     st.divider()
-                    kpi1, kpi2, kpi3 = st.columns(3)
-                    
-                    color_b = "green" if total_p >= 0 else "red"
-                    kpi1.markdown(f"**Balance**\n<h2 style='color:{color_b}'>${total_p:,.2f}</h2>", unsafe_allow_html=True)
-                    kpi2.metric("Total Trades", f"{total_trades}")
-                    kpi3.metric("Win Rate", f"{win_rate:.1f}%")
+                    k1, k2, k3 = st.columns(3)
+                    color_p = "green" if total_p >= 0 else "red"
+                    k1.markdown(f"**Balance**\n<h2 style='color:{color_p}'>${total_p:,.2f}</h2>", unsafe_allow_html=True)
+                    k2.metric("Total Trades", total_trades)
+                    k3.metric("Win Rate", f"{win_rate:.1f}%")
 
-                    # --- 3. LA GALERÍA CLASIFICADA ---
+                    # --- 3. GALERÍA ---
                     st.divider()
-                    tab_tp, tab_sl, tab_be = st.tabs(["🏆 Victorias (TP)", "⚠️ Aprendizaje (SL)", "⚖️ Gestión (BE)"])
-
-                    with tab_tp:
-                        df_tp = df_rep[df_rep['ESTADO_RESULTADO'] == "TP"]
-                        if df_tp.empty: st.write("No hay TPs en este periodo.")
-                        for i, r in df_tp.iterrows():
-                            with st.expander(f"🟢 {r['INSTRUMENTO']} | Profit: ${r['RESULTADO_DINERO']}"):
-                                st.write(f"**Fecha:** {r['FECHA']} | **Bala:** ${r['VALOR_BALA']}")
-                                st.write(f"**Obs:** {r.get('OBSERVACIONES', 'Sin notas')}")
+                    t_tp, t_sl, t_be = st.tabs(["🏆 Victorias", "⚠️ Aprendizaje", "⚖️ Gestión"])
                     
-                    with tab_sl:
-                        df_sl = df_rep[df_rep['ESTADO_RESULTADO'] == "SL"]
-                        if df_sl.empty: st.write("No hay SLs en este periodo.")
-                        for i, r in df_sl.iterrows():
-                            with st.expander(f"🔴 {r['INSTRUMENTO']} | Loss: ${r['RESULTADO_DINERO']}"):
-                                st.write(f"**Fecha:** {r['FECHA']} | **Bala:** ${r['VALOR_BALA']}")
-                                st.write(f"**Obs:** {r.get('OBSERVACIONES', 'Sin notas')}")
+                    with t_tp:
+                        for _, r in df_rep[df_rep['ESTADO_RESULTADO'] == "TP"].iterrows():
+                            with st.expander(f"🟢 {r['INSTRUMENTO']} | +${r['RESULTADO_DINERO']}"):
+                                st.write(f"Fecha: {r['FECHA']} | Bala: ${r['VALOR_BALA']}")
+                                st.write(f"Nota: {r.get('OBSERVACIONES', 'Sin notas')}")
 
-                    with tab_be:
-                        df_be = df_rep[df_rep['ESTADO_RESULTADO'] == "BE"]
-                        if df_be.empty: st.write("No hay BEs en este periodo.")
-                        for i, r in df_be.iterrows():
-                            with st.expander(f"⚪ {r['INSTRUMENTO']} | Resultado: ${r['RESULTADO_DINERO']}"):
-                                st.write(f"**Fecha:** {r['FECHA']} | **Bala:** ${r['VALOR_BALA']}")
+                    with t_sl:
+                        for _, r in df_rep[df_rep['ESTADO_RESULTADO'] == "SL"].iterrows():
+                            with st.expander(f"🔴 {r['INSTRUMENTO']} | -${abs(r['RESULTADO_DINERO'])}"):
+                                st.write(f"Fecha: {r['FECHA']} | Bala: ${r['VALOR_BALA']}")
+                                st.write(f"Nota: {r.get('OBSERVACIONES', 'Sin notas')}")
+
+                    with t_be:
+                        for _, r in df_rep[df_rep['ESTADO_RESULTADO'] == "BE"].iterrows():
+                            with st.expander(f"⚪ {r['INSTRUMENTO']} | BE"):
+                                st.write(f"Fecha: {r['FECHA']} | Bala: ${r['VALOR_BALA']}")
 
         except Exception as e:
-            st.error(f"Error crítico en reportes: {e}")
+            st.error(f"Error cargando reportes, socio: {e}")
 
     elif menu == "💬 Forum":
 
