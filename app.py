@@ -381,81 +381,108 @@ def main_app():
         if p_ent > 0 and p_sl > 0:
             st.success(f"📊 **Cálculo:** Lotaje: **{lotaje:.2f}** | TP Sugerido: **{tp_sugerido:.4f}**")
 
-# --- 4. EVIDENCIA VISUAL (INTERFAZ DE SELECCIÓN PROFESIONAL) ---
-        st.divider()
-        st.write("🖼️ **Evidencia Visual**")
+# --- 4. EVIDENCIA VISUAL (CORREGIDA) ---
+st.divider()
+st.write("🖼️ **Evidencia Visual**")
+
+def capturar_evidencia(label, key_base):
+    with st.container(border=True):
+        st.write(f"**{label}**")
+        opcion = st.radio(f"Fuente para {label}", 
+                        ["📂 Archivo", "📸 Cámara", "❌ Sin imagen"], 
+                        horizontal=True, key=f"rad_{key_base}_{v}")
         
-        def capturar_evidencia(label, key_base):
-            with st.container(border=True):
-                st.write(f"**{label}**")
-                # El socio elige qué quiere usar
-                opcion = st.radio(f"Fuente para {label}", 
-                                ["📂 Archivo", "📸 Cámara", "❌ Sin imagen"], 
-                                horizontal=True, key=f"rad_{key_base}_{v}")
-                
-                if opcion == "📸 Cámara":
-                    # Intentamos forzar la cámara trasera con 'facingMode' si el navegador lo permite
-                    # En Streamlit esto activa el componente solo cuando se selecciona
-                    foto = st.camera_input(f"Capturar {label}", key=f"cam_{key_base}_{v}")
-                    if foto:
-                        return foto, f"cam_{key_base}_{datetime.now().strftime('%H%M%S')}.png"
-                
-                elif opcion == "📂 Archivo":
-                    archivo = st.file_uploader(f"Subir {label}", type=['png', 'jpg', 'jpeg'], key=f"file_{key_base}_{v}")
-                    if archivo:
-                        return archivo, archivo.name
-                
-                return None, "N/A"
-
-        # Distribución limpia
-        col_izq, col_der = st.columns(2)
-        with col_izq:
-            obj_may, nombre_may = capturar_evidencia("Gráfico Mayor", "may")
-            obj_ent, nombre_ent = capturar_evidencia("Gráfico Entrada", "ent")
-        with col_der:
-            obj_men, nombre_men = capturar_evidencia("Gráfico Menor", "men")
-            obj_res, nombre_res = capturar_evidencia("Gráfico Resultado", "res")
-
-# --- 5. PSICOLOGÍA Y RESULTADO (CORRECCIÓN DEFINITIVA DE CÁLCULO) ---
-        st.divider()
-        col_e, col_r = st.columns(2)
-        opciones_emo = ["🟢 Calma", "🔵 Zen", "🟡 Neutral", "🟠 Nervioso", "🔴 Ansioso"]
-        semaforo = col_e.select_slider("Semáforo Emocional", options=opciones_emo, value="🟢 Calma", key=f"emo_{v}")
+        if opcion == "📸 Cámara":
+            foto = st.camera_input(f"Capturar {label}", key=f"cam_{key_base}_{v}")
+            if foto:
+                return foto, f"cam_{key_base}_{datetime.now().strftime('%H%M%S')}.png"
         
-        # 1. Selector de estado
-        tipo_final = col_r.selectbox("Estado Final", ["PENDIENTE", "TP", "SL", "BE"], key=f"tipo_{v}")
+        elif opcion == "📂 Archivo":
+            archivo = st.file_uploader(f"Subir {label}", type=['png', 'jpg', 'jpeg'], key=f"file_{key_base}_{v}")
+            if archivo:
+                return archivo, archivo.name
         
-        # 2. LÓGICA DE INYECCIÓN: Calculamos y metemos el valor en el estado del input
-        monto_key = f"monto_{v}"
-        if tipo_final == "TP":
-            valor_calculado = float(abs(tp_sugerido - p_ent) * lotaje)
-            st.session_state[monto_key] = valor_calculado
-        elif tipo_final == "SL":
-            valor_calculado = -float(bala)
-            st.session_state[monto_key] = valor_calculado
-        elif tipo_final == "BE":
-            st.session_state[monto_key] = 0.0
-        elif tipo_final == "PENDIENTE" and monto_key not in st.session_state:
-            st.session_state[monto_key] = 0.0
+        return None, "N/A"
 
-        # 3. El input ahora lee directamente de la sesión actualizada
-        monto_final = st.number_input("Monto Resultante ($)", format="%.2f", key=monto_key)
-        observaciones = st.text_area("Observaciones", key=f"obs_{v}")
+col_izq, col_der = st.columns(2)
+with col_izq:
+    obj_may, nombre_may = capturar_evidencia("Gráfico Mayor", "may")
+    obj_ent, nombre_ent = capturar_evidencia("Gráfico Entrada", "ent")
+with col_der:
+    obj_men, nombre_men = capturar_evidencia("Gráfico Menor", "men")
+    obj_res, nombre_res = capturar_evidencia("Gráfico Resultado", "res")
 
-# --- 6. BOTÓN DE GUARDAR ---
-        if st.button("💾 GUARDAR REGISTRO", use_container_width=True, key=f"btn_save_{v}"):
-            # ... validaciones ...
+# --- 5. PSICOLOGÍA Y RESULTADO ---
+st.divider()
+col_e, col_r = st.columns(2)
+opciones_emo = ["🟢 Calma", "🔵 Zen", "🟡 Neutral", "🟠 Nervioso", "🔴 Ansioso"]
+semaforo = col_e.select_slider("Semáforo Emocional", options=opciones_emo, value="🟢 Calma", key=f"emo_{v}")
+
+tipo_final = col_r.selectbox("Estado Final", ["PENDIENTE", "TP", "SL", "BE"], key=f"tipo_{v}")
+
+monto_key = f"monto_{v}"
+# Lógica de cálculo automático
+if tipo_final == "TP":
+    st.session_state[monto_key] = float(abs(tp_sugerido - p_ent) * lotaje)
+elif tipo_final == "SL":
+    st.session_state[monto_key] = -float(bala)
+elif tipo_final == "BE":
+    st.session_state[monto_key] = 0.0
+elif monto_key not in st.session_state:
+    st.session_state[monto_key] = 0.0
+
+monto_final = st.number_input("Monto Resultante ($)", format="%.2f", key=monto_key)
+observaciones = st.text_area("Observaciones", key=f"obs_{v}")
+
+# --- 6. BOTÓN DE GUARDAR (ELIMINADO EL NAMEERROR) ---
+if st.button("💾 GUARDAR REGISTRO", use_container_width=True, key=f"btn_save_{v}"):
+    if p_ent == 0 or p_sl == 0 or bala == 0:
+        st.warning("⚠️ Socio, faltan datos técnicos.")
+    else:
+        with st.spinner("Sincronizando con Google Sheets..."):
+            # AQUÍ ESTÁ LA CORRECCIÓN: Usamos 'monto_final' directamente
             nueva_fila = [
-                len(hoja_b.get_all_values()), user["ID_USUARIO"], str(date.today()),
-                ins, acc, float(bala), float(p_ent), float(p_sl), float(tp_sugerido), 
+                len(hoja_b.get_all_values()), 
+                user["ID_USUARIO"], 
+                str(date.today()),
+                ins, 
+                acc, 
+                float(bala), 
+                float(p_ent), 
+                float(p_sl), 
+                float(tp_sugerido), 
                 round(float(lotaje), 2),
-                0, datetime.now().strftime("%H:%M:%S"),
-                nombre_may, nombre_men, # <--- USAR 'nombre_xxx'
-                nombre_ent, nombre_res, # <--- USAR 'nombre_xxx'
+                0, 
+                datetime.now().strftime("%H:%M:%S"),
+                nombre_may, 
+                nombre_men, 
+                nombre_ent, 
+                nombre_res,
                 "N/A", "N/A", "N/A", "N/A",
-                tipo_final, monto_final_val, "NO", 0, "N/A", observaciones, semaforo
+                tipo_final, 
+                float(monto_final), # <--- Cambiado de monto_final_val a monto_final
+                "NO", 
+                0, 
+                "N/A", 
+                observaciones, 
+                semaforo
             ]
-            # ... resto del guardado ...
+            
+            hoja_b.append_row(nueva_fila)
+            
+            # Registro en Finanzas si no es pendiente
+            if tipo_final != "PENDIENTE":
+                ing = monto_final if monto_final > 0 else 0
+                egr = abs(monto_final) if monto_final < 0 else 0
+                hoja_f.append_row([
+                    len(hoja_f.get_all_values()), str(date.today()), user["ID_USUARIO"],
+                    f"CIERRE {ins}", float(saldo_actual), float(ing), float(egr), 
+                    float(saldo_actual + monto_final), "APP"
+                ])
+            
+            st.success(f"✅ ¡Registro guardado con éxito, socio!")
+            time.sleep(1)
+            limpiar_todo_al_final()
 
 # =========================================================
     # # SECCIÓN 8: CIERRE DE CICLO (CON CÁMARA INTEGRADA - 100%)
