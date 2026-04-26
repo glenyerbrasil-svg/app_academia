@@ -452,7 +452,7 @@ def main_app():
                     limpiar_todo_al_final()
 
 # =========================================================
-# # SECCIÓN 8: AUDITORÍA DE OPERACIONES (CALENDARIO)
+# # SECCIÓN 8: AUDITORÍA CON COLORES (ESTILO TRADING PRO)
 # =========================================================
     elif menu == "✏️ Editar":
         st.header("🔍 Auditoría de Operaciones")
@@ -462,79 +462,68 @@ def main_app():
             datos = hoja_b.get_all_records()
             
             if not datos:
-                st.warning("No hay datos registrados aún.")
+                st.warning("Aún no hay datos para mostrar, socio.")
                 st.stop()
                 
             df = pd.DataFrame(datos)
-            # Limpiamos nombres de columnas: quitamos espacios y todo a MAYÚSCULAS
             df.columns = df.columns.str.strip().str.upper()
-            
-            # Filtro por tu usuario (Glenyer)
             df = df[df["ID_USUARIO"] == user["ID_USUARIO"]]
 
-            # --- PANEL DE FILTROS ---
+            # --- FILTROS ---
             with st.container(border=True):
-                st.write("📅 **Selecciona los criterios de búsqueda:**")
                 c1, c2 = st.columns(2)
-                
-                # Selector de fecha (Calendario)
-                fecha_sel = c1.date_input("Selecciona el día", value=date.today(), key="audit_date")
-                # Selector de resultado (Usando tu columna ESTADO_RESULTADO)
-                res_sel = c2.selectbox("Estado del Trade", ["TODOS", "TP", "SL", "BE", "PENDIENTE"], key="audit_res")
+                fecha_sel = c1.date_input("📅 Selecciona el día", value=date.today(), key="audit_date")
+                res_sel = c2.selectbox("🎯 Filtrar por Estado", ["TODOS", "TP", "SL", "BE", "PENDIENTE"], key="audit_res")
 
-            # --- LÓGICA DE FILTRADO ---
+            # --- LÓGICA FILTRADO ---
             str_fecha = fecha_sel.strftime("%Y-%m-%d")
             df_filtrado = df.copy()
             
-            # 1. Filtro por Fecha
             if "FECHA" in df_filtrado.columns:
                 df_filtrado = df_filtrado[df_filtrado["FECHA"].astype(str).str.contains(str_fecha)]
             
-            # 2. Filtro por el nombre exacto que me dijiste: ESTADO_RESULTADO
             if res_sel != "TODOS" and "ESTADO_RESULTADO" in df_filtrado.columns:
                 df_filtrado = df_filtrado[df_filtrado["ESTADO_RESULTADO"] == res_sel]
 
-            # --- PRESENTACIÓN DE DATOS ---
+            # --- FUNCIÓN DE COLOR ---
+            def color_filas(row):
+                # Extraemos el estado para decidir el color
+                estado = row.get("ESTADO_RESULTADO", "")
+                if estado == "TP":
+                    return ['background-color: rgba(0, 255, 0, 0.2)'] * len(row) # Verde suave
+                elif estado == "SL":
+                    return ['background-color: rgba(255, 0, 0, 0.2)'] * len(row) # Rojo suave
+                elif estado == "BE":
+                    return ['background-color: rgba(255, 255, 0, 0.2)'] * len(row) # Amarillo suave
+                return [''] * len(row)
+
+            # --- VISTA ---
             st.divider()
-            st.subheader(f"📊 Operaciones: {str_fecha}")
-            
             if not df_filtrado.empty:
-                # Definimos qué columnas mostrar para no dar error
-                # Mostramos las básicas que siempre están
+                # Columnas a mostrar
                 columnas_vista = ["FECHA", "INSTRUMENTO", "ACCION", "VALOR_BALA", "ESTADO_RESULTADO"]
                 
-                # Verificamos si existe alguna columna de MONTO o RESULTADO para mostrar el dinero
-                # Buscamos nombres parecidos como 'MONTO', 'RESULTADO', 'MONTO_RESULTADO'
-                col_dinero = None
-                posibles_nombres = ["MONTO_RESULTADO", "RESULTADO", "MONTO", "RESULTADO_DINERO"]
-                for nombre in posibles_nombres:
-                    if nombre in df_filtrado.columns:
-                        col_dinero = nombre
-                        break
-                
+                # Buscamos la columna de dinero dinámicamente
+                col_dinero = next((n for n in ["MONTO_RESULTADO", "RESULTADO", "MONTO"] if n in df_filtrado.columns), None)
                 if col_dinero:
                     columnas_vista.append(col_dinero)
+
+                # Aplicamos el estilo y mostramos
+                df_estilado = df_filtrado[columnas_vista].sort_index(ascending=False).style.apply(color_filas, axis=1)
                 
-                # Mostrar tabla
-                st.dataframe(
-                    df_filtrado[columnas_vista].sort_index(ascending=False),
-                    use_container_width=True,
-                    hide_index=True
-                )
+                st.dataframe(df_estilado, use_container_width=True)
                 
-                # Si encontramos la columna de dinero, sumamos el balance del día
+                # Resumen de caja
                 if col_dinero:
                     try:
-                        total_dia = pd.to_numeric(df_filtrado[col_dinero]).sum()
-                        color = "green" if total_dia >= 0 else "red"
-                        st.markdown(f"### Balance estimado del día: :{color}[${total_dia:.2f}]")
-                    except:
-                        pass # Si no son números, no sumamos nada
+                        total = pd.to_numeric(df_filtrado[col_dinero]).sum()
+                        st.metric("Balance del Día", f"${total:.2f}", delta=float(total))
+                    except: pass
             else:
-                st.info(f"Socio, no hay trades '{res_sel}' para el {str_fecha}.")
+                st.info(f"Sin operaciones registradas para el {str_fecha}.")
 
         except Exception as e:
-            st.error(f"Hubo un bache en el buscador: {e}")
+            st.error(f"Socio, algo saltó aquí: {e}")
 
     # # SECCION 9: BACKTESTING
     elif menu == "📊 Backtesting":
