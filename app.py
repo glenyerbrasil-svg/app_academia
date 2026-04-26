@@ -452,21 +452,14 @@ def main_app():
                     limpiar_todo_al_final()
 
 # =========================================================
-    # # SECCIÓN 8: CIERRE DE OPERACIONES (REINGENIERÍA TOTAL)
+    # # SECCIÓN 8: CIERRE DE CICLO (CÁLCULO DINÁMICO CORREGIDO)
     # =========================================================
     elif menu == "✏️ Editar":
         from datetime import datetime
         st.header("🏁 Cierre de Ciclo de Trade")
 
-        # 1. MOTOR DE REFRESCO
-        if 'v_cierre' not in st.session_state:
-            st.session_state.v_cierre = 0
+        if 'v_cierre' not in st.session_state: st.session_state.v_cierre = 0
 
-        def refrescar_cierre():
-            st.session_state.v_cierre += 1
-            st.rerun()
-
-        # 2. CONEXIÓN DIRECTA
         try:
             hoja_b = doc.worksheet("Bitacora")
             hoja_f = doc.worksheet("Finanzas")
@@ -474,109 +467,87 @@ def main_app():
             df_f = pd.DataFrame(hoja_f.get_all_records())
             saldo_actual = float(df_f.iloc[-1].get("SALDO_FINAL", 0)) if not df_f.empty else 0.0
         except Exception as e:
-            st.error(f"Error de conexión: {e}")
-            st.stop()
+            st.error(f"Error de conexión: {e}"); st.stop()
 
-        # --- 3. BUSCADOR ENFOCADO (HOY POR DEFECTO) ---
         with st.container(border=True):
-            col_busq1, col_busq2 = st.columns([2, 1])
-            f_busq = col_busq1.date_input("📅 Fecha de operativa", value=date.today())
-            solo_pendientes = col_busq2.toggle("Solo Pendientes", value=True)
+            col_b1, col_b2 = st.columns([2, 1])
+            f_busq = col_b1.date_input("📅 Fecha de operativa", value=date.today())
+            solo_p = col_b2.toggle("Solo Pendientes", value=True)
 
         if datos:
             df = pd.DataFrame(datos)
             df.columns = df.columns.str.strip().str.upper()
             str_f = f_busq.strftime("%Y-%m-%d")
             
-            # Filtro base: Usuario + Fecha
             mask = (df["ID_USUARIO"] == user["ID_USUARIO"]) & (df["FECHA"].astype(str).str.contains(str_f))
-            # Filtro adicional: Pendientes
-            if solo_pendientes:
-                mask = mask & (df["ESTADO_RESULTADO"] == "PENDIENTE")
+            if solo_p: mask = mask & (df["ESTADO_RESULTADO"] == "PENDIENTE")
             
             df_filtrado = df[mask].copy()
-
             if df_filtrado.empty:
-                st.info(f"No hay operaciones {'pendientes ' if solo_pendientes else ''}para el {str_f}.")
-                st.stop()
+                st.info("No hay operaciones para este criterio."); st.stop()
 
-            # --- 4. SELECTOR DE TRADE ---
-            # Jerarquizamos: Pendientes arriba
-            df_filtrado['PRIO'] = df_filtrado['ESTADO_RESULTADO'].apply(lambda x: 0 if x == "PENDIENTE" else 1)
-            df_filtrado = df_filtrado.sort_values(by='PRIO')
-
-            opciones = []
-            for idx, fila in df_filtrado.iterrows():
-                label = f"Fila {idx+2} | {fila.get('INSTRUMENTO')} | {fila.get('ACCION')} | {fila.get('ESTADO_RESULTADO')}"
-                opciones.append((label, idx + 2, fila))
-
-            sel = st.selectbox("🎯 Selecciona el trade para cerrar:", opciones, format_func=lambda x: x[0])
+            # Selector de trade
+            opciones = [(f"Fila {i+2} | {r['INSTRUMENTO']} | {r['ACCION']}", i+2, r) for i, r in df_filtrado.iterrows()]
+            sel = st.selectbox("🎯 Selecciona el trade:", opciones, format_func=lambda x: x[0])
             
             if sel:
                 f_idx, d = sel[1], sel[2]
-                v = st.session_state.v_cierre
                 st.divider()
 
-                # --- 5. FORMULARIO DE CIERRE (LOS NO NEGOCIABLES) ---
-                with st.form(key=f"cierre_trade_{f_idx}_{v}"):
-                    st.subheader(f"📝 Resultado de: {d.get('INSTRUMENTO')}")
-                    
-                    # Datos de solo lectura para referencia
-                    st.caption(f"Bala: ${d.get('VALOR_BALA')} | Entrada: {d.get('PRECIO_ENTRADA')} | SL: {d.get('PRECIO_SL')}")
-                    
-                    c1, c2 = st.columns(2)
-                    # El no negociable: Estado y Monto
-                    nuevo_estado = c1.selectbox("Estado Final", ["PENDIENTE", "TP", "SL", "BE"], 
+                # --- LÓGICA DE CÁLCULO FUERA DEL FORMULARIO PARA DINAMISMO ---
+                col_c1, col_c2 = st.columns(2)
+                
+                # 1. El usuario elige el estado
+                nuevo_estado = col_c1.selectbox("Estado Final", ["PENDIENTE", "TP", "SL", "BE"], 
                                               index=["PENDIENTE", "TP", "SL", "BE"].index(d.get('ESTADO_RESULTADO', 'PENDIENTE')))
-                    
-                    # Lógica de cálculo automático (Tu motor de Bitácora)
+                
+                # 2. Rescatamos valores técnicos (convertir a float sí o sí)
+                try:
                     p_ent = float(d.get('PRECIO_ENTRADA', 0))
                     p_tp = float(d.get('PRECIO_TP', 0))
-                    lotaje = float(d.get('LOTAJES', 0)) # Asegúrate que tu columna se llame LOTAJES
+                    lotaje = float(d.get('LOTAJES', 0))
                     bala = float(d.get('VALOR_BALA', 0))
+                except:
+                    p_ent, p_tp, lotaje, bala = 0.0, 0.0, 0.0, 0.0
 
+                # 3. Cálculo matemático instantáneo
+                monto_sugerido = 0.0
+                if nuevo_estado == "TP":
+                    monto_sugerido = abs(p_tp - p_ent) * lotaje
+                elif nuevo_estado == "SL":
+                    monto_sugerido = -bala
+                elif nuevo_estado == "BE":
                     monto_sugerido = 0.0
-                    if nuevo_estado == "TP":
-                        monto_sugerido = abs(p_tp - p_ent) * lotaje
-                    elif nuevo_estado == "SL":
-                        monto_sugerido = -bala
-                    elif nuevo_estado == "BE":
-                        monto_sugerido = float(d.get('MONTO_RESULTADO', 0.0)) # Manual para BE
-                    
-                    monto_final = c2.number_input("Monto Final ($)", value=float(monto_sugerido), format="%.2f")
+                else:
+                    monto_sugerido = float(d.get('MONTO_RESULTADO', 0.0))
 
-                    # El otro no negociable: Gráfico de Resultado
-                    st.write("🖼️ **Evidencia del Resultado**")
-                    img_res = st.file_uploader("Subir Gráfico Final", type=['png', 'jpg', 'jpeg'], key=f"img_res_{f_idx}")
-                    
-                    obs = st.text_area("Observaciones Finales", value=str(d.get('OBSERVACIONES', '')))
+                # 4. El input de monto ahora recibe el cálculo
+                monto_final = col_c2.number_input("Monto Final ($)", value=float(monto_sugerido), format="%.2f")
 
-                    # BOTÓN MAESTRO
-                    if st.form_submit_button("💾 CERRAR CICLO Y GUARDAR", use_container_width=True):
-                        try:
-                            # 1. Actualizamos la Bitácora (Solo las columnas de resultado)
-                            # U=21(Estado), V=22(Monto), P=16(Img Resultado), Z=26(Obs)
-                            hoja_b.update_cell(f_idx, 21, nuevo_estado)
-                            hoja_b.update_cell(f_idx, 22, float(monto_final))
-                            hoja_b.update_cell(f_idx, 26, obs)
-                            if img_res:
-                                hoja_b.update_cell(f_idx, 16, img_res.name)
-                            
-                            # 2. Si pasó de PENDIENTE a cerrado, afectamos Finanzas
-                            if d.get('ESTADO_RESULTADO') == "PENDIENTE" and nuevo_estado != "PENDIENTE":
-                                ing = monto_final if monto_final > 0 else 0
-                                egr = abs(monto_final) if monto_final < 0 else 0
-                                hoja_f.append_row([
-                                    len(hoja_f.get_all_values()), str(date.today()), user["ID_USUARIO"],
-                                    f"CIERRE {d.get('INSTRUMENTO')}", float(saldo_actual), float(ing), float(egr), 
-                                    float(saldo_actual + monto_final), "APP"
-                                ])
-                            
-                            st.success(f"✅ Ciclo cerrado. Balance: ${monto_final:.2f}")
-                            time.sleep(1.5)
-                            refrescar_cierre()
-                        except Exception as e_final:
-                            st.error(f"Error al sincronizar: {e_final}")
+                # --- FORMULARIO SOLO PARA SUBIDA DE ARCHIVOS Y BOTÓN ---
+                with st.form(key=f"cierre_final_{f_idx}"):
+                    st.write("🖼️ **Evidencia y Notas**")
+                    img_res = st.file_uploader("Gráfico de Resultado", type=['png', 'jpg', 'jpeg'])
+                    obs = st.text_area("Observaciones", value=str(d.get('OBSERVACIONES', '')))
+                    
+                    if st.form_submit_button("💾 GUARDAR CAMBIOS", use_container_width=True):
+                        # Actualización en Sheets (U=21, V=22, P=16, Z=26)
+                        hoja_b.update_cell(f_idx, 21, nuevo_estado)
+                        hoja_b.update_cell(f_idx, 22, float(monto_final))
+                        hoja_b.update_cell(f_idx, 26, obs)
+                        if img_res: hoja_b.update_cell(f_idx, 16, img_res.name)
+                        
+                        # Registro en Finanzas si cierra
+                        if d.get('ESTADO_RESULTADO') == "PENDIENTE" and nuevo_estado != "PENDIENTE":
+                            hoja_f.append_row([
+                                len(hoja_f.get_all_values()), str(date.today()), user["ID_USUARIO"],
+                                f"CIERRE {d.get('INSTRUMENTO')}", float(saldo_actual), 
+                                monto_final if monto_final > 0 else 0, abs(monto_final) if monto_final < 0 else 0, 
+                                float(saldo_actual + monto_final), "APP"
+                            ])
+                        
+                        st.success("✅ Guardado correctamente")
+                        time.sleep(1); st.rerun()
 
     # # SECCION 9: BACKTESTING
     elif menu == "📊 Backtesting":
