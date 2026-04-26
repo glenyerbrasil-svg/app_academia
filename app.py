@@ -452,92 +452,104 @@ def main_app():
                     limpiar_todo_al_final()
 
 # =========================================================
-    # # SECCIÓN 8: CIERRE DE CICLO (CÁLCULO DINÁMICO CORREGIDO)
+    # # SECCIÓN 8: CIERRE DE CICLO (VERSIÓN BLINDADA)
     # =========================================================
     elif menu == "✏️ Editar":
         from datetime import datetime
         st.header("🏁 Cierre de Ciclo de Trade")
 
-        if 'v_cierre' not in st.session_state: st.session_state.v_cierre = 0
+        if 'monto_operacion' not in st.session_state:
+            st.session_state.monto_operacion = 0.0
 
         try:
             hoja_b = doc.worksheet("Bitacora")
             hoja_f = doc.worksheet("Finanzas")
-            datos = hoja_b.get_all_records()
+            # Cargamos datos y limpiamos columnas
+            df_b = pd.DataFrame(hoja_b.get_all_records())
+            df_b.columns = df_b.columns.str.strip().str.upper()
+            
             df_f = pd.DataFrame(hoja_f.get_all_records())
             saldo_actual = float(df_f.iloc[-1].get("SALDO_FINAL", 0)) if not df_f.empty else 0.0
         except Exception as e:
             st.error(f"Error de conexión: {e}"); st.stop()
 
+        # Buscador
         with st.container(border=True):
             col_b1, col_b2 = st.columns([2, 1])
             f_busq = col_b1.date_input("📅 Fecha de operativa", value=date.today())
             solo_p = col_b2.toggle("Solo Pendientes", value=True)
 
-        if datos:
-            df = pd.DataFrame(datos)
-            df.columns = df.columns.str.strip().str.upper()
-            str_f = f_busq.strftime("%Y-%m-%d")
-            
-            mask = (df["ID_USUARIO"] == user["ID_USUARIO"]) & (df["FECHA"].astype(str).str.contains(str_f))
-            if solo_p: mask = mask & (df["ESTADO_RESULTADO"] == "PENDIENTE")
-            
-            df_filtrado = df[mask].copy()
-            if df_filtrado.empty:
-                st.info("No hay operaciones para este criterio."); st.stop()
+        str_f = f_busq.strftime("%Y-%m-%d")
+        mask = (df_b["ID_USUARIO"].astype(str) == str(user["ID_USUARIO"])) & (df_b["FECHA"].astype(str).str.contains(str_f))
+        if solo_p: mask = mask & (df_b["ESTADO_RESULTADO"] == "PENDIENTE")
+        
+        df_filtrado = df_b[mask].copy()
 
-            # Selector de trade
-            opciones = [(f"Fila {i+2} | {r['INSTRUMENTO']} | {r['ACCION']}", i+2, r) for i, r in df_filtrado.iterrows()]
-            sel = st.selectbox("🎯 Selecciona el trade:", opciones, format_func=lambda x: x[0])
-            
-            if sel:
-                f_idx, d = sel[1], sel[2]
-                st.divider()
+        if df_filtrado.empty:
+            st.info("No hay trades para mostrar."); st.stop()
 
-                # --- LÓGICA DE CÁLCULO FUERA DEL FORMULARIO PARA DINAMISMO ---
-                col_c1, col_c2 = st.columns(2)
-                
-                # 1. El usuario elige el estado
-                nuevo_estado = col_c1.selectbox("Estado Final", ["PENDIENTE", "TP", "SL", "BE"], 
-                                              index=["PENDIENTE", "TP", "SL", "BE"].index(d.get('ESTADO_RESULTADO', 'PENDIENTE')))
-                
-                # 2. Rescatamos valores técnicos (convertir a float sí o sí)
+        # Selector
+        opciones = []
+        for i, r in df_filtrado.iterrows():
+            label = f"Fila {i+2} | {r.get('INSTRUMENTO')} | {r.get('ACCION')}"
+            opciones.append((label, i+2, r.to_dict()))
+
+        sel = st.selectbox("🎯 Selecciona el trade:", opciones, format_func=lambda x: x[0])
+        
+        if sel:
+            f_idx, d = sel[1], sel[2]
+            st.divider()
+
+            # --- MOTOR DE CÁLCULO DINÁMICO ---
+            col_c1, col_c2 = st.columns(2)
+            
+            nuevo_estado = col_c1.selectbox("Estado Final", ["PENDIENTE", "TP", "SL", "BE"], 
+                                          index=["PENDIENTE", "TP", "SL", "BE"].index(d.get('ESTADO_RESULTADO', 'PENDIENTE')))
+            
+            # Limpieza profunda de valores numéricos
+            def a_float(valor):
                 try:
-                    p_ent = float(d.get('PRECIO_ENTRADA', 0))
-                    p_tp = float(d.get('PRECIO_TP', 0))
-                    lotaje = float(d.get('LOTAJES', 0))
-                    bala = float(d.get('VALOR_BALA', 0))
-                except:
-                    p_ent, p_tp, lotaje, bala = 0.0, 0.0, 0.0, 0.0
+                    if valor is None or str(valor).strip() == "" or str(valor) == "None": return 0.0
+                    return float(valor)
+                except: return 0.0
 
-                # 3. Cálculo matemático instantáneo
-                monto_sugerido = 0.0
-                if nuevo_estado == "TP":
-                    monto_sugerido = abs(p_tp - p_ent) * lotaje
-                elif nuevo_estado == "SL":
-                    monto_sugerido = -bala
-                elif nuevo_estado == "BE":
-                    monto_sugerido = 0.0
+            p_ent = a_float(d.get('PRECIO_ENTRADA'))
+            p_tp = a_float(d.get('PRECIO_TP'))
+            lotaje = a_float(d.get('LOTAJES'))
+            bala = a_float(d.get('VALOR_BALA'))
+
+            # Recálculo según el estado seleccionado
+            if nuevo_estado == "TP":
+                st.session_state.monto_operacion = abs(p_tp - p_ent) * lotaje
+            elif nuevo_estado == "SL":
+                st.session_state.monto_operacion = -bala
+            elif nuevo_estado == "BE":
+                # Si es BE y no hemos movido nada, ponemos 0.0, pero dejamos que edites
+                if st.session_state.monto_operacion not in [abs(p_tp - p_ent) * lotaje, -bala]:
+                    pass # Mantiene lo que el usuario escriba
                 else:
-                    monto_sugerido = float(d.get('MONTO_RESULTADO', 0.0))
+                    st.session_state.monto_operacion = 0.0
+            
+            # Input de monto conectado a la sesión
+            monto_final = col_c2.number_input("Monto Final ($)", 
+                                             value=float(st.session_state.monto_operacion), 
+                                             format="%.2f",
+                                             on_change=None)
 
-                # 4. El input de monto ahora recibe el cálculo
-                monto_final = col_c2.number_input("Monto Final ($)", value=float(monto_sugerido), format="%.2f")
-
-                # --- FORMULARIO SOLO PARA SUBIDA DE ARCHIVOS Y BOTÓN ---
-                with st.form(key=f"cierre_final_{f_idx}"):
-                    st.write("🖼️ **Evidencia y Notas**")
-                    img_res = st.file_uploader("Gráfico de Resultado", type=['png', 'jpg', 'jpeg'])
-                    obs = st.text_area("Observaciones", value=str(d.get('OBSERVACIONES', '')))
-                    
-                    if st.form_submit_button("💾 GUARDAR CAMBIOS", use_container_width=True):
-                        # Actualización en Sheets (U=21, V=22, P=16, Z=26)
+            # Formulario para archivos y guardado
+            with st.form(key=f"cierre_form_{f_idx}"):
+                st.caption(f"Referencia técnica: Entrada {p_ent} | TP {p_tp} | Lotaje {lotaje}")
+                img_res = st.file_uploader("Gráfico de Resultado", type=['png', 'jpg', 'jpeg'])
+                obs = st.text_area("Observaciones", value=str(d.get('OBSERVACIONES', '')))
+                
+                if st.form_submit_button("💾 ACTUALIZAR TRADE", use_container_width=True):
+                    with st.spinner("Sincronizando..."):
+                        # Columnas: U=21, V=22, P=16, Z=26
                         hoja_b.update_cell(f_idx, 21, nuevo_estado)
                         hoja_b.update_cell(f_idx, 22, float(monto_final))
                         hoja_b.update_cell(f_idx, 26, obs)
                         if img_res: hoja_b.update_cell(f_idx, 16, img_res.name)
                         
-                        # Registro en Finanzas si cierra
                         if d.get('ESTADO_RESULTADO') == "PENDIENTE" and nuevo_estado != "PENDIENTE":
                             hoja_f.append_row([
                                 len(hoja_f.get_all_values()), str(date.today()), user["ID_USUARIO"],
@@ -546,7 +558,7 @@ def main_app():
                                 float(saldo_actual + monto_final), "APP"
                             ])
                         
-                        st.success("✅ Guardado correctamente")
+                        st.success("✅ Trade cerrado con éxito.")
                         time.sleep(1); st.rerun()
 
     # # SECCION 9: BACKTESTING
