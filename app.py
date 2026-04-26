@@ -452,67 +452,89 @@ def main_app():
                     limpiar_todo_al_final()
 
 # =========================================================
-# # SECCIÓN 8: BUSCADOR DE OPERACIONES (AUDITORÍA RÁPIDA)
+# # SECCIÓN 8: AUDITORÍA DE OPERACIONES (CALENDARIO)
 # =========================================================
     elif menu == "✏️ Editar":
-        st.header("🔍 Buscador y Auditoría de Operaciones")
+        st.header("🔍 Auditoría de Operaciones")
         
         try:
-            # Conexión limpia
             hoja_b = doc.worksheet("Bitacora")
             datos = hoja_b.get_all_records()
             
             if not datos:
-                st.warning("No hay datos en la bitácora todavía.")
+                st.warning("No hay datos registrados aún.")
                 st.stop()
                 
             df = pd.DataFrame(datos)
-            df.columns = df.columns.str.strip() # Limpieza de nombres de columnas
+            # Limpiamos nombres de columnas: quitamos espacios y todo a MAYÚSCULAS
+            df.columns = df.columns.str.strip().str.upper()
             
-            # Filtro inicial por tu usuario
+            # Filtro por tu usuario (Glenyer)
             df = df[df["ID_USUARIO"] == user["ID_USUARIO"]]
 
             # --- PANEL DE FILTROS ---
-            st.write("Configura tu búsqueda:")
-            c1, c2 = st.columns(2)
-            
-            # 1. Filtro por Fecha (Input de texto para máxima flexibilidad)
-            f_fecha = c1.text_input("📅 Fecha (YYYY-MM-DD)", placeholder="Ej: 2026-04-25")
-            
-            # 2. Filtro por Resultado
-            f_resultado = c2.selectbox("🎯 Resultado", ["TODOS", "TP", "SL", "BE", "PENDIENTE"])
+            with st.container(border=True):
+                st.write("📅 **Selecciona los criterios de búsqueda:**")
+                c1, c2 = st.columns(2)
+                
+                # Selector de fecha (Calendario)
+                fecha_sel = c1.date_input("Selecciona el día", value=date.today(), key="audit_date")
+                # Selector de resultado (Usando tu columna ESTADO_RESULTADO)
+                res_sel = c2.selectbox("Estado del Trade", ["TODOS", "TP", "SL", "BE", "PENDIENTE"], key="audit_res")
 
             # --- LÓGICA DE FILTRADO ---
+            str_fecha = fecha_sel.strftime("%Y-%m-%d")
             df_filtrado = df.copy()
+            
+            # 1. Filtro por Fecha
+            if "FECHA" in df_filtrado.columns:
+                df_filtrado = df_filtrado[df_filtrado["FECHA"].astype(str).str.contains(str_fecha)]
+            
+            # 2. Filtro por el nombre exacto que me dijiste: ESTADO_RESULTADO
+            if res_sel != "TODOS" and "ESTADO_RESULTADO" in df_filtrado.columns:
+                df_filtrado = df_filtrado[df_filtrado["ESTADO_RESULTADO"] == res_sel]
 
-            if f_fecha:
-                # Buscamos coincidencias en la columna FECHA
-                df_filtrado = df_filtrado[df_filtrado["FECHA"].astype(str).str.contains(f_fecha)]
-
-            if f_resultado != "TODOS":
-                # Filtramos por el estado seleccionado
-                df_filtrado = df_filtrado[df_filtrado["ESTADO_RESULTADO"] == f_resultado]
-
-            # --- RESULTADOS ---
+            # --- PRESENTACIÓN DE DATOS ---
             st.divider()
-            num_res = len(df_filtrado)
-            st.subheader(f"📊 Resultados encontrados: {num_res}")
-
+            st.subheader(f"📊 Operaciones: {str_fecha}")
+            
             if not df_filtrado.empty:
-                # Mostramos solo las columnas clave para que sea fácil de leer
-                columnas_vista = ["FECHA", "INSTRUMENTO", "ACCION", "VALOR_BALA", "ESTADO_RESULTADO", "MONTO_RESULTADO"]
+                # Definimos qué columnas mostrar para no dar error
+                # Mostramos las básicas que siempre están
+                columnas_vista = ["FECHA", "INSTRUMENTO", "ACCION", "VALOR_BALA", "ESTADO_RESULTADO"]
                 
-                # Usamos st.dataframe para que puedas ordenar haciendo clic en las columnas
+                # Verificamos si existe alguna columna de MONTO o RESULTADO para mostrar el dinero
+                # Buscamos nombres parecidos como 'MONTO', 'RESULTADO', 'MONTO_RESULTADO'
+                col_dinero = None
+                posibles_nombres = ["MONTO_RESULTADO", "RESULTADO", "MONTO", "RESULTADO_DINERO"]
+                for nombre in posibles_nombres:
+                    if nombre in df_filtrado.columns:
+                        col_dinero = nombre
+                        break
+                
+                if col_dinero:
+                    columnas_vista.append(col_dinero)
+                
+                # Mostrar tabla
                 st.dataframe(
                     df_filtrado[columnas_vista].sort_index(ascending=False),
                     use_container_width=True,
                     hide_index=True
                 )
+                
+                # Si encontramos la columna de dinero, sumamos el balance del día
+                if col_dinero:
+                    try:
+                        total_dia = pd.to_numeric(df_filtrado[col_dinero]).sum()
+                        color = "green" if total_dia >= 0 else "red"
+                        st.markdown(f"### Balance estimado del día: :{color}[${total_dia:.2f}]")
+                    except:
+                        pass # Si no son números, no sumamos nada
             else:
-                st.info("No hay operaciones que coincidan con esos filtros hoy, socio.")
+                st.info(f"Socio, no hay trades '{res_sel}' para el {str_fecha}.")
 
         except Exception as e:
-            st.error(f"Error en el buscador: {e}")
+            st.error(f"Hubo un bache en el buscador: {e}")
 
     # # SECCION 9: BACKTESTING
     elif menu == "📊 Backtesting":
