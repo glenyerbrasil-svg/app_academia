@@ -417,27 +417,24 @@ def main_app():
         monto_final = st.number_input("Monto Resultante ($)", format="%.2f", key=monto_key)
         observaciones = st.text_area("Observaciones", key=f"obs_{v}")
 
-# --- 6. BOTÓN DE GUARDAR (VERSIÓN PRO CON CLOUDINARY) ---
+# --- 6. BOTÓN DE GUARDAR (ORDEN DE COLUMNAS CORREGIDO) ---
         if st.button("💾 GUARDAR REGISTRO", use_container_width=True, key=f"btn_save_{v}"):
             if p_ent == 0 or p_sl == 0 or bala == 0:
-                st.warning("⚠️ Socio, faltan datos técnicos (Entrada, SL o Bala).")
+                st.warning("⚠️ Socio, faltan datos técnicos.")
             else:
-                with st.spinner("🚀 Subiendo evidencias a la nube y sincronizando..."):
+                with st.spinner("🚀 Sincronizando con precisión profesional..."):
                     try:
                         import cloudinary
                         import cloudinary.uploader
 
-                        # Configuración con tus credenciales
                         cloudinary.config(
                             cloud_name = "dqur2fztq", 
                             api_key = "694985462176285", 
                             api_secret = "8iJE0G6CM6qE0zu9IKPsjzP6BNU"
                         )
 
-                        # Función interna para subir y obtener el link
                         def subir_evidencia(archivo, etiqueta):
                             if archivo:
-                                # Subimos el archivo con un nombre que incluya el activo y fecha
                                 respuesta = cloudinary.uploader.upload(
                                     archivo, 
                                     folder = "bitacora_trading",
@@ -446,43 +443,57 @@ def main_app():
                                 return respuesta['secure_url']
                             return "N/A"
 
-                        # 1. Ejecutar subidas
-                        url_may = subir_evidencia(img_may, "mayor")
-                        url_men = subir_evidencia(img_men, "menor")
-                        url_ent = subir_evidencia(img_ent, "entrada")
-                        url_res = subir_evidencia(img_res, "resultado")
+                        # 1. Subida de imágenes
+                        url_may = subir_evidencia(img_may, "MAYOR")
+                        url_men = subir_evidencia(img_men, "MENOR")
+                        url_ent = subir_evidencia(img_ent, "EJECUCION") # Se guarda en DIRECCION_EJECUCION
+                        url_res = subir_evidencia(img_res, "RESULTADO") # Se guarda en IMAGEN_RESULTADO
 
                         monto_final_val = float(monto_final)
+                        hora_actual = datetime.now().strftime("%H:%M:%S")
                         
-                        # 2. Preparar fila con los LINKS (URLs)
+                        # 2. CONSTRUCCIÓN DE FILA (Siguiendo tu lista exacta de columnas)
+                        # Columnas: ID_BITACORA (0), ID_USUARIO (1), FECHA (2), INSTRUMENTO (3), ACCION (4), 
+                        # VALOR_BALA (5), PRECIO_ENT (6), PRECIO_SL (7), PRECIO_TP (8), LOTAJEMARGEN (9), 
+                        # HORA_ENTRADA (10), HORA_SALIDA (11), TIEMPO_TOTAL (12), 
+                        # DIRECCION_MAYOR (13), IMAGEN_MAYOR (14), DIRECCION_MENOR (15), IMAGEN_MENOR (16), 
+                        # DIRECCION_EJECUCION (17), IMAGEN_EJECUCION (18), 
+                        # ESTADO_RESULTADO (19), RESULTADO_DINERO (20), LLEGO_11 (21), DRAWDOWN (22), 
+                        # IMAGEN_RESULTADO (23), OBSERVACIONES (24), ESTADO_EMOCIONAL (25)
+                        
                         nueva_fila = [
-                            len(hoja_b.get_all_values()), 
-                            user["ID_USUARIO"], 
-                            str(date.today()),
-                            ins, 
-                            acc, 
-                            float(bala), 
-                            float(p_ent), 
-                            float(p_sl), 
-                            float(tp_sugerido), 
-                            round(float(lotaje), 2),
-                            0, 
-                            datetime.now().strftime("%H:%M:%S"),
-                            url_may, url_men, url_ent, url_res, # <-- Guardamos los links de Cloudinary
-                            "N/A", "N/A", "N/A", "N/A",
-                            tipo_final, 
-                            monto_final_val, 
-                            "NO", 
-                            0, 
-                            "N/A", 
-                            observaciones, 
-                            semaforo
+                            len(hoja_b.get_all_values()),    # ID_BITACORA
+                            user["ID_USUARIO"],             # ID_USUARIO
+                            str(date.today()),              # FECHA
+                            ins,                            # INSTRUMENTO
+                            acc,                            # ACCION
+                            float(bala),                    # VALOR_BALA
+                            float(p_ent),                   # PRECIO_ENT
+                            float(p_sl),                    # PRECIO_SL
+                            float(tp_sugerido),             # PRECIO_TP
+                            round(float(lotaje), 2),        # LOTAJEMARGEN
+                            hora_actual,                    # HORA_ENTRADA
+                            "N/A",                          # HORA_SALIDA (Se llena al cerrar si aplica)
+                            "N/A",                          # TIEMPO_TOTAL
+                            url_may,                        # DIRECCION_MAYOR (Link Cloudinary)
+                            "N/A",                          # IMAGEN_MAYOR (Opcional: nombre archivo)
+                            url_men,                        # DIRECCION_MENOR (Link Cloudinary)
+                            "N/A",                          # IMAGEN_MENOR
+                            url_ent,                        # DIRECCION_EJECUCION (Link entrada)
+                            "N/A",                          # IMAGEN_EJECUCION
+                            tipo_final,                     # ESTADO_RESULTADO
+                            monto_final_val,                # RESULTADO_DINERO
+                            "NO",                           # LLEGO_11
+                            0,                              # DRAWDOWN
+                            url_res,                        # IMAGEN_RESULTADO (Link resultado)
+                            observaciones,                  # OBSERVACIONES
+                            semaforo                        # ESTADO_EMOCIONAL
                         ]
                         
-                        # 3. Escribir en Google Sheets
+                        # 3. Guardar en Sheets
                         hoja_b.append_row(nueva_fila)
                         
-                        # 4. Actualizar Finanzas si no es Pendiente
+                        # 4. Actualizar Finanzas (Solo si no es PENDIENTE)
                         if tipo_final != "PENDIENTE":
                             ing = monto_final_val if monto_final_val > 0 else 0
                             egr = abs(monto_final_val) if monto_final_val < 0 else 0
@@ -498,12 +509,12 @@ def main_app():
                                 "APP"
                             ])
                         
-                        st.success(f"✅ ¡Operación blindada y guardada! Resultado: ${monto_final_val:.2f}")
+                        st.success(f"✅ ¡Registro alineado correctamente! Resultado: ${monto_final_val:.2f}")
                         time.sleep(2)
                         limpiar_todo_al_final()
 
-                    except Exception as error_c:
-                        st.error(f"❌ Error al subir imágenes o guardar: {error_c}")
+                    except Exception as e:
+                        st.error(f"❌ Error de alineación: {e}")
 
 # =========================================================
     # # SECCIÓN 8: CIERRE DE CICLO (CON CÁMARA INTEGRADA - 100%)
