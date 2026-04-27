@@ -418,7 +418,7 @@ def main_app():
         observaciones = st.text_area("Observaciones", key=f"obs_{v}")
 
 # --- CONSTRUCCIÓN DE FILA CON PRECISIÓN QUIRÚRGICA ---
-                        # Usamos una lista de 26 elementos (de la A a la Z)
+                        # Creamos la lista de 26 espacios (Columna A hasta la Z)
                         nueva_fila = [None] * 26 
 
                         nueva_fila[0]  = len(hoja_b.get_all_values()) # A: ID_BITACORA
@@ -435,21 +435,18 @@ def main_app():
                         nueva_fila[11] = "N/A"                       # L: HORA_SALIDA
                         nueva_fila[12] = "N/A"                       # M: TIEMPO_TOTAL
                         nueva_fila[13] = url_may                     # N: DIRECCION_MAYOR
-                        nueva_fila[14] = "N/A"                       # O: (Espacio)
-                        nueva_fila[15] = url_may                     # P: IMAGEN_MAYOR <--- AQUÍ
+                        nueva_fila[14] = "N/A"                       # O: DIRECCION_MAYOR_NOM
+                        nueva_fila[15] = url_may                     # P: IMAGEN_MAYOR <--- COL P
                         nueva_fila[16] = url_men                     # Q: DIRECCION_MENOR
-                        nueva_fila[17] = url_men                     # R: IMAGEN_MENOR <--- AQUÍ
+                        nueva_fila[17] = url_men                     # R: IMAGEN_MENOR <--- COL R
                         nueva_fila[18] = url_ent                     # S: DIRECCION_EJECUCION
-                        nueva_fila[19] = url_ent                     # T: IMAGEN_EJECUCION <--- AQUÍ
+                        nueva_fila[19] = url_ent                     # T: IMAGEN_EJECUCION <--- COL T
                         nueva_fila[20] = tipo_final                  # U: ESTADO_RESULTADO
                         nueva_fila[21] = monto_final_val             # V: RESULTADO_DINERO
                         nueva_fila[22] = "NO"                        # W: LLEGO_11
                         nueva_fila[23] = 0                           # X: DRAWDOWN
-                        nueva_fila[24] = url_res                     # Y: IMAGEN_RESULTADO <--- AQUÍ
-                        nueva_fila[25] = observaciones               # Z: OBSERVACIONES (o ESTADO_EMOCIONAL)
-
-                        # Si tienes una columna adicional para el Semáforo (AA), agrégala así:
-                        nueva_fila.append(semaforo) 
+                        nueva_fila[24] = url_res                     # Y: IMAGEN_RESULTADO <--- COL Y
+                        nueva_fila[25] = observaciones               # Z: OBSERVACIONES / EMOCIÓN
 
                         # 3. Guardar en Sheets
                         hoja_b.append_row(nueva_fila)
