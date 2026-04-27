@@ -417,39 +417,93 @@ def main_app():
         monto_final = st.number_input("Monto Resultante ($)", format="%.2f", key=monto_key)
         observaciones = st.text_area("Observaciones", key=f"obs_{v}")
 
-        # --- 6. BOTÓN DE GUARDAR ---
+# --- 6. BOTÓN DE GUARDAR (VERSIÓN PRO CON CLOUDINARY) ---
         if st.button("💾 GUARDAR REGISTRO", use_container_width=True, key=f"btn_save_{v}"):
             if p_ent == 0 or p_sl == 0 or bala == 0:
-                st.warning("⚠️ Socio, faltan datos técnicos.")
+                st.warning("⚠️ Socio, faltan datos técnicos (Entrada, SL o Bala).")
             else:
-                with st.spinner("Sincronizando..."):
-                    # Usamos el valor que quedó en el input
-                    monto_final_val = float(monto_final)
-                    
-                    nueva_fila = [
-                        len(hoja_b.get_all_values()), user["ID_USUARIO"], str(date.today()),
-                        ins, acc, float(bala), float(p_ent), float(p_sl), float(tp_sugerido), 
-                        round(float(lotaje), 2),
-                        0, datetime.now().strftime("%H:%M:%S"),
-                        img_may.name if img_may else "N/A", img_men.name if img_men else "N/A",
-                        img_ent.name if img_ent else "N/A", img_res.name if img_res else "N/A",
-                        "N/A", "N/A", "N/A", "N/A",
-                        tipo_final, monto_final_val, "NO", 0, "N/A", observaciones, semaforo
-                    ]
-                    hoja_b.append_row(nueva_fila)
-                    
-                    if tipo_final != "PENDIENTE":
-                        ing = monto_final_val if monto_final_val > 0 else 0
-                        egr = abs(monto_final_val) if monto_final_val < 0 else 0
-                        hoja_f.append_row([
-                            len(hoja_f.get_all_values()), str(date.today()), user["ID_USUARIO"],
-                            f"CIERRE {ins}", float(saldo_actual), float(ing), float(egr), 
-                            float(saldo_actual + monto_final_val), "APP"
-                        ])
-                    
-                    st.success(f"✅ ¡Guardado! Resultado: ${monto_final_val:.2f}")
-                    time.sleep(1)
-                    limpiar_todo_al_final()
+                with st.spinner("🚀 Subiendo evidencias a la nube y sincronizando..."):
+                    try:
+                        import cloudinary
+                        import cloudinary.uploader
+
+                        # Configuración con tus credenciales
+                        cloudinary.config(
+                            cloud_name = "dqur2fztq", 
+                            api_key = "694985462176285", 
+                            api_secret = "8iJE0G6CM6qE0zu9IKPsjzP6BNU"
+                        )
+
+                        # Función interna para subir y obtener el link
+                        def subir_evidencia(archivo, etiqueta):
+                            if archivo:
+                                # Subimos el archivo con un nombre que incluya el activo y fecha
+                                respuesta = cloudinary.uploader.upload(
+                                    archivo, 
+                                    folder = "bitacora_trading",
+                                    public_id = f"{ins}_{etiqueta}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+                                )
+                                return respuesta['secure_url']
+                            return "N/A"
+
+                        # 1. Ejecutar subidas
+                        url_may = subir_evidencia(img_may, "mayor")
+                        url_men = subir_evidencia(img_men, "menor")
+                        url_ent = subir_evidencia(img_ent, "entrada")
+                        url_res = subir_evidencia(img_res, "resultado")
+
+                        monto_final_val = float(monto_final)
+                        
+                        # 2. Preparar fila con los LINKS (URLs)
+                        nueva_fila = [
+                            len(hoja_b.get_all_values()), 
+                            user["ID_USUARIO"], 
+                            str(date.today()),
+                            ins, 
+                            acc, 
+                            float(bala), 
+                            float(p_ent), 
+                            float(p_sl), 
+                            float(tp_sugerido), 
+                            round(float(lotaje), 2),
+                            0, 
+                            datetime.now().strftime("%H:%M:%S"),
+                            url_may, url_men, url_ent, url_res, # <-- Guardamos los links de Cloudinary
+                            "N/A", "N/A", "N/A", "N/A",
+                            tipo_final, 
+                            monto_final_val, 
+                            "NO", 
+                            0, 
+                            "N/A", 
+                            observaciones, 
+                            semaforo
+                        ]
+                        
+                        # 3. Escribir en Google Sheets
+                        hoja_b.append_row(nueva_fila)
+                        
+                        # 4. Actualizar Finanzas si no es Pendiente
+                        if tipo_final != "PENDIENTE":
+                            ing = monto_final_val if monto_final_val > 0 else 0
+                            egr = abs(monto_final_val) if monto_final_val < 0 else 0
+                            hoja_f.append_row([
+                                len(hoja_f.get_all_values()), 
+                                str(date.today()), 
+                                user["ID_USUARIO"],
+                                f"CIERRE {ins}", 
+                                float(saldo_actual), 
+                                float(ing), 
+                                float(egr), 
+                                float(saldo_actual + monto_final_val), 
+                                "APP"
+                            ])
+                        
+                        st.success(f"✅ ¡Operación blindada y guardada! Resultado: ${monto_final_val:.2f}")
+                        time.sleep(2)
+                        limpiar_todo_al_final()
+
+                    except Exception as error_c:
+                        st.error(f"❌ Error al subir imágenes o guardar: {error_c}")
 
 # =========================================================
     # # SECCIÓN 8: CIERRE DE CICLO (CON CÁMARA INTEGRADA - 100%)
