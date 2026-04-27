@@ -417,39 +417,93 @@ def main_app():
         monto_final = st.number_input("Monto Resultante ($)", format="%.2f", key=monto_key)
         observaciones = st.text_area("Observaciones", key=f"obs_{v}")
 
-# --- CONSTRUCCIÓN DE FILA CON PRECISIÓN QUIRÚRGICA ---
-                        # Creamos la lista de 26 espacios (Columna A hasta la Z)
-                        nueva_fila = [None] * 26 
+# --- 6. BOTÓN DE GUARDAR (VERSIÓN PRO CON CLOUDINARY) ---
+        if st.button("💾 GUARDAR REGISTRO", use_container_width=True, key=f"btn_save_{v}"):
+            if p_ent == 0 or p_sl == 0 or bala == 0:
+                st.warning("⚠️ Socio, faltan datos técnicos (Entrada, SL o Bala).")
+            else:
+                with st.spinner("🚀 Subiendo evidencias a la nube y sincronizando..."):
+                    try:
+                        import cloudinary
+                        import cloudinary.uploader
 
-                        nueva_fila[0]  = len(hoja_b.get_all_values()) # A: ID_BITACORA
-                        nueva_fila[1]  = user["ID_USUARIO"]          # B: ID_USUARIO
-                        nueva_fila[2]  = str(date.today())           # C: FECHA
-                        nueva_fila[3]  = ins                         # D: INSTRUMENTO
-                        nueva_fila[4]  = acc                         # E: ACCION
-                        nueva_fila[5]  = float(bala)                 # F: VALOR_BALA
-                        nueva_fila[6]  = float(p_ent)                # G: PRECIO_ENT
-                        nueva_fila[7]  = float(p_sl)                 # H: PRECIO_SL
-                        nueva_fila[8]  = float(tp_sugerido)          # I: PRECIO_TP
-                        nueva_fila[9]  = round(float(lotaje), 2)     # J: LOTAJEMARGEN
-                        nueva_fila[10] = hora_actual                 # K: HORA_ENTRADA
-                        nueva_fila[11] = "N/A"                       # L: HORA_SALIDA
-                        nueva_fila[12] = "N/A"                       # M: TIEMPO_TOTAL
-                        nueva_fila[13] = url_may                     # N: DIRECCION_MAYOR
-                        nueva_fila[14] = "N/A"                       # O: DIRECCION_MAYOR_NOM
-                        nueva_fila[15] = url_may                     # P: IMAGEN_MAYOR <--- COL P
-                        nueva_fila[16] = url_men                     # Q: DIRECCION_MENOR
-                        nueva_fila[17] = url_men                     # R: IMAGEN_MENOR <--- COL R
-                        nueva_fila[18] = url_ent                     # S: DIRECCION_EJECUCION
-                        nueva_fila[19] = url_ent                     # T: IMAGEN_EJECUCION <--- COL T
-                        nueva_fila[20] = tipo_final                  # U: ESTADO_RESULTADO
-                        nueva_fila[21] = monto_final_val             # V: RESULTADO_DINERO
-                        nueva_fila[22] = "NO"                        # W: LLEGO_11
-                        nueva_fila[23] = 0                           # X: DRAWDOWN
-                        nueva_fila[24] = url_res                     # Y: IMAGEN_RESULTADO <--- COL Y
-                        nueva_fila[25] = observaciones               # Z: OBSERVACIONES / EMOCIÓN
+                        # Configuración con tus credenciales
+                        cloudinary.config(
+                            cloud_name = "dqur2fztq", 
+                            api_key = "694985462176285", 
+                            api_secret = "8iJE0G6CM6qE0zu9IKPsjzP6BNU"
+                        )
 
-                        # 3. Guardar en Sheets
+                        # Función interna para subir y obtener el link
+                        def subir_evidencia(archivo, etiqueta):
+                            if archivo:
+                                # Subimos el archivo con un nombre que incluya el activo y fecha
+                                respuesta = cloudinary.uploader.upload(
+                                    archivo, 
+                                    folder = "bitacora_trading",
+                                    public_id = f"{ins}_{etiqueta}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+                                )
+                                return respuesta['secure_url']
+                            return "N/A"
+
+                        # 1. Ejecutar subidas
+                        url_may = subir_evidencia(IMAGEN_MAYOR, "mayor")
+                        url_men = subir_evidencia(IMAGEN_MENOR, "menor")
+                        url_ent = subir_evidencia(IMAGEN_EJECUCION, "entrada")
+                        url_res = subir_evidencia(IMAGEN_RESULTADO, "resultado")
+
+                        monto_final_val = float(monto_final)
+                        
+                        # 2. Preparar fila con los LINKS (URLs)
+                        nueva_fila = [
+                            len(hoja_b.get_all_values()), 
+                            user["ID_USUARIO"], 
+                            str(date.today()),
+                            ins, 
+                            acc, 
+                            float(bala), 
+                            float(p_ent), 
+                            float(p_sl), 
+                            float(tp_sugerido), 
+                            round(float(lotaje), 2),
+                            0, 
+                            datetime.now().strftime("%H:%M:%S"),
+                            url_may, url_men, url_ent, url_res, # <-- Guardamos los links de Cloudinary
+                            "N/A", "N/A", "N/A", "N/A",
+                            tipo_final, 
+                            monto_final_val, 
+                            "NO", 
+                            0, 
+                            "N/A", 
+                            observaciones, 
+                            semaforo
+                        ]
+                        
+                        # 3. Escribir en Google Sheets
                         hoja_b.append_row(nueva_fila)
+                        
+                        # 4. Actualizar Finanzas si no es Pendiente
+                        if tipo_final != "PENDIENTE":
+                            ing = monto_final_val if monto_final_val > 0 else 0
+                            egr = abs(monto_final_val) if monto_final_val < 0 else 0
+                            hoja_f.append_row([
+                                len(hoja_f.get_all_values()), 
+                                str(date.today()), 
+                                user["ID_USUARIO"],
+                                f"CIERRE {ins}", 
+                                float(saldo_actual), 
+                                float(ing), 
+                                float(egr), 
+                                float(saldo_actual + monto_final_val), 
+                                "APP"
+                            ])
+                        
+                        st.success(f"✅ ¡Operación blindada y guardada! Resultado: ${monto_final_val:.2f}")
+                        time.sleep(2)
+                        limpiar_todo_al_final()
+
+                    except Exception as error_c:
+                        st.error(f"❌ Error al subir imágenes o guardar: {error_c}")
 
 # =========================================================
     # # SECCIÓN 8: CIERRE DE CICLO (CON CÁMARA INTEGRADA - 100%)
@@ -628,25 +682,29 @@ def main_app():
             st.error(f"Error de conexión: {e}")
 
 # =========================================================
-    # # SECCION 11: REPORTES MASTER (AUDITORÍA 360°) - V2
+    # # SECCION 11: REPORTES MASTER (AUDITORÍA 360°)
     # =========================================================
     elif menu == "📈 Reportes":
         st.header("📊 Reportes Master: Auditoría de Operaciones")
 
         try:
-            # 1. CARGA Y LIMPIEZA ROBUSTA
+            # 1. CARGA DE DATOS
             hoja_b = doc.worksheet("Bitacora")
             datos = hoja_b.get_all_records()
             df = pd.DataFrame(datos)
             
-            # Normalizamos nombres de columnas para evitar el error de la imagen
+            # Limpieza básica
             df.columns = df.columns.str.strip().str.upper()
             df['FECHA'] = pd.to_datetime(df['FECHA']).dt.date
             df = df[df['ID_USUARIO'].astype(str) == str(user["ID_USUARIO"])]
 
-            # PANEL DE CONTROL
+            # ---------------------------------------------------------
+            # 1. PANEL DE CONTROL (FILTROS)
+            # ---------------------------------------------------------
             with st.container(border=True):
                 col_f1, col_f2 = st.columns([2, 1])
+                
+                # Selector de Rango
                 rango_opcion = col_f1.radio("Rango de Auditoría:", 
                     ["Hoy", "Esta Semana", "Mes Actual", "Personalizado"], horizontal=True)
                 
@@ -660,78 +718,98 @@ def main_app():
                     f_inicio = hoy.replace(day=1)
                     f_fin = hoy
                 else:
-                    f_inicio, f_fin = col_f1.date_input("Rango", [hoy - timedelta(days=30), hoy])
+                    f_inicio, f_fin = col_f1.date_input("Calendario Personalizado", [hoy - timedelta(days=30), hoy])
 
-                activos = ["Todos"] + list(df['INSTRUMENTO'].unique())
-                activo_sel = col_f2.selectbox("Instrumento:", activos)
+                # Filtro de Activos
+                activos_disponibles = ["Todos"] + list(df['INSTRUMENTO'].unique())
+                activo_sel = col_f2.selectbox("Filtrar por Activo:", activos_disponibles)
 
-            # Aplicar Filtros
+            # Aplicar Filtros al DF
             df_filtrado = df[(df['FECHA'] >= f_inicio) & (df['FECHA'] <= f_fin)]
             if activo_sel != "Todos":
                 df_filtrado = df_filtrado[df_filtrado['INSTRUMENTO'] == activo_sel]
 
             if df_filtrado.empty:
-                st.warning("Sin datos para este filtro, socio.")
+                st.warning("No hay datos para este periodo, socio. ¡A darle al mercado!")
                 st.stop()
 
             # ---------------------------------------------------------
-            # 2. SECCIÓN DE GRÁFICAS DE RENDIMIENTO (NUEVO)
-            # ---------------------------------------------------------
-            st.subheader("📈 Análisis Visual de Rendimiento")
-            g1, g2 = st.columns(2)
-
-            with g1:
-                # Gráfico de Barras: Conteo de Resultados
-                conteo_res = df_filtrado['ESTADO_RESULTADO'].value_counts().reset_index()
-                conteo_res.columns = ['Resultado', 'Cantidad']
-                import plotly.express as px
-                
-                fig_bar = px.bar(conteo_res, x='Resultado', y='Cantidad', 
-                                title="Distribución de Trades (TP vs SL vs BE)",
-                                color='Resultado',
-                                color_discrete_map={'TP': '#00CC96', 'SL': '#EF553B', 'BE': '#636EFA'})
-                st.plotly_chart(fig_bar, use_container_width=True)
-
-            with g2:
-                # Gráfico de Línea: Evolución del Balance
-                df_linea = df_filtrado.sort_values('FECHA')
-                df_linea['BALANCE_ACUM'] = df_linea['RESULTADO_DINERO'].astype(float).cumsum()
-                
-                fig_line = px.line(df_linea, x='FECHA', y='BALANCE_ACUM', 
-                                 title="Curva de Crecimiento ($)",
-                                 markers=True)
-                fig_line.update_traces(line_color='#00CC96')
-                st.plotly_chart(fig_line, use_container_width=True)
-
-            # ---------------------------------------------------------
-            # 3. EL AUDITOR DE GRÁFICOS (TABS CORREGIDO)
+            # 2. DASHBOARD DE KPIs
             # ---------------------------------------------------------
             st.divider()
-            tab_tp, tab_sl, tab_ge = st.tabs(["🟢 Victorias (TP)", "🔴 Aprendizajes (SL)", "⚪ Gestión"])
+            # Cálculos
+            balance_neto = df_filtrado['RESULTADO_DINERO'].astype(float).sum()
+            total_trades = len(df_filtrado[df_filtrado['ESTADO_RESULTADO'] != 'PENDIENTE'])
+            ganados = len(df_filtrado[df_filtrado['ESTADO_RESULTADO'] == 'TP'])
+            win_rate = (ganados / total_trades * 100) if total_trades > 0 else 0
+            
+            # Ratio Promedio (Simplificado)
+            ratio_avg = df_filtrado[df_filtrado['ESTADO_RESULTADO'] == 'TP']['VALOR_BALA'].astype(float).mean() # Ejemplo lógico
 
-            # Función auxiliar para evitar el error de 'LOTAJEMARGEN'
-            def get_val(row, col_name):
-                return row[col_name] if col_name in row else "N/A"
+            k1, k2, k3, k4 = st.columns(4)
+            k1.metric("💰 Balance Neto", f"${balance_neto:,.2f}", delta=f"{balance_neto:.2f}")
+            k2.metric("🎯 Win Rate", f"{win_rate:.1f}%")
+            k3.metric("⚖️ Ratio Prom.", "1:2.4") # Aquí puedes vincular tu columna de ratio real
+            k4.metric("🔥 Racha", "5 Días") # Lógica de racha en desarrollo
+
+            # ---------------------------------------------------------
+            # 3. EL AUDITOR DE GRÁFICOS (TABS)
+            # ---------------------------------------------------------
+            st.divider()
+            tab_tp, tab_sl, tab_ge = st.tabs(["🟢 Victorias (TP)", "🔴 Aprendizajes (SL)", "⚪ Gestión (BE/Pend)"])
 
             with tab_tp:
                 df_tp = df_filtrado[df_filtrado['ESTADO_RESULTADO'] == 'TP']
                 for _, r in df_tp.iterrows():
-                    with st.expander(f"✅ {r['INSTRUMENTO']} | +${r['RESULTADO_DINERO']} | {r['FECHA']}"):
-                        st.write(f"**Lotaje usado:** {get_val(r, 'LOTAJEMARGEN')}")
-                        # Aquí puedes agregar el código para mostrar las imágenes de Cloudinary
-                        st.info(f"Comentario: {r['OBSERVACIONES']}")
+                    with st.expander(f"✅ {r['INSTRUMENTO']} | Profit: ${r['RESULTADO_DINERO']} | {r['FECHA']}"):
+                        c_img1, c_img2 = st.columns(2)
+                        c_img1.write("**Análisis de Entrada**")
+                        c_img1.info(f"Lotaje: {r['LOTAJEMARGEN']}")
+                        # Aquí iría la lógica de mostrar la imagen de Cloudinary si existe el link
+                        c_img2.write("**Desarrollo / Resultado**")
+                        st.write(f"*Observaciones:* {r['OBSERVACIONES']}")
 
             with tab_sl:
                 df_sl = df_filtrado[df_filtrado['ESTADO_RESULTADO'] == 'SL']
                 for _, r in df_sl.iterrows():
-                    with st.expander(f"❌ {r['INSTRUMENTO']} | -${abs(float(r['RESULTADO_DINERO']))} | {r['FECHA']}"):
-                        st.error(f"Falla detectada: {r['OBSERVACIONES']}")
+                    with st.expander(f"❌ {r['INSTRUMENTO']} | Pérdida: ${r['RESULTADO_DINERO']} | {r['FECHA']}"):
+                        st.error(f"Motivo: {r['OBSERVACIONES']}")
+                        st.write("Analiza si fue error de lectura o gestión emocional.")
 
-            # ... (Resto del código de psicología y exportación igual que antes)
+            with tab_ge:
+                df_ge = df_filtrado[(df_filtrado['ESTADO_RESULTADO'] == 'BE') | (df_filtrado['ESTADO_RESULTADO'] == 'PENDIENTE')]
+                st.dataframe(df_ge[['FECHA', 'INSTRUMENTO', 'ACCION', 'ESTADO_RESULTADO']])
+
+            # ---------------------------------------------------------
+            # 4. PSICOLOGÍA Y CONSISTENCIA
+            # ---------------------------------------------------------
+            st.divider()
+            st.subheader("🧠 El Termómetro del Trader")
+            col_p1, col_p2 = st.columns(2)
+
+            with col_p1:
+                # Gráfico de Emociones (Circular)
+                if 'SEMAFORO_EMOCIONAL' in df_filtrado.columns:
+                    emo_counts = df_filtrado['SEMAFORO_EMOCIONAL'].value_counts()
+                    import plotly.express as px
+                    fig_emo = px.pie(values=emo_counts.values, names=emo_counts.index, 
+                                   title="Dominancia Emocional", color_discrete_sequence=px.colors.qualitative.Safe)
+                    st.plotly_chart(fig_emo, use_container_width=True)
+
+            with col_p2:
+                st.write("**Relación Emoción/Resultado**")
+                res_emo = df_filtrado.groupby(['SEMAFORO_EMOCIONAL', 'ESTADO_RESULTADO']).size().unstack(fill_value=0)
+                st.table(res_emo)
+
+            # ---------------------------------------------------------
+            # 5. EXPORTACIÓN
+            # ---------------------------------------------------------
+            st.divider()
+            csv = df_filtrado.to_csv(index=False).encode('utf-8')
+            st.download_button("📥 Descargar Reporte CSV", data=csv, file_name=f"Reporte_{f_inicio}.csv", mime='text/csv')
 
         except Exception as e:
-            st.error(f"Socio, hubo un error técnico: {e}")
-            st.info("Revisa que los nombres de las columnas en tu Excel coincidan exactamente (Ej: LOTAJEMARGEN)")
+            st.error(f"Error en el motor de reportes: {e}")
 
     elif menu == "💬 Forum":
         st.header("💬 Forum de la Academia")
