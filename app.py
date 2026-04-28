@@ -417,103 +417,59 @@ def main_app():
         monto_final = st.number_input("Monto Resultante ($)", format="%.2f", key=monto_key)
         observaciones = st.text_area("Observaciones", key=f"obs_{v}")
 
-# --- 6. BOTÓN DE GUARDAR (ORDEN DE COLUMNAS PARA ANOTACIÓN) ---
-        if st.button("💾 GUARDAR REGISTRO", use_container_width=True, key=f"btn_save_{v}"):
-            if p_ent == 0 or p_sl == 0 or bala == 0:
-                st.warning("⚠️ Socio, faltan datos técnicos (Entrada, SL o Bala).")
-            else:
-                with st.spinner("🚀 Sincronizando y respetando columnas de notas..."):
-                    try:
-                        import cloudinary
-                        import cloudinary.uploader
+# =========================================================
+# SECCION 6: GUARDAR OPERACIÓN (CORREGIDA - 27 COLUMNAS)
+# =========================================================
+if st.button("🚀 Guardar Operación"):
+    try:
+        # 1. Subida de imágenes con manejo de errores y URLs por defecto
+        url_may = subir_a_cloudinary(img_may) if img_may else "N/A"
+        url_men = subir_a_cloudinary(img_men) if img_men else "N/A"
+        url_ent = subir_a_cloudinary(img_ent) if img_ent else "N/A"
+        url_res = "N/A" # Se llena al editar/cerrar el trade
 
-                        # 1. Configuración de Cloudinary
-                        cloudinary.config(
-                            cloud_name = "dqur2fztq", 
-                            api_key = "694985462176285", 
-                            api_secret = "8iJE0G6CM6qE0zu9IKPsjzP6BNU"
-                        )
+        # 2. Preparación de la fila (Mapeo Maestro de 27 columnas)
+        # Aseguramos que la lista tenga exactamente 27 espacios (índices 0 al 26)
+        nueva_fila = [""] * 27
+        
+        nueva_fila[0]  = st.session_state.get('user_id', 'Desconocido') # ID_USUARIO
+        nueva_fila[1]  = datetime.now().strftime("%d/%m/%Y %H:%M:%S")  # FECHA
+        nueva_fila[2]  = instrumento
+        nueva_fila[3]  = accion
+        nueva_fila[4]  = str(bala)
+        nueva_fila[5]  = str(precio_entrada)
+        nueva_fila[6]  = str(tp)
+        nueva_fila[7]  = str(sl)
+        nueva_fila[8]  = str(lotaje)
+        nueva_fila[9]  = hora_entrada
+        nueva_fila[10] = hora_salida
+        nueva_fila[11] = dia_semana
+        nueva_fila[12] = mes
+        nueva_fila[13] = temporalidad
+        
+        # --- BLOQUE DE IMÁGENES Y ANOTACIONES ---
+        nueva_fila[14] = dir_may  # Anotación Mayor
+        nueva_fila[15] = url_may  # LINK CLOUDINARY MAYOR
+        nueva_fila[16] = dir_men  # Anotación Menor
+        nueva_fila[17] = url_men  # LINK CLOUDINARY MENOR
+        nueva_fila[18] = dir_ent  # Anotación Ejecución
+        nueva_fila[19] = url_ent  # LINK CLOUDINARY ENTRADA
+        
+        nueva_fila[20] = "PENDIENTE"
+        nueva_fila[21] = "0"      # RESULTADO_DINERO
+        nueva_fila[22] = "0"      # BALANCE_TEMPORAL
+        nueva_fila[23] = "N/A"    # Link Adicional
+        nueva_fila[24] = url_res  # LINK CLOUDINARY RESULTADO
+        nueva_fila[25] = observaciones
+        nueva_fila[26] = estado_emocional
 
-                        # Función para subir y obtener URL
-                        def subir_a_nube(archivo, etiqueta):
-                            if archivo:
-                                res = cloudinary.uploader.upload(
-                                    archivo, 
-                                    folder = "bitacora_trading",
-                                    public_id = f"{ins}_{etiqueta}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-                                )
-                                return res['secure_url']
-                            return "N/A"
-
-                        # 2. Ejecutar subidas
-                        url_may = subir_a_nube(img_may, "MAYOR")
-                        url_men = subir_a_nube(img_men, "MENOR")
-                        url_ent = subir_a_nube(img_ent, "EJECUCION")
-                        url_res = subir_a_nube(img_res, "RESULTADO")
-
-                        monto_final_val = float(monto_final)
-                        hora_actual = datetime.now().strftime("%H:%M:%S")
-
-                        # 3. MAPEO MAESTRO (1-27) - AJUSTADO PARA COLUMNAS DE ANOTACIÓN
-                        nueva_fila = [""] * 27 
-
-                        nueva_fila[0]  = len(hoja_b.get_all_values()) # 1: ID_BITACORA
-                        nueva_fila[1]  = user["ID_USUARIO"]          # 2: ID_USUARIO
-                        nueva_fila[2]  = str(date.today())           # 3: FECHA
-                        nueva_fila[3]  = ins                         # 4: INSTRUMENTO
-                        nueva_fila[4]  = acc                         # 5: ACCION
-                        nueva_fila[5]  = float(bala)                 # 6: VALOR_BALA
-                        nueva_fila[6]  = float(p_ent)                # 7: PRECIO_ENT
-                        nueva_fila[7]  = float(p_sl)                 # 8: PRECIO_SL
-                        nueva_fila[8]  = float(tp_sugerido)          # 9: PRECIO_TP
-                        nueva_fila[9]  = round(float(lotaje), 2)     # 10: LOTAJE
-                        nueva_fila[10] = 0                           # 11: MARGEN
-                        nueva_fila[11] = hora_actual                 # 12: HORA_ENTRADA
-                        nueva_fila[12] = "N/A"                       # 13: HORA_SALIDA
-                        nueva_fila[13] = "N/A"                       # 14: TIEMPO_TOTAL
-                        
-                        # --- SECCIÓN DE IMÁGENES Y NOTAS ---
-                        nueva_fila[14] = "N/A"                       # 15: DIRECCION_MAYOR (Anotación)
-                        nueva_fila[15] = url_may                     # 16: IMAGEN_MAYOR ✅
-                        nueva_fila[16] = "N/A"                       # 17: DIRECCION_MENOR (Anotación)
-                        nueva_fila[17] = url_men                     # 18: IMAGEN_MENOR ✅
-                        nueva_fila[18] = "N/A"                       # 19: DIRECCION_EJECUCION (Anotación)
-                        nueva_fila[19] = url_ent                     # 20: IMAGEN_EJECUCION ✅
-                        
-                        nueva_fila[20] = tipo_final                  # 21: ESTADO_RESULTADO
-                        nueva_fila[21] = monto_final_val             # 22: RESULTADO_DINERO
-                        nueva_fila[22] = "NO"                        # 23: LLEGO_11
-                        nueva_fila[23] = 0                           # 24: DRAWDOWN
-                        nueva_fila[24] = url_res                     # 25: IMAGEN_RESULTADO ✅
-                        nueva_fila[25] = observaciones               # 26: OBSERVACIONES
-                        nueva_fila[26] = semaforo                    # 27: ESTADO_EMOCIONAL
-
-                        # 4. Guardado en Google Sheets
-                        hoja_b.append_row(nueva_fila)
-                        
-                        # 5. Actualizar Finanzas
-                        if tipo_final != "PENDIENTE":
-                            ing = monto_final_val if monto_final_val > 0 else 0
-                            egr = abs(monto_final_val) if monto_final_val < 0 else 0
-                            hoja_f.append_row([
-                                len(hoja_f.get_all_values()), 
-                                str(date.today()), 
-                                user["ID_USUARIO"],
-                                f"CIERRE {ins}", 
-                                float(saldo_actual), 
-                                float(ing), 
-                                float(egr), 
-                                float(saldo_actual + monto_final_val), 
-                                "APP"
-                            ])
-                        
-                        st.success(f"✅ ¡Guardado! Las columnas de anotación quedaron libres. Resultado: ${monto_final_val:.2f}")
-                        st.balloons()
-                        time.sleep(2)
-                        limpiar_todo_al_final()
-
-                    except Exception as e:
-                        st.error(f"❌ Error crítico: {e}")
+        # 3. Guardar en Google Sheets
+        hoja_operaciones.append_row(nueva_fila)
+        st.success("✅ Operación guardada con éxito en las 27 columnas.")
+        st.balloons()
+        
+    except Exception as e:
+        st.error(f"❌ Error al guardar: {e}")
 # =========================================================
     # # SECCIÓN 8: CIERRE DE CICLO (CON CLOUDINARY - 100%)
     # =========================================================
@@ -690,72 +646,105 @@ def main_app():
         except Exception as e:
             st.error(f"Error de conexión: {e}")
 
-# --- SECCION 11: REPORTES (EL MOTOR DE TUS ESTADÍSTICAS) ---
-    elif menu == "📈 Reportes":
-        import plotly.express as px
-        st.header("📈 Análisis de Rendimiento Master")
-
-        try:
-            # 1. Cargar datos de Bitácora
-            hoja_b = doc.worksheet("Bitacora")
-            data = hoja_b.get_all_records()
+# =========================================================
+# SECCION 11: REPORTES Y ANÁLISIS PRO (RECUPERADA)
+# =========================================================
+elif menu == "📊 Reportes":
+    st.header("📊 Análisis de Rendimiento y Operaciones")
+    
+    try:
+        # 1. Carga de datos
+        data = hoja_operaciones.get_all_records()
+        if not data:
+            st.warning("Aún no hay operaciones registradas para generar reportes.")
+        else:
             df = pd.DataFrame(data)
             
-            # Limpiar nombres de columnas (quitar espacios y poner mayúsculas)
-            df.columns = df.columns.str.strip().str.upper()
+            # Limpieza y preparación de fechas
+            df['FECHA_DT'] = pd.to_datetime(df['FECHA'], dayfirst=True, errors='coerce')
+            df = df.dropna(subset=['FECHA_DT']) # Elimina filas con fechas rotas
             
-            # Filtrar solo los datos del usuario actual
-            df = df[df["ID_USUARIO"].astype(str) == str(user["ID_USUARIO"])]
+            # --- FILTROS LATERALES ---
+            with st.sidebar:
+                st.subheader("📅 Filtros de Análisis")
+                hoy = date.today()
+                hace_un_mes = hoy - timedelta(days=30)
+                
+                f_inicio = st.date_input("Fecha Inicio", hace_un_mes)
+                f_fin = st.date_input("Fecha Fin", hoy)
+                
+                # Filtro por Instrumento
+                activos = ["Todos"] + sorted(df['INSTRUMENTO'].unique().tolist())
+                filtro_activo = st.selectbox("Filtrar por Activo", activos)
 
-            if df.empty:
-                st.warning("Socio, aún no tienes trades registrados para analizar.")
-                st.stop()
+            # Aplicar filtros al DataFrame
+            mask = (df['FECHA_DT'].dt.date >= f_inicio) & (df['FECHA_DT'].dt.date <= f_fin)
+            if filtro_activo != "Todos":
+                mask = mask & (df['INSTRUMENTO'] == filtro_activo)
+            
+            df_filtrado = df.loc[mask]
 
-            # 2. Conversión de datos para gráficas
-            # Aseguramos que el dinero sea número (cambia coma por punto si es necesario)
-            df["RESULTADO_DINERO"] = df["RESULTADO_DINERO"].apply(lambda x: float(str(x).replace(',', '.')) if str(x).strip() != "" else 0.0)
-            df["FECHA_DT"] = pd.to_datetime(df["FECHA"])
+            # --- 2. KPI METRICS (Tarjetas de resumen) ---
+            col1, col2, col3, col4 = st.columns(4)
+            
+            total_trades = len(df_filtrado)
+            wins = len(df_filtrado[df_filtrado['ESTADO_RESULTADO'] == 'TP'])
+            losses = len(df_filtrado[df_filtrado['ESTADO_RESULTADO'] == 'SL'])
+            win_rate = (wins / total_trades * 100) if total_trades > 0 else 0
+            
+            # Convertir PnL a numérico por si acaso
+            df_filtrado['RESULTADO_DINERO'] = pd.to_numeric(df_filtrado['RESULTADO_DINERO'], errors='coerce').fillna(0)
+            pnl_total = df_filtrado['RESULTADO_DINERO'].sum()
 
-            # 3. Métricas Rápidas (KPIs)
-            pnl_total = df["RESULTADO_DINERO"].sum()
-            total_trades = len(df)
-            ganadores = len(df[df["RESULTADO_DINERO"] > 0])
-            win_rate = (ganadores / total_trades) * 100 if total_trades > 0 else 0
+            col1.metric("Total Trades", total_trades)
+            col2.metric("Win Rate", f"{win_rate:.1f}%")
+            col3.metric("Net PnL", f"${pnl_total:.2f}", delta=f"{pnl_total:.2f}")
+            col4.metric("Wins/Losses", f"{wins}W / {losses}L")
 
-            m1, m2, m3 = st.columns(3)
-            m1.metric("Total Trades", total_trades)
-            m2.metric("PnL Acumulado", f"$ {pnl_total:.2f}", delta=f"{pnl_total:.2f}")
-            m3.metric("Win Rate %", f"{win_rate:.1f}%")
-
+            # --- 3. GALERÍA DE GRÁFICOS (Cloudinary) ---
             st.divider()
+            st.subheader("📸 Bitácora Visual de Operaciones")
+            
+            if df_filtrado.empty:
+                st.info("No hay fotos para el rango seleccionado.")
+            else:
+                for i, row in df_filtrado.iterrows():
+                    with st.expander(f"🔍 {row['INSTRUMENTO']} - {row['FECHA']} | {row['ESTADO_RESULTADO']} | ${row['RESULTADO_DINERO']}"):
+                        c1, c2, c3 = st.columns(3)
+                        
+                        # Mostrar fotos usando los nombres de columna del mapeo de 27
+                        with c1:
+                            if row.get('IMAGEN_MAYOR') and row['IMAGEN_MAYOR'] != "N/A":
+                                st.image(row['IMAGEN_MAYOR'], caption="T. Mayor")
+                            else:
+                                st.write("Sin Análisis Mayor")
+                                
+                        with c2:
+                            if row.get('IMAGEN_MENOR') and row['IMAGEN_MENOR'] != "N/A":
+                                st.image(row['IMAGEN_MENOR'], caption="T. Menor")
+                            else:
+                                st.write("Sin Análisis Menor")
+                                
+                        with c3:
+                            if row.get('IMAGEN_ENTRADA') and row['IMAGEN_ENTRADA'] != "N/A":
+                                st.image(row['IMAGEN_ENTRADA'], caption="Entrada")
+                            else:
+                                st.write("Sin Foto Entrada")
+                        
+                        # Foto del resultado (la que se sube al cerrar)
+                        if row.get('IMAGEN_RESULTADO') and row['IMAGEN_RESULTADO'] != "N/A":
+                            st.image(row['IMAGEN_RESULTADO'], caption="Resultado Final", use_column_width=True)
+                        
+                        st.info(f"**Observaciones:** {row.get('OBSERVACIONES', 'Sin notas')}")
 
-            # 4. Gráficas Profesionales
-            col_g1, col_g2 = st.columns(2)
+            # --- 4. EXPORTACIÓN ---
+            st.divider()
+            if st.button("📄 Generar Reporte PDF"):
+                st.warning("Función de PDF en desarrollo: Aquí se integrará la librería FPDF.")
 
-            with col_g1:
-                st.subheader("🎯 Efectividad por Estado")
-                fig_pie = px.pie(df, names='ESTADO_RESULTADO', hole=0.4, 
-                                 color_discrete_sequence=px.colors.qualitative.Pastel)
-                st.plotly_chart(fig_pie, use_container_width=True)
-
-            with col_g2:
-                st.subheader("📈 Crecimiento de Capital")
-                df_sorted = df.sort_values("FECHA_DT")
-                df_sorted["EQUITY_CURVE"] = df_sorted["RESULTADO_DINERO"].cumsum()
-                fig_line = px.line(df_sorted, x="FECHA_DT", y="EQUITY_CURVE", 
-                                   markers=True, title="Curva de Equidad")
-                st.plotly_chart(fig_line, use_container_width=True)
-
-            # 5. Análisis por Instrumento
-            st.subheader("🔍 Rendimiento por Activo")
-            fig_bar = px.bar(df.groupby("INSTRUMENTO")["RESULTADO_DINERO"].sum().reset_index(), 
-                             x="INSTRUMENTO", y="RESULTADO_DINERO", color="RESULTADO_DINERO",
-                             title="Ganancia/Pérdida por Símbolo")
-            st.plotly_chart(fig_bar, use_container_width=True)
-
-        except Exception as e:
-            st.error(f"Error al generar reportes: {e}")
-            st.info("Asegúrate de que las columnas en Google Sheets coincidan con: ID_USUARIO, RESULTADO_DINERO, FECHA, ESTADO_RESULTADO")
+    except Exception as e:
+        st.error(f"Error al cargar la sección de reportes: {e}")
+        st.info("Revisa que los nombres de las columnas en Sheets sean exactos (IMAGEN_MAYOR, RESULTADO_DINERO, etc.)")
 
 # --- SECCION 12: FORUM (OPCIONAL) ---
     elif menu == "💬 Forum":
