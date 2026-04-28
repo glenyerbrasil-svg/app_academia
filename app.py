@@ -691,149 +691,122 @@ def main_app():
             st.error(f"Error de conexión: {e}")
 
 # =========================================================
-    # # SECCION 11: REPORTES MASTER RECARGADO (CORREGIDO)
-    # =========================================================
-    elif menu == "📊 Reportes":
-        import plotly.express as px
-        from fpdf import FPDF
-        import base64
-        from datetime import datetime
+# SECCION 11: REPORTES Y AUDITORÍA VISUAL (MODIFICADA)
+# =========================================================
+elif menu == "📊 Reportes":
+    st.header("📊 Análisis de Rendimiento Profesional")
 
-        st.header("📊 Centro de Mando: Análisis de Trading")
-
-        try:
-            # 1. Conexión y carga de datos
-            hoja_b = doc.worksheet("Bitacora")
-            data = hoja_b.get_all_records()
-            df = pd.DataFrame(data)
-            df.columns = df.columns.str.strip().str.upper()
-            
-            # Filtro por usuario
-            df = df[df["ID_USUARIO"].astype(str) == str(user["ID_USUARIO"])]
-            
-            if df.empty:
-                st.info("Socio, aún no hay datos registrados para generar reportes.")
-                st.stop()
-
-            # Limpieza de datos numéricos y fechas
-            def to_num(x):
-                try:
-                    if x == "" or x is None: return 0.0
-                    return float(str(x).replace(',', '.'))
-                except: return 0.0
-
-            df["RESULTADO_DINERO"] = df["RESULTADO_DINERO"].apply(to_num)
-            df["FECHA_DT"] = pd.to_datetime(df["FECHA"])
-
-        except Exception as e:
-            st.error(f"❌ Error al cargar motor de reportes: {e}")
+    try:
+        # 1. Obtener datos actualizados
+        data = hoja_operaciones.get_all_records()
+        if not data:
+            st.warning("No hay datos suficientes para generar reportes.")
             st.stop()
-
-        # --- FUNCIÓN GENERADORA DE PDF (DENTRO DE LA SECCIÓN) ---
-        def generar_pdf(dataframe):
-            try:
-                pdf = FPDF()
-                pdf.add_page()
-                pdf.set_font("Arial", "B", 16)
-                pdf.cell(190, 10, "REPORTE DE TRADING - BITACORA MASTER", ln=True, align="C")
-                pdf.ln(10)
-                
-                pdf.set_font("Arial", size=12)
-                total_pnl = dataframe["RESULTADO_DINERO"].sum()
-                tps = len(dataframe[dataframe["ESTADO_RESULTADO"] == "TP"])
-                wr = (tps / len(dataframe)) * 100 if len(dataframe) > 0 else 0
-                
-                pdf.cell(190, 8, f"Total Trades: {len(dataframe)}", ln=True)
-                pdf.cell(190, 8, f"PnL Acumulado: $ {total_pnl:.2f}", ln=True)
-                pdf.cell(190, 8, f"Win Rate: {wr:.1f}%", ln=True)
-                pdf.ln(5)
-                
-                # Encabezado de Tabla
-                pdf.set_fill_color(200, 220, 255)
-                pdf.set_font("Arial", "B", 10)
-                pdf.cell(30, 10, "FECHA", 1, 0, "C", True)
-                pdf.cell(60, 10, "INSTRUMENTO", 1, 0, "C", True)
-                pdf.cell(30, 10, "ESTADO", 1, 0, "C", True)
-                pdf.cell(40, 10, "RESULTADO", 1, 1, "C", True)
-                
-                pdf.set_font("Arial", size=10)
-                for _, row in dataframe.tail(15).iterrows():
-                    pdf.cell(30, 10, str(row["FECHA"]), 1)
-                    pdf.cell(60, 10, str(row["INSTRUMENTO"]), 1)
-                    pdf.cell(30, 10, str(row["ESTADO_RESULTADO"]), 1)
-                    pdf.cell(40, 10, f"$ {row['RESULTADO_DINERO']}", 1, 1)
-                
-                return pdf.output(dest="S").encode("latin-1")
-            except:
-                return None
-
-        # --- BOTÓN DE DESCARGA PDF ---
-        col_pdf, _ = st.columns([1, 2])
-        with col_pdf:
-            pdf_data = generar_pdf(df)
-            if pdf_data:
-                st.download_button(
-                    label="📥 Descargar Reporte PDF",
-                    data=pdf_data,
-                    file_name=f"Reporte_{datetime.now().strftime('%d_%m_%Y')}.pdf",
-                    mime="application/pdf",
-                    use_container_width=True
-                )
-
-        st.divider()
-
-        # --- 2. MÉTRICAS DASHBOARD ---
-        m1, m2, m3, m4 = st.columns(4)
-        tps_count = len(df[df["ESTADO_RESULTADO"] == "TP"])
-        win_rate_val = (tps_count / len(df) * 100) if len(df) > 0 else 0
+            
+        df = pd.DataFrame(data)
         
-        m1.metric("Trades", len(df))
-        m2.metric("Win Rate", f"{win_rate_val:.1f}%")
-        m3.metric("PnL Total", f"${df['RESULTADO_DINERO'].sum():.2f}")
-        m4.metric("BE", len(df[df["ESTADO_RESULTADO"] == "BE"]))
+        # 2. Preparación de datos (Fechas y Dinero)
+        df['FECHA_DT'] = pd.to_datetime(df['FECHA'], dayfirst=True, errors='coerce')
+        df['RESULTADO_DINERO'] = pd.to_numeric(df['RESULTADO_DINERO'], errors='coerce').fillna(0)
+        df = df.dropna(subset=['FECHA_DT'])
 
-        # --- 3. GRÁFICAS ---
-        g1, g2 = st.columns(2)
+        # --- FILTROS DE RANGO ---
+        with st.sidebar:
+            st.subheader("📅 Filtros de Auditoría")
+            f_inicio = st.date_input("Desde", date.today() - timedelta(days=30))
+            f_fin = st.date_input("Hasta", date.today())
+            
+            activos = ["Todos"] + sorted(df['INSTRUMENTO'].unique().tolist())
+            filtro_activo = st.selectbox("Activo Específico", activos)
 
-        with g1:
-            st.subheader("🎯 Resultados")
-            conteo = df["ESTADO_RESULTADO"].value_counts().reset_index()
-            conteo.columns = ["Estado", "Cant"]
-            fig_bar = px.bar(conteo, x="Estado", y="Cant", color="Estado",
-                             color_discrete_map={"TP": "#00FF00", "SL": "#FF4B4B", "BE": "#FFA500"},
-                             template="plotly_dark", text_auto=True)
-            st.plotly_chart(fig_bar, use_container_width=True)
+        # Aplicar filtros
+        mask = (df['FECHA_DT'].dt.date >= f_inicio) & (df['FECHA_DT'].dt.date <= f_fin)
+        if filtro_activo != "Todos":
+            mask = mask & (df['INSTRUMENTO'] == filtro_activo)
+        
+        df_filtrado = df.loc[mask].sort_values("FECHA_DT")
 
-        with g2:
-            st.subheader("📈 Rendimiento")
-            rend = df.groupby('FECHA_DT')['RESULTADO_DINERO'].sum().reset_index()
-            fig_line = px.line(rend, x="FECHA_DT", y="RESULTADO_DINERO", markers=True, template="plotly_dark")
-            fig_line.add_hline(y=0, line_dash="dash", line_color="white")
-            st.plotly_chart(fig_line, use_container_width=True)
-
-        st.divider()
-
-        # --- 4. VISOR DE EVIDENCIAS ---
-        st.subheader("🔍 Auditoría de Trades")
-        filtro_f = st.date_input("Fecha a revisar", value=date.today())
-        df_hoy = df[df["FECHA"].astype(str) == str(filtro_f)]
-
-        if df_hoy.empty:
-            st.warning("No hay trades en esta fecha.")
+        if df_filtrado.empty:
+            st.info("No se encontraron trades en este rango de fechas.")
         else:
-            for i, r in df_hoy.iterrows():
-                emo = "🟢" if r["ESTADO_RESULTADO"] == "TP" else "🔴" if r["ESTADO_RESULTADO"] == "SL" else "🟡"
-                with st.expander(f"{emo} {r['INSTRUMENTO']} | {r['HORA_ENTRADA']} | PnL: ${r['RESULTADO_DINERO']}"):
-                    c1, c2, c3, c4 = st.columns(4)
-                    cols_img = [('IMAGEN_MAYOR', c1), ('IMAGEN_MENOR', c2), ('IMAGEN_EJECUCION', c3), ('IMAGEN_RESULTADO', c4)]
+            # --- 3. MÉTRICAS CLAVE (KPIs) ---
+            total_t = len(df_filtrado)
+            wins = len(df_filtrado[df_filtrado['ESTADO_RESULTADO'] == 'TP'])
+            wr = (wins / total_t * 100) if total_t > 0 else 0
+            pnl_total = df_filtrado['RESULTADO_DINERO'].sum()
+
+            c1, c2, c3, c4 = st.columns(4)
+            c1.metric("Total Trades", total_t)
+            c2.metric("Win Rate", f"{wr:.1f}%")
+            c3.metric("PnL Total", f"${pnl_total:.2f}", delta=f"{pnl_total:.2f}")
+            c4.metric("Wins/Losses", f"{wins}W / {len(df_filtrado)-wins}L")
+
+            # --- 4. GRÁFICOS DE RENDIMIENTO (PLOTLY) ---
+            col_g1, col_g2 = st.columns(2)
+            
+            with col_g1:
+                st.subheader("📈 Curva de Equidad")
+                df_filtrado["EQUITY_CURVE"] = df_filtrado["RESULTADO_DINERO"].cumsum()
+                fig_line = px.line(df_filtrado, x="FECHA_DT", y="EQUITY_CURVE", 
+                                   markers=True, title="Crecimiento del Capital")
+                st.plotly_chart(fig_line, use_container_width=True)
+
+            with col_g2:
+                st.subheader("🔍 PnL por Activo")
+                fig_bar = px.bar(df_filtrado.groupby("INSTRUMENTO")["RESULTADO_DINERO"].sum().reset_index(), 
+                                 x="INSTRUMENTO", y="RESULTADO_DINERO", color="RESULTADO_DINERO",
+                                 title="Ganancia por Símbolo")
+                st.plotly_chart(fig_bar, use_container_width=True)
+
+            st.divider()
+
+            # --- 5. AUDITORÍA VISUAL (GALERÍA DE CLOUDINARY) ---
+            st.subheader("📸 Auditoría de Evidencias (Cloudinary)")
+            
+            for i, r in df_filtrado.iterrows():
+                # Icono según resultado
+                status_icon = "🟢" if r['ESTADO_RESULTADO'] == "TP" else "🔴" if r['ESTADO_RESULTADO'] == "SL" else "🟡"
+                
+                with st.expander(f"{status_icon} {r['INSTRUMENTO']} | {r['FECHA']} | Bala: ${r['BALA']} | PnL: ${r['RESULTADO_DINERO']}"):
+                    tab1, tab2, tab3, tab4 = st.tabs(["T. Mayor", "T. Menor", "Entrada", "Resultado Final"])
                     
-                    for col_name, col_st in cols_img:
-                        with col_st:
-                            url = r.get(col_name, "N/A")
-                            if "http" in str(url): st.image(url, use_container_width=True)
-                            else: st.write("🚫")
+                    with tab1:
+                        if "http" in str(r.get('IMAGEN_MAYOR', '')):
+                            st.image(r['IMAGEN_MAYOR'], caption="Análisis Temporalidad Mayor")
+                        else: st.write("No hay captura cargada.")
+                        
+                    with tab2:
+                        if "http" in str(r.get('IMAGEN_MENOR', '')):
+                            st.image(r['IMAGEN_MENOR'], caption="Análisis Temporalidad Menor")
+                        else: st.write("No hay captura cargada.")
+                        
+                    with tab3:
+                        if "http" in str(r.get('IMAGEN_EJECUCION', '')):
+                            st.image(r['IMAGEN_EJECUCION'], caption="Punto de Entrada")
+                        else: st.write("No hay captura cargada.")
+                        
+                    with tab4:
+                        if "http" in str(r.get('IMAGEN_RESULTADO', '')):
+                            st.image(r['IMAGEN_RESULTADO'], caption="Captura del Cierre")
+                        else: st.write("Pendiente de cierre.")
                     
-                    st.write(f"**Notas:** {r.get('OBSERVACIONES', 'S/N')}")
+                    st.markdown(f"**Observaciones:** {r.get('OBSERVACIONES', 'Sin notas')}")
+                    st.markdown(f"**Estado Emocional:** {r.get('ESTADO_EMOCIONAL', 'N/A')}")
+
+            # --- 6. EXPORTACIÓN ---
+            if st.button("📄 Generar Reporte PDF"):
+                st.info("Generando archivo con tus estadísticas... (Requiere librería FPDF)")
+
+    except Exception as e:
+        st.error(f"Error al generar reportes: {e}")
+
+# =========================================================
+# SECCION 12: FORUM
+# =========================================================
+
+    elif menu == "💬 Forum":
+        st.header("💬 Forum de la Academia")
+        st.write("Próximamente: Espacio para compartir trades y análisis con otros socios.")
 
 # =========================================================
 # # CONTROL DE FLUJO
