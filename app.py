@@ -690,134 +690,77 @@ def main_app():
         except Exception as e:
             st.error(f"Error de conexión: {e}")
 
-# =========================================================
-    # # SECCION 11: REPORTES MASTER RECARGADO (VISUAL & EVIDENCIA)
-    # =========================================================
-    elif menu == "📊 Reportes":
+# --- SECCION 11: REPORTES (EL MOTOR DE TUS ESTADÍSTICAS) ---
+    elif menu == "📈 Reportes":
         import plotly.express as px
-        st.header("📊 Centro de Mando: Análisis de Trading")
+        st.header("📈 Análisis de Rendimiento Master")
 
         try:
-            # Conexión y limpieza de datos
+            # 1. Cargar datos de Bitácora
             hoja_b = doc.worksheet("Bitacora")
             data = hoja_b.get_all_records()
             df = pd.DataFrame(data)
+            
+            # Limpiar nombres de columnas (quitar espacios y poner mayúsculas)
             df.columns = df.columns.str.strip().str.upper()
             
-            # Filtro por tu ID de usuario
+            # Filtrar solo los datos del usuario actual
             df = df[df["ID_USUARIO"].astype(str) == str(user["ID_USUARIO"])]
-            
+
             if df.empty:
-                st.info("Socio, aún no hay datos registrados para generar reportes. ¡A darle al mercado!")
+                st.warning("Socio, aún no tienes trades registrados para analizar.")
                 st.stop()
 
-            # Asegurar que los números sean operativos
-            def to_num(x):
-                try: return float(str(x).replace(',', '.')) if x != "" else 0.0
-                except: return 0.0
-
-            df["RESULTADO_DINERO"] = df["RESULTADO_DINERO"].apply(to_num)
+            # 2. Conversión de datos para gráficas
+            # Aseguramos que el dinero sea número (cambia coma por punto si es necesario)
+            df["RESULTADO_DINERO"] = df["RESULTADO_DINERO"].apply(lambda x: float(str(x).replace(',', '.')) if str(x).strip() != "" else 0.0)
             df["FECHA_DT"] = pd.to_datetime(df["FECHA"])
 
-        except Exception as e:
-            st.error(f"Error cargando el motor de reportes: {e}"); st.stop()
+            # 3. Métricas Rápidas (KPIs)
+            pnl_total = df["RESULTADO_DINERO"].sum()
+            total_trades = len(df)
+            ganadores = len(df[df["RESULTADO_DINERO"] > 0])
+            win_rate = (ganadores / total_trades) * 100 if total_trades > 0 else 0
 
-        # --- 1. MÉTRICAS CLAVE (EL DASHBOARD) ---
-        col1, col2, col3, col4 = st.columns(4)
-        
-        total_t = len(df)
-        tps = len(df[df["ESTADO_RESULTADO"] == "TP"])
-        sls = len(df[df["ESTADO_RESULTADO"] == "SL"])
-        bes = len(df[df["ESTADO_RESULTADO"] == "BE"])
-        win_rate = (tps / total_t * 100) if total_t > 0 else 0
-        pnl_acumulado = df["RESULTADO_DINERO"].sum()
+            m1, m2, m3 = st.columns(3)
+            m1.metric("Total Trades", total_trades)
+            m2.metric("PnL Acumulado", f"$ {pnl_total:.2f}", delta=f"{pnl_total:.2f}")
+            m3.metric("Win Rate %", f"{win_rate:.1f}%")
 
-        col1.metric("Trades Totales", total_t)
-        col2.metric("Win Rate %", f"{win_rate:.1f}%", delta=f"{tps} Ganadores")
-        col3.metric("PnL Acumulado", f"${pnl_acumulado:.2f}")
-        col4.metric("BE / Neutral", bes)
+            st.divider()
 
-        st.divider()
+            # 4. Gráficas Profesionales
+            col_g1, col_g2 = st.columns(2)
 
-        # --- 2. GRÁFICA DE BARRAS (TP vs SL vs BE) ---
-        col_g1, col_g2 = st.columns([1, 1])
+            with col_g1:
+                st.subheader("🎯 Efectividad por Estado")
+                fig_pie = px.pie(df, names='ESTADO_RESULTADO', hole=0.4, 
+                                 color_discrete_sequence=px.colors.qualitative.Pastel)
+                st.plotly_chart(fig_pie, use_container_width=True)
 
-        with col_g1:
-            st.subheader("🎯 Distribución de Resultados")
-            conteo = df["ESTADO_RESULTADO"].value_counts().reset_index()
-            conteo.columns = ["Estado", "Cantidad"]
-            
-            fig_bar = px.bar(
-                conteo, x="Estado", y="Cantidad", color="Estado",
-                color_discrete_map={"TP": "#00FF00", "SL": "#FF4B4B", "BE": "#FFA500", "PENDIENTE": "#808080"},
-                text_auto=True, template="plotly_dark"
-            )
+            with col_g2:
+                st.subheader("📈 Crecimiento de Capital")
+                df_sorted = df.sort_values("FECHA_DT")
+                df_sorted["EQUITY_CURVE"] = df_sorted["RESULTADO_DINERO"].cumsum()
+                fig_line = px.line(df_sorted, x="FECHA_DT", y="EQUITY_CURVE", 
+                                   markers=True, title="Curva de Equidad")
+                st.plotly_chart(fig_line, use_container_width=True)
+
+            # 5. Análisis por Instrumento
+            st.subheader("🔍 Rendimiento por Activo")
+            fig_bar = px.bar(df.groupby("INSTRUMENTO")["RESULTADO_DINERO"].sum().reset_index(), 
+                             x="INSTRUMENTO", y="RESULTADO_DINERO", color="RESULTADO_DINERO",
+                             title="Ganancia/Pérdida por Símbolo")
             st.plotly_chart(fig_bar, use_container_width=True)
 
-        # --- 3. GRÁFICA LINEAL (RENDIMIENTO DIARIO) ---
-        with col_g2:
-            st.subheader("📈 Curva de Rendimiento")
-            rendimiento = df.groupby('FECHA_DT')['RESULTADO_DINERO'].sum().reset_index().sort_values('FECHA_DT')
-            
-            fig_line = px.line(
-                rendimiento, x="FECHA_DT", y="RESULTADO_DINERO",
-                markers=True, template="plotly_dark",
-                labels={"FECHA_DT": "Fecha", "RESULTADO_DINERO": "PnL Diario ($)"}
-            )
-            fig_line.add_hline(y=0, line_dash="dash", line_color="white", opacity=0.5)
-            fig_line.update_traces(line_color='#00BFFF', line_width=3)
-            st.plotly_chart(fig_line, use_container_width=True)
+        except Exception as e:
+            st.error(f"Error al generar reportes: {e}")
+            st.info("Asegúrate de que las columnas en Google Sheets coincidan con: ID_USUARIO, RESULTADO_DINERO, FECHA, ESTADO_RESULTADO")
 
-        # Resumen del mejor día
-        if not rendimiento.empty:
-            mejor_fila = rendimiento.loc[rendimiento['RESULTADO_DINERO'].idxmax()]
-            st.success(f"💎 **Récord del Mes:** El día {mejor_fila['FECHA_DT'].strftime('%d/%m')} ganaste **${mejor_fila['RESULTADO_DINERO']:.2f}**")
-
-        st.divider()
-
-        # --- 4. AUDITORÍA DE EVIDENCIAS (VISOR DE FOTOS) ---
-        st.subheader("🔍 Auditoría Visual de Trades")
-        
-        filtro_fecha = st.date_input("Filtrar historial por fecha", value=date.today())
-        df_dia = df[df["FECHA"].astype(str) == str(filtro_fecha)]
-
-        if df_dia.empty:
-            st.warning("No hay trades para mostrar en esta fecha, socio.")
-        else:
-            for i, row in df_dia.iterrows():
-                # Título con color según resultado
-                status_color = "🟢" if row["ESTADO_RESULTADO"] == "TP" else "🔴" if row["ESTADO_RESULTADO"] == "SL" else "🟡"
-                
-                with st.expander(f"{status_color} {row['INSTRUMENTO']} | {row['HORA_ENTRADA']} | PnL: ${row['RESULTADO_DINERO']} | Lote: {row['LOTAJE']}"):
-                    # Layout de 4 columnas para las imágenes de Cloudinary
-                    c1, c2, c3, c4 = st.columns(4)
-                    
-                    with c1:
-                        st.caption("🖼️ Temp. Mayor")
-                        url_m = row.get('IMAGEN_MAYOR', 'N/A')
-                        if "http" in str(url_m): st.image(url_m, use_container_width=True)
-                        else: st.write("🚫")
-
-                    with c2:
-                        st.caption("🖼️ Temp. Menor")
-                        url_mn = row.get('IMAGEN_MENOR', 'N/A')
-                        if "http" in str(url_mn): st.image(url_mn, use_container_width=True)
-                        else: st.write("🚫")
-
-                    with c3:
-                        st.caption("🖼️ Ejecución")
-                        url_e = row.get('IMAGEN_EJECUCION', 'N/A')
-                        if "http" in str(url_e): st.image(url_e, use_container_width=True)
-                        else: st.write("🚫")
-
-                    with c4:
-                        st.caption("🏆 Resultado")
-                        url_r = row.get('IMAGEN_RESULTADO', 'N/A')
-                        if "http" in str(url_r): st.image(url_r, use_container_width=True)
-                        else: st.write("🚫")
-                    
-                    st.info(f"**📝 Notas:** {row.get('OBSERVACIONES', 'Sin notas')}")
-                    st.write(f"**🧠 Estado Emocional:** {row.get('ESTADO_EMOCIONAL', 'N/A')}")
+# --- SECCION 12: FORUM (OPCIONAL) ---
+    elif menu == "💬 Forum":
+        st.header("💬 Comunidad de Traders")
+        st.info("Próximamente: Comparte tus señales y análisis con otros socios.")
 
 # =========================================================
 # # CONTROL DE FLUJO
