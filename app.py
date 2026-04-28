@@ -515,7 +515,7 @@ def main_app():
                     except Exception as e:
                         st.error(f"❌ Error crítico: {e}")
 # =========================================================
-    # # SECCIÓN 8: CIERRE DE CICLO (CON CÁMARA INTEGRADA - 100%)
+    # # SECCIÓN 8: CIERRE DE CICLO (CON CLOUDINARY - 100%)
     # =========================================================
     elif menu == "✏️ Editar":
         from datetime import datetime
@@ -548,7 +548,7 @@ def main_app():
         if df_filtrado.empty:
             st.info("No hay trades abiertos para hoy, socio."); st.stop()
 
-        # Selector inteligente (con ID y Hora)
+        # Selector inteligente
         opciones = []
         for i, r in df_filtrado.iterrows():
             label = f"📝 Fila {i+2} | ID: {r.get('ID_BITACORA')} | {r.get('INSTRUMENTO')} | 🕒 {r.get('HORA_ENTRADA')} | 💰 ${r.get('VALOR_BALA')}"
@@ -560,21 +560,18 @@ def main_app():
             f_idx, d = sel[1], sel[2]
             st.divider()
 
-            # Función de limpieza blindada para números
             def clean(val):
                 try:
                     if val is None or str(val).strip() in ["", "None", "nan"]: return 0.0
                     return float(str(val).replace(',', '.'))
                 except: return 0.0
 
-            # Recuperación de datos técnicos (con tu lógica detective de lotaje)
             p_ent = clean(d.get('PRECIO_ENT'))
             p_tp = clean(d.get('PRECIO_TP'))
             bala = clean(d.get('VALOR_BALA'))
             lotaje = clean(d.get('LOTAJEMARGEN'))
-            if lotaje == 0.0: lotaje = clean(d.get('LOTAJE')) # Respaldo por si acaso
+            if lotaje == 0.0: lotaje = clean(d.get('LOTAJE'))
 
-            # Sección de cálculo dinámico (fuera del form para velocidad)
             col_c1, col_c2 = st.columns(2)
             nuevo_estado = col_c1.selectbox("Estado Final", ["PENDIENTE", "TP", "SL", "BE"], 
                                           index=["PENDIENTE", "TP", "SL", "BE"].index(d.get('ESTADO_RESULTADO', 'PENDIENTE')))
@@ -590,62 +587,65 @@ def main_app():
 
             monto_final_usuario = col_c2.number_input("Monto Final ($)", value=float(st.session_state.monto_operacion), format="%.2f")
 
-            # --- FORMULARIO FINAL CON INTEGRACIÓN DE CÁMARA ---
             with st.form(key=f"form_cierre_cam_{f_idx}"):
-                # Cuadro de info matemática blindada
-                st.info(f"📊 **Matemáticas Funcionando:** Entrada {p_ent} | TP {p_tp} | Lotaje {lotaje}")
-                
+                st.info(f"📊 **Matemáticas:** Entrada {p_ent} | TP {p_tp} | Lotaje {lotaje}")
                 st.divider()
                 st.write("🖼️ **Evidencia Final (Cámara o Archivo)**")
                 
-                # --- NUEVA LÓGICA DE CAPTURA ---
-                # Vía 1: Camera Input
-                foto_camara = st.camera_input("📷 Tomar foto del gráfico con celular", key=f"cam_{f_idx}")
+                foto_camara = st.camera_input("📷 Tomar foto con celular", key=f"cam_{f_idx}")
+                foto_archivo = st.file_uploader("📂 O subir archivo", type=['png', 'jpg', 'jpeg'], key=f"file_{f_idx}")
                 
-                # Vía 2: File Uploader (como respaldo)
-                foto_archivo = st.file_uploader("📂 O subir archivo existente", type=['png', 'jpg', 'jpeg'], key=f"file_{f_idx}")
+                # Decidimos cuál imagen usar
+                imagen_final = foto_camara if foto_camara else foto_archivo
                 
-                # Decidimos cuál imagen usar (prioridad a la cámara)
-                imagen_final_a_guardar = None
-                nombre_imagen_hoja = "N/A"
-                
-                if foto_camara:
-                    imagen_final_a_guardar = foto_camara
-                    nombre_imagen_hoja = f"foto_cam_{d.get('ID_BITACORA')}_{datetime.now().strftime('%H%M%S')}.png"
-                elif foto_archivo:
-                    imagen_final_a_guardar = foto_archivo
-                    nombre_imagen_hoja = foto_archivo.name
-                
-                # Mostramos previsualización si hay captura de cámara
-                if foto_camara:
-                    st.image(foto_camara, caption="Foto capturada lista para guardar", width=300)
-
                 obs = st.text_area("Observaciones Finales", value=str(d.get('OBSERVACIONES', '')))
                 
-                # Botón maestro de guardado
                 if st.form_submit_button("💾 ACTUALIZAR Y CERRAR CICLO", use_container_width=True):
-                    with st.spinner("Sincronizando evidencia en la nube..."):
-                        # 1. Actualización física en Sheets (Columnas: U=21, V=22, Z=26, Y=25)
-                        # Nota: IMAGEN_RESULTADO es la 25 contando desde A=1
-                        hoja_b.update_cell(f_idx, 21, nuevo_estado)
-                        hoja_b.update_cell(f_idx, 22, float(monto_final_usuario))
-                        hoja_b.update_cell(f_idx, 26, obs)
-                        if imagen_final_a_guardar:
-                            hoja_b.update_cell(f_idx, 25, nombre_imagen_hoja)
-                        
-                        # 2. Registro en Finanzas si cierra ciclo
-                        if d.get('ESTADO_RESULTADO') == "PENDIENTE" and nuevo_estado != "PENDIENTE":
-                            hoja_f.append_row([
-                                len(hoja_f.get_all_values()), str(date.today()), user["ID_USUARIO"],
-                                f"CIERRE {d.get('INSTRUMENTO')} (FOTO)", float(saldo_actual), 
-                                monto_final_usuario if monto_final_usuario > 0 else 0, 
-                                abs(monto_final_usuario) if monto_final_usuario < 0 else 0, 
-                                float(saldo_actual + monto_final_usuario), "APP"
-                            ])
-                        
-                        st.success("✅ Trade actualizado y evidencia guardada socio.")
-                        time.sleep(1.5)
-                        st.rerun()
+                    with st.spinner("🚀 Subiendo evidencia a Cloudinary y actualizando Sheets..."):
+                        try:
+                            import cloudinary
+                            import cloudinary.uploader
+
+                            # Configuración
+                            cloudinary.config(
+                                cloud_name = "dqur2fztq", 
+                                api_key = "694985462176285", 
+                                api_secret = "8iJE0G6CM6qE0zu9IKPsjzP6BNU"
+                            )
+
+                            url_resultado = d.get('IMAGEN_RESULTADO', 'N/A')
+
+                            # Si el usuario puso una foto nueva, la subimos
+                            if imagen_final:
+                                res = cloudinary.uploader.upload(
+                                    imagen_final, 
+                                    folder = "bitacora_trading",
+                                    public_id = f"RES_{d.get('INSTRUMENTO')}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+                                )
+                                url_resultado = res['secure_url']
+
+                            # 1. Actualización en Sheets (U=21, V=22, Y=25, Z=26)
+                            hoja_b.update_cell(f_idx, 21, nuevo_estado)
+                            hoja_b.update_cell(f_idx, 22, float(monto_final_usuario))
+                            hoja_b.update_cell(f_idx, 25, url_resultado) # Link de Cloudinary
+                            hoja_b.update_cell(f_idx, 26, obs)
+                            
+                            # 2. Registro en Finanzas si cierra ciclo
+                            if d.get('ESTADO_RESULTADO') == "PENDIENTE" and nuevo_estado != "PENDIENTE":
+                                hoja_f.append_row([
+                                    len(hoja_f.get_all_values()), str(date.today()), user["ID_USUARIO"],
+                                    f"CIERRE {d.get('INSTRUMENTO')}", float(saldo_actual), 
+                                    monto_final_usuario if monto_final_usuario > 0 else 0, 
+                                    abs(monto_final_usuario) if monto_final_usuario < 0 else 0, 
+                                    float(saldo_actual + monto_final_usuario), "APP"
+                                ])
+                            
+                            st.success("✅ Trade actualizado y link guardado en columna 25 socio.")
+                            time.sleep(1.5)
+                            st.rerun()
+
+                        except Exception as e:
+                            st.error(f"❌ Error al subir a Cloudinary: {e}")
 
     # # SECCION 9: BACKTESTING
     elif menu == "📊 Backtesting":
