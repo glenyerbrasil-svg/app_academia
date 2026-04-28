@@ -691,114 +691,124 @@ def main_app():
             st.error(f"Error de conexión: {e}")
 
 # =========================================================
-# SECCION 11: REPORTES Y AUDITORÍA VISUAL (MODIFICADA)
+# SECCION 11: REPORTES Y AUDITORÍA VISUAL (PRO)
 # =========================================================
 elif menu == "📊 Reportes":
     st.header("📊 Análisis de Rendimiento Profesional")
 
     try:
-        # 1. Obtener datos actualizados
+        # 1. Obtener datos actualizados de la hoja que ya está conectada
         data = hoja_operaciones.get_all_records()
         if not data:
             st.warning("No hay datos suficientes para generar reportes.")
-            st.stop()
-            
-        df = pd.DataFrame(data)
-        
-        # 2. Preparación de datos (Fechas y Dinero)
-        df['FECHA_DT'] = pd.to_datetime(df['FECHA'], dayfirst=True, errors='coerce')
-        df['RESULTADO_DINERO'] = pd.to_numeric(df['RESULTADO_DINERO'], errors='coerce').fillna(0)
-        df = df.dropna(subset=['FECHA_DT'])
-
-        # --- FILTROS DE RANGO ---
-        with st.sidebar:
-            st.subheader("📅 Filtros de Auditoría")
-            f_inicio = st.date_input("Desde", date.today() - timedelta(days=30))
-            f_fin = st.date_input("Hasta", date.today())
-            
-            activos = ["Todos"] + sorted(df['INSTRUMENTO'].unique().tolist())
-            filtro_activo = st.selectbox("Activo Específico", activos)
-
-        # Aplicar filtros
-        mask = (df['FECHA_DT'].dt.date >= f_inicio) & (df['FECHA_DT'].dt.date <= f_fin)
-        if filtro_activo != "Todos":
-            mask = mask & (df['INSTRUMENTO'] == filtro_activo)
-        
-        df_filtrado = df.loc[mask].sort_values("FECHA_DT")
-
-        if df_filtrado.empty:
-            st.info("No se encontraron trades en este rango de fechas.")
         else:
-            # --- 3. MÉTRICAS CLAVE (KPIs) ---
-            total_t = len(df_filtrado)
-            wins = len(df_filtrado[df_filtrado['ESTADO_RESULTADO'] == 'TP'])
-            wr = (wins / total_t * 100) if total_t > 0 else 0
-            pnl_total = df_filtrado['RESULTADO_DINERO'].sum()
-
-            c1, c2, c3, c4 = st.columns(4)
-            c1.metric("Total Trades", total_t)
-            c2.metric("Win Rate", f"{wr:.1f}%")
-            c3.metric("PnL Total", f"${pnl_total:.2f}", delta=f"{pnl_total:.2f}")
-            c4.metric("Wins/Losses", f"{wins}W / {len(df_filtrado)-wins}L")
-
-            # --- 4. GRÁFICOS DE RENDIMIENTO (PLOTLY) ---
-            col_g1, col_g2 = st.columns(2)
+            df = pd.DataFrame(data)
             
-            with col_g1:
-                st.subheader("📈 Curva de Equidad")
-                df_filtrado["EQUITY_CURVE"] = df_filtrado["RESULTADO_DINERO"].cumsum()
-                fig_line = px.line(df_filtrado, x="FECHA_DT", y="EQUITY_CURVE", 
-                                   markers=True, title="Crecimiento del Capital")
-                st.plotly_chart(fig_line, use_container_width=True)
+            # Limpieza y preparación de datos para gráficos
+            df['FECHA_DT'] = pd.to_datetime(df['FECHA'], dayfirst=True, errors='coerce')
+            df['RESULTADO_DINERO'] = pd.to_numeric(df['RESULTADO_DINERO'], errors='coerce').fillna(0)
+            df = df.dropna(subset=['FECHA_DT'])
 
-            with col_g2:
-                st.subheader("🔍 PnL por Activo")
-                fig_bar = px.bar(df_filtrado.groupby("INSTRUMENTO")["RESULTADO_DINERO"].sum().reset_index(), 
-                                 x="INSTRUMENTO", y="RESULTADO_DINERO", color="RESULTADO_DINERO",
-                                 title="Ganancia por Símbolo")
-                st.plotly_chart(fig_bar, use_container_width=True)
-
-            st.divider()
-
-            # --- 5. AUDITORÍA VISUAL (GALERÍA DE CLOUDINARY) ---
-            st.subheader("📸 Auditoría de Evidencias (Cloudinary)")
-            
-            for i, r in df_filtrado.iterrows():
-                # Icono según resultado
-                status_icon = "🟢" if r['ESTADO_RESULTADO'] == "TP" else "🔴" if r['ESTADO_RESULTADO'] == "SL" else "🟡"
+            # --- FILTROS DE RANGO EN SIDEBAR ---
+            with st.sidebar:
+                st.subheader("📅 Filtros de Auditoría")
+                f_inicio = st.date_input("Desde", date.today() - timedelta(days=30))
+                f_fin = st.date_input("Hasta", date.today())
                 
-                with st.expander(f"{status_icon} {r['INSTRUMENTO']} | {r['FECHA']} | Bala: ${r['BALA']} | PnL: ${r['RESULTADO_DINERO']}"):
-                    tab1, tab2, tab3, tab4 = st.tabs(["T. Mayor", "T. Menor", "Entrada", "Resultado Final"])
-                    
-                    with tab1:
-                        if "http" in str(r.get('IMAGEN_MAYOR', '')):
-                            st.image(r['IMAGEN_MAYOR'], caption="Análisis Temporalidad Mayor")
-                        else: st.write("No hay captura cargada.")
-                        
-                    with tab2:
-                        if "http" in str(r.get('IMAGEN_MENOR', '')):
-                            st.image(r['IMAGEN_MENOR'], caption="Análisis Temporalidad Menor")
-                        else: st.write("No hay captura cargada.")
-                        
-                    with tab3:
-                        if "http" in str(r.get('IMAGEN_EJECUCION', '')):
-                            st.image(r['IMAGEN_EJECUCION'], caption="Punto de Entrada")
-                        else: st.write("No hay captura cargada.")
-                        
-                    with tab4:
-                        if "http" in str(r.get('IMAGEN_RESULTADO', '')):
-                            st.image(r['IMAGEN_RESULTADO'], caption="Captura del Cierre")
-                        else: st.write("Pendiente de cierre.")
-                    
-                    st.markdown(f"**Observaciones:** {r.get('OBSERVACIONES', 'Sin notas')}")
-                    st.markdown(f"**Estado Emocional:** {r.get('ESTADO_EMOCIONAL', 'N/A')}")
+                # Filtro por Activo (FlipX, FXVOL20, etc)
+                activos = ["Todos"] + sorted(df['INSTRUMENTO'].unique().tolist())
+                filtro_activo = st.selectbox("Activo Específico", activos)
 
-            # --- 6. EXPORTACIÓN ---
-            if st.button("📄 Generar Reporte PDF"):
-                st.info("Generando archivo con tus estadísticas... (Requiere librería FPDF)")
+            # Aplicar filtros al DataFrame
+            mask = (df['FECHA_DT'].dt.date >= f_inicio) & (df['FECHA_DT'].dt.date <= f_fin)
+            if filtro_activo != "Todos":
+                mask = mask & (df['INSTRUMENTO'] == filtro_activo)
+            
+            df_filtrado = df.loc[mask].sort_values("FECHA_DT")
+
+            if df_filtrado.empty:
+                st.info("No se encontraron trades en este rango de fechas con los filtros aplicados.")
+            else:
+                # --- 2. MÉTRICAS CLAVE (KPIs) ---
+                total_t = len(df_filtrado)
+                wins = len(df_filtrado[df_filtrado['ESTADO_RESULTADO'] == 'TP'])
+                losses = len(df_filtrado[df_filtrado['ESTADO_RESULTADO'] == 'SL'])
+                wr = (wins / total_t * 100) if total_t > 0 else 0
+                pnl_total = df_filtrado['RESULTADO_DINERO'].sum()
+
+                col1, col2, col3, col4 = st.columns(4)
+                col1.metric("Total Trades", total_t)
+                col2.metric("Win Rate", f"{wr:.1f}%")
+                col3.metric("PnL Total", f"${pnl_total:.2f}", delta=f"${pnl_total:.2f}")
+                col4.metric("Wins/Losses", f"{wins}W / {losses}L")
+
+                st.divider()
+
+                # --- 3. GRÁFICOS DE RENDIMIENTO (PLOTLY) ---
+                col_g1, col_g2 = st.columns(2)
+                
+                with col_g1:
+                    st.subheader("📈 Curva de Equidad")
+                    df_filtrado["EQUITY_CURVE"] = df_filtrado["RESULTADO_DINERO"].cumsum()
+                    fig_line = px.line(df_filtrado, x="FECHA_DT", y="EQUITY_CURVE", 
+                                       markers=True, title="Crecimiento del Capital")
+                    st.plotly_chart(fig_line, use_container_width=True)
+
+                with col_g2:
+                    st.subheader("🔍 PnL por Activo")
+                    pnl_por_activo = df_filtrado.groupby("INSTRUMENTO")["RESULTADO_DINERO"].sum().reset_index()
+                    fig_bar = px.bar(pnl_por_activo, x="INSTRUMENTO", y="RESULTADO_DINERO", 
+                                     color="RESULTADO_DINERO", title="Ganancia por Símbolo",
+                                     color_continuous_scale='RdYlGn')
+                    st.plotly_chart(fig_bar, use_container_width=True)
+
+                st.divider()
+
+                # --- 4. AUDITORÍA VISUAL (GALERÍA DE CLOUDINARY) ---
+                st.subheader("📸 Auditoría de Evidencias (Cloudinary)")
+                st.write("Revisa tus capturas de pantalla para analizar tus entradas.")
+                
+                # Mostramos los trades del más reciente al más antiguo
+                for i, r in df_filtrado.iloc[::-1].iterrows():
+                    # Icono visual según el resultado
+                    status_icon = "🟢" if r['ESTADO_RESULTADO'] == "TP" else "🔴" if r['ESTADO_RESULTADO'] == "SL" else "🟡"
+                    
+                    with st.expander(f"{status_icon} {r['INSTRUMENTO']} | {r['FECHA']} | Bala: ${r['BALA']} | PnL: ${r['RESULTADO_DINERO']}"):
+                        # Usamos pestañas para no saturar la vista
+                        t1, t2, t3, t4 = st.tabs(["Análisis Mayor", "Análisis Menor", "Ejecución", "Resultado Final"])
+                        
+                        with t1:
+                            url = r.get('IMAGEN_MAYOR', 'N/A')
+                            if "http" in str(url): st.image(url, caption="Temporalidad Mayor")
+                            else: st.info("Sin captura de temporalidad mayor.")
+                            
+                        with t2:
+                            url = r.get('IMAGEN_MENOR', 'N/A')
+                            if "http" in str(url): st.image(url, caption="Temporalidad Menor")
+                            else: st.info("Sin captura de temporalidad menor.")
+                            
+                        with t3:
+                            url = r.get('IMAGEN_EJECUCION', 'N/A')
+                            if "http" in str(url): st.image(url, caption="Punto de Entrada")
+                            else: st.info("Sin captura de ejecución.")
+                            
+                        with t4:
+                            url = r.get('IMAGEN_RESULTADO', 'N/A')
+                            if "http" in str(url): st.image(url, caption="Resultado del Trade")
+                            else: st.info("Este trade aún no tiene captura de cierre.")
+                        
+                        st.markdown(f"**Observaciones:** {r.get('OBSERVACIONES', 'Sin notas adicionales')}")
+                        st.markdown(f"**Estado Emocional:** {r.get('ESTADO_EMOCIONAL', 'No registrado')}")
+
+                # --- 5. EXPORTACIÓN ---
+                st.divider()
+                if st.button("📄 Generar Reporte PDF"):
+                    st.info("Preparando datos para el reporte PDF... (Función en desarrollo)")
 
     except Exception as e:
-        st.error(f"Error al generar reportes: {e}")
+        st.error(f"Ocurrió un error al cargar los reportes: {e}")
+        st.info("Verifica que las columnas 'IMAGEN_MAYOR', 'IMAGEN_MENOR', 'IMAGEN_EJECUCION' e 'IMAGEN_RESULTADO' existan en tu Google Sheets.")
+
 
 # =========================================================
 # SECCION 12: FORUM
