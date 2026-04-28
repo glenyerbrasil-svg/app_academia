@@ -691,98 +691,112 @@ def main_app():
             st.error(f"Error de conexión: {e}")
 
 # =========================================================
-# SECCION 11: REPORTES Y AUDITORÍA VISUAL (SIN ERRORES)
+# SECCION 11: REPORTES Y AUDITORÍA VISUAL (BLINDADA)
 # =========================================================
 elif menu == "📊 Reportes":
     st.header("📊 Análisis de Rendimiento Profesional")
 
     try:
-        # 1. Obtener datos con validación de seguridad
+        # 1. Obtener datos de la hoja
         registros = hoja_operaciones.get_all_records()
         
         if not registros:
-            st.warning("⚠️ La base de datos está vacía o no tiene el formato correcto.")
+            st.warning("⚠️ No se encontraron registros en la hoja de cálculo.")
         else:
             df = pd.DataFrame(registros)
             
-            # 2. Conversión de datos usando TUS nombres de columna
-            # Usamos errors='coerce' para que si hay una celda vacía no se caiga la app
-            df['FECHA_DT'] = pd.to_datetime(df['FECHA'], dayfirst=True, errors='coerce')
-            df['RESULTADO_DINERO'] = pd.to_numeric(df['RESULTADO_DINERO'], errors='coerce').fillna(0)
-            df = df.dropna(subset=['FECHA_DT'])
+            # --- LIMPIEZA DE COLUMNAS (Para evitar errores de espacios o nombres mal escritos) ---
+            df.columns = [str(c).strip() for c in df.columns]
 
-            # --- FILTROS EN SIDEBAR ---
-            with st.sidebar:
-                st.subheader("📅 Filtros de Auditoría")
-                f_inicio = st.date_input("Desde", date.today() - timedelta(days=30))
-                f_fin = st.date_input("Hasta", date.today())
-                
-                activos = ["Todos"] + sorted(df['INSTRUMENTO'].unique().tolist())
-                filtro_activo = st.selectbox("Activo Específico", activos)
-
-            # Aplicar filtros
-            mask = (df['FECHA_DT'].dt.date >= f_inicio) & (df['FECHA_DT'].dt.date <= f_fin)
-            if filtro_activo != "Todos":
-                mask = mask & (df['INSTRUMENTO'] == filtro_activo)
-            
-            df_filtrado = df.loc[mask].sort_values("FECHA_DT")
-
-            if df_filtrado.empty:
-                st.info("No hay trades registrados en este rango de fechas.")
+            # 2. Validación de existencia de columnas críticas
+            if 'FECHA' not in df.columns:
+                st.error("❌ No se encontró la columna 'FECHA'.")
+                st.write("Columnas detectadas en tu Sheets:", list(df.columns))
+                st.info("Asegúrate de que la tercera columna de tu Sheets se llame exactamente FECHA.")
             else:
-                # --- 3. KPIs CON TUS DATOS ---
-                total_t = len(df_filtrado)
-                wins = len(df_filtrado[df_filtrado['ESTADO_RESULTADO'] == 'TP'])
-                wr = (wins / total_t * 100) if total_t > 0 else 0
-                pnl_total = df_filtrado['RESULTADO_DINERO'].sum()
+                # 3. Preparación de datos
+                df['FECHA_DT'] = pd.to_datetime(df['FECHA'], dayfirst=True, errors='coerce')
+                df['RESULTADO_DINERO'] = pd.to_numeric(df['RESULTADO_DINERO'], errors='coerce').fillna(0)
+                
+                # Quitar filas donde la fecha falló o está vacía
+                df = df.dropna(subset=['FECHA_DT'])
 
-                c1, c2, c3, c4 = st.columns(4)
-                c1.metric("Total Trades", total_t)
-                c2.metric("Win Rate", f"{wr:.1f}%")
-                c3.metric("PnL Total", f"${pnl_total:.2f}", delta=f"${pnl_total:.2f}")
-                c4.metric("Wins/Losses", f"{wins}W / {len(df_filtrado)-wins}L")
-
-                # --- 4. GRÁFICOS (PLOTLY) ---
-                col_g1, col_g2 = st.columns(2)
-                with col_g1:
-                    df_filtrado["EQUITY_CURVE"] = df_filtrado["RESULTADO_DINERO"].cumsum()
-                    fig_line = px.line(df_filtrado, x="FECHA_DT", y="EQUITY_CURVE", markers=True, title="Curva de Equidad")
-                    st.plotly_chart(fig_line, use_container_width=True)
-                with col_g2:
-                    pnl_act = df_filtrado.groupby("INSTRUMENTO")["RESULTADO_DINERO"].sum().reset_index()
-                    fig_bar = px.bar(pnl_act, x="INSTRUMENTO", y="RESULTADO_DINERO", color="RESULTADO_DINERO", title="PnL por Activo")
-                    st.plotly_chart(fig_bar, use_container_width=True)
-
-                st.divider()
-
-                # --- 5. AUDITORÍA VISUAL (CON TUS 27 COLUMNAS) ---
-                st.subheader("📸 Galería de Evidencias")
-                for i, r in df_filtrado.iloc[::-1].iterrows():
-                    # Icono según resultado
-                    icon = "🟢" if r['ESTADO_RESULTADO'] == "TP" else "🔴" if r['ESTADO_RESULTADO'] == "SL" else "🟡"
+                # --- FILTROS EN SIDEBAR ---
+                with st.sidebar:
+                    st.subheader("📅 Filtros de Auditoría")
+                    f_inicio = st.date_input("Desde", date.today() - timedelta(days=30))
+                    f_fin = st.date_input("Hasta", date.today())
                     
-                    with st.expander(f"{icon} {r['INSTRUMENTO']} | {r['FECHA']} | PnL: ${r['RESULTADO_DINERO']}"):
-                        t1, t2, t3, t4 = st.tabs(["T. Mayor", "T. Menor", "Ejecución", "Resultado"])
+                    activos = ["Todos"] + sorted(df['INSTRUMENTO'].unique().tolist()) if 'INSTRUMENTO' in df.columns else ["Todos"]
+                    filtro_activo = st.selectbox("Activo Específico", activos)
+
+                # Aplicar filtros al DataFrame
+                mask = (df['FECHA_DT'].dt.date >= f_inicio) & (df['FECHA_DT'].dt.date <= f_fin)
+                if filtro_activo != "Todos":
+                    mask = mask & (df['INSTRUMENTO'] == filtro_activo)
+                
+                df_filtrado = df.loc[mask].sort_values("FECHA_DT")
+
+                if df_filtrado.empty:
+                    st.info("No hay trades registrados para el rango seleccionado.")
+                else:
+                    # --- 4. MÉTRICAS CLAVE (KPIs) ---
+                    total_t = len(df_filtrado)
+                    wins = len(df_filtrado[df_filtrado['ESTADO_RESULTADO'] == 'TP']) if 'ESTADO_RESULTADO' in df.columns else 0
+                    wr = (wins / total_t * 100) if total_t > 0 else 0
+                    pnl_total = df_filtrado['RESULTADO_DINERO'].sum()
+
+                    c1, c2, c3, c4 = st.columns(4)
+                    c1.metric("Total Trades", total_t)
+                    c2.metric("Win Rate", f"{wr:.1f}%")
+                    c3.metric("PnL Total", f"${pnl_total:.2f}", delta=f"{pnl_total:.2f}")
+                    c4.metric("Wins/Losses", f"{wins}W / {total_t-wins}L")
+
+                    # --- 5. GRÁFICOS (PLOTLY) ---
+                    col_g1, col_g2 = st.columns(2)
+                    with col_g1:
+                        df_filtrado["EQUITY_CURVE"] = df_filtrado["RESULTADO_DINERO"].cumsum()
+                        fig_line = px.line(df_filtrado, x="FECHA_DT", y="EQUITY_CURVE", markers=True, title="Curva de Equidad")
+                        st.plotly_chart(fig_line, use_container_width=True)
+                    with col_g2:
+                        if 'INSTRUMENTO' in df_filtrado.columns:
+                            pnl_act = df_filtrado.groupby("INSTRUMENTO")["RESULTADO_DINERO"].sum().reset_index()
+                            fig_bar = px.bar(pnl_act, x="INSTRUMENTO", y="RESULTADO_DINERO", color="RESULTADO_DINERO", title="PnL por Activo")
+                            st.plotly_chart(fig_bar, use_container_width=True)
+
+                    st.divider()
+
+                    # --- 6. AUDITORÍA VISUAL (GALERÍA) ---
+                    st.subheader("📸 Auditoría de Evidencias")
+                    for i, r in df_filtrado.iloc[::-1].iterrows():
+                        res = str(r.get('ESTADO_RESULTADO', ''))
+                        icon = "🟢" if res == "TP" else "🔴" if res == "SL" else "🟡"
                         
-                        with t1:
-                            if "http" in str(r.get('IMAGEN_MAYOR', '')): st.image(r['IMAGEN_MAYOR'])
-                            else: st.write("Sin imagen.")
-                        with t2:
-                            if "http" in str(r.get('IMAGEN_MENOR', '')): st.image(r['IMAGEN_MENOR'])
-                            else: st.write("Sin imagen.")
-                        with t3:
-                            if "http" in str(r.get('IMAGEN_EJECUCION', '')): st.image(r['IMAGEN_EJECUCION'])
-                            else: st.write("Sin imagen.")
-                        with t4:
-                            if "http" in str(r.get('IMAGEN_RESULTADO', '')): st.image(r['IMAGEN_RESULTADO'])
-                            else: st.write("Trade aún abierto.")
-                        
-                        st.write(f"**Observaciones:** {r.get('OBSERVACIONES', 'N/A')}")
-                        st.write(f"**Emoción:** {r.get('ESTADO_EMOCIONAL', 'N/A')}")
+                        with st.expander(f"{icon} {r.get('INSTRUMENTO', 'Trade')} | {r['FECHA']} | PnL: ${r['RESULTADO_DINERO']}"):
+                            t1, t2, t3, t4 = st.tabs(["Análisis Mayor", "Análisis Menor", "Ejecución", "Resultado"])
+                            
+                            with t1:
+                                url = r.get('IMAGEN_MAYOR', '')
+                                if "http" in str(url): st.image(url, caption="Temp. Mayor")
+                                else: st.info("Sin imagen.")
+                            with t2:
+                                url = r.get('IMAGEN_MENOR', '')
+                                if "http" in str(url): st.image(url, caption="Temp. Menor")
+                                else: st.info("Sin imagen.")
+                            with t3:
+                                url = r.get('IMAGEN_EJECUCION', '')
+                                if "http" in str(url): st.image(url, caption="Punto de Entrada")
+                                else: st.info("Sin imagen.")
+                            with t4:
+                                url = r.get('IMAGEN_RESULTADO', '')
+                                if "http" in str(url): st.image(url, caption="Captura Cierre")
+                                else: st.info("Trade abierto.")
+                            
+                            st.write(f"**Observaciones:** {r.get('OBSERVACIONES', 'N/A')}")
+                            st.write(f"**Emoción:** {r.get('ESTADO_EMOCIONAL', 'N/A')}")
 
     except Exception as e:
-        st.error(f"Error de sincronización: {e}")
-        st.info("Revisa que los encabezados en Google Sheets sean exactamente los 27 que me pasaste.")
+        st.error(f"Error crítico en reportes: {e}")
 
 
 # =========================================================
