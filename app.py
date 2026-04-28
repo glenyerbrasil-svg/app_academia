@@ -417,25 +417,25 @@ def main_app():
         monto_final = st.number_input("Monto Resultante ($)", format="%.2f", key=monto_key)
         observaciones = st.text_area("Observaciones", key=f"obs_{v}")
 
-# --- 6. BOTÓN DE GUARDAR (VERSIÓN FINAL MAESTRA) ---
+# --- 6. BOTÓN DE GUARDAR (VERSIÓN DEFINITIVA: 27 COLUMNAS) ---
         if st.button("💾 GUARDAR REGISTRO", use_container_width=True, key=f"btn_save_{v}"):
             if p_ent == 0 or p_sl == 0 or bala == 0:
                 st.warning("⚠️ Socio, faltan datos técnicos (Entrada, SL o Bala).")
             else:
-                with st.spinner("🚀 Subiendo evidencias a Cloudinary y sincronizando con Excel..."):
+                with st.spinner("🚀 Sincronizando con el servidor y Cloudinary..."):
                     try:
                         import cloudinary
                         import cloudinary.uploader
 
-                        # 1. Configuración de tus credenciales
+                        # 1. Configuración de Cloudinary
                         cloudinary.config(
                             cloud_name = "dqur2fztq", 
                             api_key = "694985462176285", 
                             api_secret = "8iJE0G6CM6qE0zu9IKPsjzP6BNU"
                         )
 
-                        # Función interna para subir archivos y obtener el URL
-                        def subir_a_nube(archivo, etiqueta):
+                        # Función para subir y obtener URL
+                        def subir_a_cloudinary(archivo, etiqueta):
                             if archivo:
                                 res = cloudinary.uploader.upload(
                                     archivo, 
@@ -445,50 +445,50 @@ def main_app():
                                 return res['secure_url']
                             return "N/A"
 
-                        # 2. Ejecución de subidas (Usando los nombres correctos de tus file_uploaders)
-                        url_may = subir_a_nube(img_may, "MAYOR")
-                        url_men = subir_a_nube(img_men, "MENOR")
-                        url_ent = subir_a_nube(img_ent, "EJECUCION")
-                        url_res = subir_a_nube(img_res, "RESULTADO")
+                        # 2. Ejecutar subidas
+                        url_may = subir_a_cloudinary(img_may, "MAYOR")
+                        url_men = subir_a_cloudinary(img_men, "MENOR")
+                        url_ent = subir_a_cloudinary(img_ent, "EJECUCION")
+                        url_res = subir_a_cloudinary(img_res, "RESULTADO")
 
                         monto_final_val = float(monto_final)
                         hora_actual = datetime.now().strftime("%H:%M:%S")
 
-                        # 3. CONSTRUCCIÓN DE FILA (Mapeo exacto de Columnas A-Z)
-                        # Creamos una lista de 26 espacios para asegurar que nada se corra
-                        nueva_fila = [None] * 26 
+                        # 3. MAPEO MAESTRO DE 27 COLUMNAS (Índices 0 a 26)
+                        nueva_fila = [""] * 27 
 
-                        nueva_fila[0]  = len(hoja_b.get_all_values()) # A: ID_BITACORA
-                        nueva_fila[1]  = user["ID_USUARIO"]          # B: ID_USUARIO
-                        nueva_fila[2]  = str(date.today())           # C: FECHA
-                        nueva_fila[3]  = ins                         # D: INSTRUMENTO
-                        nueva_fila[4]  = acc                         # E: ACCION
-                        nueva_fila[5]  = float(bala)                 # F: VALOR_BALA
-                        nueva_fila[6]  = float(p_ent)                # G: PRECIO_ENT
-                        nueva_fila[7]  = float(p_sl)                 # H: PRECIO_SL
-                        nueva_fila[8]  = float(tp_sugerido)          # I: PRECIO_TP
-                        nueva_fila[9]  = round(float(lotaje), 2)     # J: LOTAJEMARGEN
-                        nueva_fila[10] = hora_actual                 # K: HORA_ENTRADA
-                        nueva_fila[11] = "N/A"                       # L: HORA_SALIDA
-                        nueva_fila[12] = "N/A"                       # M: TIEMPO_TOTAL
-                        nueva_fila[13] = url_may                     # N: DIRECCION_MAYOR
-                        nueva_fila[14] = "N/A"                       # O: (Vacio)
-                        nueva_fila[15] = url_may                     # P: IMAGEN_MAYOR <--- OBJETIVO 1
-                        nueva_fila[16] = url_men                     # Q: DIRECCION_MENOR
-                        nueva_fila[17] = url_men                     # R: IMAGEN_MENOR <--- OBJETIVO 2
-                        nueva_fila[18] = url_ent                     # S: DIRECCION_EJECUCION
-                        nueva_fila[19] = url_ent                     # T: IMAGEN_EJECUCION <--- OBJETIVO 3
-                        nueva_fila[20] = tipo_final                  # U: ESTADO_RESULTADO
-                        nueva_fila[21] = monto_final_val             # V: RESULTADO_DINERO
-                        nueva_fila[22] = "NO"                        # W: LLEGO_11
-                        nueva_fila[23] = 0                           # X: DRAWDOWN
-                        nueva_fila[24] = url_res                     # Y: IMAGEN_RESULTADO <--- OBJETIVO 4
-                        nueva_fila[25] = f"{observaciones} | Emo: {semaforo}" # Z: OBS + EMOCIÓN
+                        nueva_fila[0]  = len(hoja_b.get_all_values()) # 1: ID_BITACORA
+                        nueva_fila[1]  = user["ID_USUARIO"]          # 2: ID_USUARIO
+                        nueva_fila[2]  = str(date.today())           # 3: FECHA
+                        nueva_fila[3]  = ins                         # 4: INSTRUMENTO
+                        nueva_fila[4]  = acc                         # 5: ACCION
+                        nueva_fila[5]  = float(bala)                 # 6: VALOR_BALA
+                        nueva_fila[6]  = float(p_ent)                # 7: PRECIO_ENT
+                        nueva_fila[7]  = float(p_sl)                 # 8: PRECIO_SL
+                        nueva_fila[8]  = float(tp_sugerido)          # 9: PRECIO_TP
+                        nueva_fila[9]  = round(float(lotaje), 2)     # 10: LOTAJE
+                        nueva_fila[10] = 0                           # 11: MARGEN
+                        nueva_fila[11] = hora_actual                 # 12: HORA_ENTRADA
+                        nueva_fila[12] = "N/A"                       # 13: HORA_SALIDA
+                        nueva_fila[13] = "N/A"                       # 14: TIEMPO_TOTAL
+                        nueva_fila[14] = url_may                     # 15: DIRECCION_MAYOR
+                        nueva_fila[15] = url_may                     # 16: IMAGEN_MAYOR
+                        nueva_fila[16] = url_men                     # 17: DIRECCION_MENOR
+                        nueva_fila[17] = url_men                     # 18: IMAGEN_MENOR
+                        nueva_fila[18] = url_ent                     # 19: DIRECCION_EJECUCION
+                        nueva_fila[19] = url_ent                     # 20: IMAGEN_EJECUCION
+                        nueva_fila[20] = tipo_final                  # 21: ESTADO_RESULTADO
+                        nueva_fila[21] = monto_final_val             # 22: RESULTADO_DINERO
+                        nueva_fila[22] = "NO"                        # 23: LLEGO_11
+                        nueva_fila[23] = 0                           # 24: DRAWDOWN
+                        nueva_fila[24] = url_res                     # 25: IMAGEN_RESULTADO
+                        nueva_fila[25] = observaciones               # 26: OBSERVACIONES
+                        nueva_fila[26] = semaforo                    # 27: ESTADO_EMOCIONAL
 
-                        # 4. Inyección en Google Sheets
+                        # 4. Guardado en Google Sheets
                         hoja_b.append_row(nueva_fila)
                         
-                        # 5. Actualizar Finanzas (Solo si la operación cerró: TP, SL o BE)
+                        # 5. Actualizar Finanzas (Solo si cerró)
                         if tipo_final != "PENDIENTE":
                             ing = monto_final_val if monto_final_val > 0 else 0
                             egr = abs(monto_final_val) if monto_final_val < 0 else 0
@@ -504,13 +504,13 @@ def main_app():
                                 "APP"
                             ])
                         
-                        st.success(f"✅ ¡Operación registrada con éxito! Resultado: ${monto_final_val:.2f}")
+                        st.success(f"✅ ¡Operación registrada! Cada dato en su columna. Resultado: ${monto_final_val:.2f}")
                         st.balloons()
                         time.sleep(2)
                         limpiar_todo_al_final()
 
                     except Exception as e:
-                        st.error(f"❌ Error crítico al guardar: {e}")
+                        st.error(f"❌ Error crítico de guardado: {e}")
 # =========================================================
     # # SECCIÓN 8: CIERRE DE CICLO (CON CÁMARA INTEGRADA - 100%)
     # =========================================================
