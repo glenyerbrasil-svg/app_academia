@@ -691,71 +691,9 @@ def main_app():
             st.error(f"Error de conexión: {e}")
 
 # --- SECCION 11: REPORTES (EL MOTOR DE TUS ESTADÍSTICAS) ---
-    elif menu == "📈 Reportes":
-        import plotly.express as px
-        st.header("📈 Análisis de Rendimiento Master")
-
-        try:
-            # 1. Cargar datos de Bitácora
-            hoja_b = doc.worksheet("Bitacora")
-            data = hoja_b.get_all_records()
-            df = pd.DataFrame(data)
-            
-            # Limpiar nombres de columnas (quitar espacios y poner mayúsculas)
-            df.columns = df.columns.str.strip().str.upper()
-            
-            # Filtrar solo los datos del usuario actual
-            df = df[df["ID_USUARIO"].astype(str) == str(user["ID_USUARIO"])]
-
-            if df.empty:
-                st.warning("Socio, aún no tienes trades registrados para analizar.")
-                st.stop()
-
-            # 2. Conversión de datos para gráficas
-            # Aseguramos que el dinero sea número (cambia coma por punto si es necesario)
-            df["RESULTADO_DINERO"] = df["RESULTADO_DINERO"].apply(lambda x: float(str(x).replace(',', '.')) if str(x).strip() != "" else 0.0)
-            df["FECHA_DT"] = pd.to_datetime(df["FECHA"])
-
-            # 3. Métricas Rápidas (KPIs)
-            pnl_total = df["RESULTADO_DINERO"].sum()
-            total_trades = len(df)
-            ganadores = len(df[df["RESULTADO_DINERO"] > 0])
-            win_rate = (ganadores / total_trades) * 100 if total_trades > 0 else 0
-
-            m1, m2, m3 = st.columns(3)
-            m1.metric("Total Trades", total_trades)
-            m2.metric("PnL Acumulado", f"$ {pnl_total:.2f}", delta=f"{pnl_total:.2f}")
-            m3.metric("Win Rate %", f"{win_rate:.1f}%")
-
-            st.divider()
-
-            # 4. Gráficas Profesionales
-            col_g1, col_g2 = st.columns(2)
-
-            with col_g1:
-                st.subheader("🎯 Efectividad por Estado")
-                fig_pie = px.pie(df, names='ESTADO_RESULTADO', hole=0.4, 
-                                 color_discrete_sequence=px.colors.qualitative.Pastel)
-                st.plotly_chart(fig_pie, use_container_width=True)
-
-            with col_g2:
-                st.subheader("📈 Crecimiento de Capital")
-                df_sorted = df.sort_values("FECHA_DT")
-                df_sorted["EQUITY_CURVE"] = df_sorted["RESULTADO_DINERO"].cumsum()
-                fig_line = px.line(df_sorted, x="FECHA_DT", y="EQUITY_CURVE", 
-                                   markers=True, title="Curva de Equidad")
-                st.plotly_chart(fig_line, use_container_width=True)
-
-            # 5. Análisis por Instrumento
-            st.subheader("🔍 Rendimiento por Activo")
-            fig_bar = px.bar(df.groupby("INSTRUMENTO")["RESULTADO_DINERO"].sum().reset_index(), 
-                             x="INSTRUMENTO", y="RESULTADO_DINERO", color="RESULTADO_DINERO",
-                             title="Ganancia/Pérdida por Símbolo")
-            st.plotly_chart(fig_bar, use_container_width=True)
-
-        except Exception as e:
-            st.error(f"Error al generar reportes: {e}")
-            st.info("Asegúrate de que las columnas en Google Sheets coincidan con: ID_USUARIO, RESULTADO_DINERO, FECHA, ESTADO_RESULTADO")
+    elif menu == "Reportes":
+        st.header("Proximos reportes")
+        st.info("Próximamente: podras ver los reportes.")
 
 # --- SECCION 12: FORUM (OPCIONAL) ---
     elif menu == "💬 Forum":
