@@ -417,42 +417,105 @@ def main_app():
         monto_final = st.number_input("Monto Resultante ($)", format="%.2f", key=monto_key)
         observaciones = st.text_area("Observaciones", key=f"obs_{v}")
 
-        # --- 6. BOTÓN DE GUARDAR ---
+# --- 6. BOTÓN DE GUARDAR (ORDEN DE COLUMNAS PARA ANOTACIÓN) ---
         if st.button("💾 GUARDAR REGISTRO", use_container_width=True, key=f"btn_save_{v}"):
             if p_ent == 0 or p_sl == 0 or bala == 0:
-                st.warning("⚠️ Socio, faltan datos técnicos.")
+                st.warning("⚠️ Socio, faltan datos técnicos (Entrada, SL o Bala).")
             else:
-                with st.spinner("Sincronizando..."):
-                    # Usamos el valor que quedó en el input
-                    monto_final_val = float(monto_final)
-                    
-                    nueva_fila = [
-                        len(hoja_b.get_all_values()), user["ID_USUARIO"], str(date.today()),
-                        ins, acc, float(bala), float(p_ent), float(p_sl), float(tp_sugerido), 
-                        round(float(lotaje), 2),
-                        0, datetime.now().strftime("%H:%M:%S"),
-                        img_may.name if img_may else "N/A", img_men.name if img_men else "N/A",
-                        img_ent.name if img_ent else "N/A", img_res.name if img_res else "N/A",
-                        "N/A", "N/A", "N/A", "N/A",
-                        tipo_final, monto_final_val, "NO", 0, "N/A", observaciones, semaforo
-                    ]
-                    hoja_b.append_row(nueva_fila)
-                    
-                    if tipo_final != "PENDIENTE":
-                        ing = monto_final_val if monto_final_val > 0 else 0
-                        egr = abs(monto_final_val) if monto_final_val < 0 else 0
-                        hoja_f.append_row([
-                            len(hoja_f.get_all_values()), str(date.today()), user["ID_USUARIO"],
-                            f"CIERRE {ins}", float(saldo_actual), float(ing), float(egr), 
-                            float(saldo_actual + monto_final_val), "APP"
-                        ])
-                    
-                    st.success(f"✅ ¡Guardado! Resultado: ${monto_final_val:.2f}")
-                    time.sleep(1)
-                    limpiar_todo_al_final()
+                with st.spinner("🚀 Sincronizando y respetando columnas de notas..."):
+                    try:
+                        import cloudinary
+                        import cloudinary.uploader
 
+                        # 1. Configuración de Cloudinary
+                        cloudinary.config(
+                            cloud_name = "dqur2fztq", 
+                            api_key = "694985462176285", 
+                            api_secret = "8iJE0G6CM6qE0zu9IKPsjzP6BNU"
+                        )
+
+                        # Función para subir y obtener URL
+                        def subir_a_nube(archivo, etiqueta):
+                            if archivo:
+                                res = cloudinary.uploader.upload(
+                                    archivo, 
+                                    folder = "bitacora_trading",
+                                    public_id = f"{ins}_{etiqueta}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+                                )
+                                return res['secure_url']
+                            return "N/A"
+
+                        # 2. Ejecutar subidas
+                        url_may = subir_a_nube(img_may, "MAYOR")
+                        url_men = subir_a_nube(img_men, "MENOR")
+                        url_ent = subir_a_nube(img_ent, "EJECUCION")
+                        url_res = subir_a_nube(img_res, "RESULTADO")
+
+                        monto_final_val = float(monto_final)
+                        hora_actual = datetime.now().strftime("%H:%M:%S")
+
+                        # 3. MAPEO MAESTRO (1-27) - AJUSTADO PARA COLUMNAS DE ANOTACIÓN
+                        nueva_fila = [""] * 27 
+
+                        nueva_fila[0]  = len(hoja_b.get_all_values()) # 1: ID_BITACORA
+                        nueva_fila[1]  = user["ID_USUARIO"]          # 2: ID_USUARIO
+                        nueva_fila[2]  = str(date.today())           # 3: FECHA
+                        nueva_fila[3]  = ins                         # 4: INSTRUMENTO
+                        nueva_fila[4]  = acc                         # 5: ACCION
+                        nueva_fila[5]  = float(bala)                 # 6: VALOR_BALA
+                        nueva_fila[6]  = float(p_ent)                # 7: PRECIO_ENT
+                        nueva_fila[7]  = float(p_sl)                 # 8: PRECIO_SL
+                        nueva_fila[8]  = float(tp_sugerido)          # 9: PRECIO_TP
+                        nueva_fila[9]  = round(float(lotaje), 2)     # 10: LOTAJE
+                        nueva_fila[10] = 0                           # 11: MARGEN
+                        nueva_fila[11] = hora_actual                 # 12: HORA_ENTRADA
+                        nueva_fila[12] = "N/A"                       # 13: HORA_SALIDA
+                        nueva_fila[13] = "N/A"                       # 14: TIEMPO_TOTAL
+                        
+                        # --- SECCIÓN DE IMÁGENES Y NOTAS ---
+                        nueva_fila[14] = "N/A"                       # 15: DIRECCION_MAYOR (Anotación)
+                        nueva_fila[15] = url_may                     # 16: IMAGEN_MAYOR ✅
+                        nueva_fila[16] = "N/A"                       # 17: DIRECCION_MENOR (Anotación)
+                        nueva_fila[17] = url_men                     # 18: IMAGEN_MENOR ✅
+                        nueva_fila[18] = "N/A"                       # 19: DIRECCION_EJECUCION (Anotación)
+                        nueva_fila[19] = url_ent                     # 20: IMAGEN_EJECUCION ✅
+                        
+                        nueva_fila[20] = tipo_final                  # 21: ESTADO_RESULTADO
+                        nueva_fila[21] = monto_final_val             # 22: RESULTADO_DINERO
+                        nueva_fila[22] = "NO"                        # 23: LLEGO_11
+                        nueva_fila[23] = 0                           # 24: DRAWDOWN
+                        nueva_fila[24] = url_res                     # 25: IMAGEN_RESULTADO ✅
+                        nueva_fila[25] = observaciones               # 26: OBSERVACIONES
+                        nueva_fila[26] = semaforo                    # 27: ESTADO_EMOCIONAL
+
+                        # 4. Guardado en Google Sheets
+                        hoja_b.append_row(nueva_fila)
+                        
+                        # 5. Actualizar Finanzas
+                        if tipo_final != "PENDIENTE":
+                            ing = monto_final_val if monto_final_val > 0 else 0
+                            egr = abs(monto_final_val) if monto_final_val < 0 else 0
+                            hoja_f.append_row([
+                                len(hoja_f.get_all_values()), 
+                                str(date.today()), 
+                                user["ID_USUARIO"],
+                                f"CIERRE {ins}", 
+                                float(saldo_actual), 
+                                float(ing), 
+                                float(egr), 
+                                float(saldo_actual + monto_final_val), 
+                                "APP"
+                            ])
+                        
+                        st.success(f"✅ ¡Guardado! Las columnas de anotación quedaron libres. Resultado: ${monto_final_val:.2f}")
+                        st.balloons()
+                        time.sleep(2)
+                        limpiar_todo_al_final()
+
+                    except Exception as e:
+                        st.error(f"❌ Error crítico: {e}")
 # =========================================================
-    # # SECCIÓN 8: CIERRE DE CICLO (CON CÁMARA INTEGRADA - 100%)
+    # # SECCIÓN 8: CIERRE DE CICLO (CON CLOUDINARY - 100%)
     # =========================================================
     elif menu == "✏️ Editar":
         from datetime import datetime
@@ -485,7 +548,7 @@ def main_app():
         if df_filtrado.empty:
             st.info("No hay trades abiertos para hoy, socio."); st.stop()
 
-        # Selector inteligente (con ID y Hora)
+        # Selector inteligente
         opciones = []
         for i, r in df_filtrado.iterrows():
             label = f"📝 Fila {i+2} | ID: {r.get('ID_BITACORA')} | {r.get('INSTRUMENTO')} | 🕒 {r.get('HORA_ENTRADA')} | 💰 ${r.get('VALOR_BALA')}"
@@ -497,21 +560,18 @@ def main_app():
             f_idx, d = sel[1], sel[2]
             st.divider()
 
-            # Función de limpieza blindada para números
             def clean(val):
                 try:
                     if val is None or str(val).strip() in ["", "None", "nan"]: return 0.0
                     return float(str(val).replace(',', '.'))
                 except: return 0.0
 
-            # Recuperación de datos técnicos (con tu lógica detective de lotaje)
             p_ent = clean(d.get('PRECIO_ENT'))
             p_tp = clean(d.get('PRECIO_TP'))
             bala = clean(d.get('VALOR_BALA'))
             lotaje = clean(d.get('LOTAJEMARGEN'))
-            if lotaje == 0.0: lotaje = clean(d.get('LOTAJE')) # Respaldo por si acaso
+            if lotaje == 0.0: lotaje = clean(d.get('LOTAJE'))
 
-            # Sección de cálculo dinámico (fuera del form para velocidad)
             col_c1, col_c2 = st.columns(2)
             nuevo_estado = col_c1.selectbox("Estado Final", ["PENDIENTE", "TP", "SL", "BE"], 
                                           index=["PENDIENTE", "TP", "SL", "BE"].index(d.get('ESTADO_RESULTADO', 'PENDIENTE')))
@@ -527,62 +587,65 @@ def main_app():
 
             monto_final_usuario = col_c2.number_input("Monto Final ($)", value=float(st.session_state.monto_operacion), format="%.2f")
 
-            # --- FORMULARIO FINAL CON INTEGRACIÓN DE CÁMARA ---
             with st.form(key=f"form_cierre_cam_{f_idx}"):
-                # Cuadro de info matemática blindada
-                st.info(f"📊 **Matemáticas Funcionando:** Entrada {p_ent} | TP {p_tp} | Lotaje {lotaje}")
-                
+                st.info(f"📊 **Matemáticas:** Entrada {p_ent} | TP {p_tp} | Lotaje {lotaje}")
                 st.divider()
                 st.write("🖼️ **Evidencia Final (Cámara o Archivo)**")
                 
-                # --- NUEVA LÓGICA DE CAPTURA ---
-                # Vía 1: Camera Input
-                foto_camara = st.camera_input("📷 Tomar foto del gráfico con celular", key=f"cam_{f_idx}")
+                foto_camara = st.camera_input("📷 Tomar foto con celular", key=f"cam_{f_idx}")
+                foto_archivo = st.file_uploader("📂 O subir archivo", type=['png', 'jpg', 'jpeg'], key=f"file_{f_idx}")
                 
-                # Vía 2: File Uploader (como respaldo)
-                foto_archivo = st.file_uploader("📂 O subir archivo existente", type=['png', 'jpg', 'jpeg'], key=f"file_{f_idx}")
+                # Decidimos cuál imagen usar
+                imagen_final = foto_camara if foto_camara else foto_archivo
                 
-                # Decidimos cuál imagen usar (prioridad a la cámara)
-                imagen_final_a_guardar = None
-                nombre_imagen_hoja = "N/A"
-                
-                if foto_camara:
-                    imagen_final_a_guardar = foto_camara
-                    nombre_imagen_hoja = f"foto_cam_{d.get('ID_BITACORA')}_{datetime.now().strftime('%H%M%S')}.png"
-                elif foto_archivo:
-                    imagen_final_a_guardar = foto_archivo
-                    nombre_imagen_hoja = foto_archivo.name
-                
-                # Mostramos previsualización si hay captura de cámara
-                if foto_camara:
-                    st.image(foto_camara, caption="Foto capturada lista para guardar", width=300)
-
                 obs = st.text_area("Observaciones Finales", value=str(d.get('OBSERVACIONES', '')))
                 
-                # Botón maestro de guardado
                 if st.form_submit_button("💾 ACTUALIZAR Y CERRAR CICLO", use_container_width=True):
-                    with st.spinner("Sincronizando evidencia en la nube..."):
-                        # 1. Actualización física en Sheets (Columnas: U=21, V=22, Z=26, Y=25)
-                        # Nota: IMAGEN_RESULTADO es la 25 contando desde A=1
-                        hoja_b.update_cell(f_idx, 21, nuevo_estado)
-                        hoja_b.update_cell(f_idx, 22, float(monto_final_usuario))
-                        hoja_b.update_cell(f_idx, 26, obs)
-                        if imagen_final_a_guardar:
-                            hoja_b.update_cell(f_idx, 25, nombre_imagen_hoja)
-                        
-                        # 2. Registro en Finanzas si cierra ciclo
-                        if d.get('ESTADO_RESULTADO') == "PENDIENTE" and nuevo_estado != "PENDIENTE":
-                            hoja_f.append_row([
-                                len(hoja_f.get_all_values()), str(date.today()), user["ID_USUARIO"],
-                                f"CIERRE {d.get('INSTRUMENTO')} (FOTO)", float(saldo_actual), 
-                                monto_final_usuario if monto_final_usuario > 0 else 0, 
-                                abs(monto_final_usuario) if monto_final_usuario < 0 else 0, 
-                                float(saldo_actual + monto_final_usuario), "APP"
-                            ])
-                        
-                        st.success("✅ Trade actualizado y evidencia guardada socio.")
-                        time.sleep(1.5)
-                        st.rerun()
+                    with st.spinner("🚀 Subiendo evidencia a Cloudinary y actualizando Sheets..."):
+                        try:
+                            import cloudinary
+                            import cloudinary.uploader
+
+                            # Configuración
+                            cloudinary.config(
+                                cloud_name = "dqur2fztq", 
+                                api_key = "694985462176285", 
+                                api_secret = "8iJE0G6CM6qE0zu9IKPsjzP6BNU"
+                            )
+
+                            url_resultado = d.get('IMAGEN_RESULTADO', 'N/A')
+
+                            # Si el usuario puso una foto nueva, la subimos
+                            if imagen_final:
+                                res = cloudinary.uploader.upload(
+                                    imagen_final, 
+                                    folder = "bitacora_trading",
+                                    public_id = f"RES_{d.get('INSTRUMENTO')}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+                                )
+                                url_resultado = res['secure_url']
+
+                            # 1. Actualización en Sheets (U=21, V=22, Y=25, Z=26)
+                            hoja_b.update_cell(f_idx, 21, nuevo_estado)
+                            hoja_b.update_cell(f_idx, 22, float(monto_final_usuario))
+                            hoja_b.update_cell(f_idx, 25, url_resultado) # Link de Cloudinary
+                            hoja_b.update_cell(f_idx, 26, obs)
+                            
+                            # 2. Registro en Finanzas si cierra ciclo
+                            if d.get('ESTADO_RESULTADO') == "PENDIENTE" and nuevo_estado != "PENDIENTE":
+                                hoja_f.append_row([
+                                    len(hoja_f.get_all_values()), str(date.today()), user["ID_USUARIO"],
+                                    f"CIERRE {d.get('INSTRUMENTO')}", float(saldo_actual), 
+                                    monto_final_usuario if monto_final_usuario > 0 else 0, 
+                                    abs(monto_final_usuario) if monto_final_usuario < 0 else 0, 
+                                    float(saldo_actual + monto_final_usuario), "APP"
+                                ])
+                            
+                            st.success("✅ Trade actualizado y link guardado en columna 25 socio.")
+                            time.sleep(1.5)
+                            st.rerun()
+
+                        except Exception as e:
+                            st.error(f"❌ Error al subir a Cloudinary: {e}")
 
     # # SECCION 9: BACKTESTING
     elif menu == "📊 Backtesting":
@@ -628,138 +691,149 @@ def main_app():
             st.error(f"Error de conexión: {e}")
 
 # =========================================================
-    # # SECCION 11: REPORTES MASTER (AUDITORÍA 360°)
+    # # SECCION 11: REPORTES MASTER RECARGADO (CORREGIDO)
     # =========================================================
-    elif menu == "📈 Reportes":
-        st.header("📊 Reportes Master: Auditoría de Operaciones")
+    elif menu == "📊 Reportes":
+        import plotly.express as px
+        from fpdf import FPDF
+        import base64
+        from datetime import datetime
+
+        st.header("📊 Centro de Mando: Análisis de Trading")
 
         try:
-            # 1. CARGA DE DATOS
+            # 1. Conexión y carga de datos
             hoja_b = doc.worksheet("Bitacora")
-            datos = hoja_b.get_all_records()
-            df = pd.DataFrame(datos)
-            
-            # Limpieza básica
+            data = hoja_b.get_all_records()
+            df = pd.DataFrame(data)
             df.columns = df.columns.str.strip().str.upper()
-            df['FECHA'] = pd.to_datetime(df['FECHA']).dt.date
-            df = df[df['ID_USUARIO'].astype(str) == str(user["ID_USUARIO"])]
-
-            # ---------------------------------------------------------
-            # 1. PANEL DE CONTROL (FILTROS)
-            # ---------------------------------------------------------
-            with st.container(border=True):
-                col_f1, col_f2 = st.columns([2, 1])
-                
-                # Selector de Rango
-                rango_opcion = col_f1.radio("Rango de Auditoría:", 
-                    ["Hoy", "Esta Semana", "Mes Actual", "Personalizado"], horizontal=True)
-                
-                hoy = date.today()
-                if rango_opcion == "Hoy":
-                    f_inicio, f_fin = hoy, hoy
-                elif rango_opcion == "Esta Semana":
-                    f_inicio = hoy - timedelta(days=hoy.weekday())
-                    f_fin = hoy
-                elif rango_opcion == "Mes Actual":
-                    f_inicio = hoy.replace(day=1)
-                    f_fin = hoy
-                else:
-                    f_inicio, f_fin = col_f1.date_input("Calendario Personalizado", [hoy - timedelta(days=30), hoy])
-
-                # Filtro de Activos
-                activos_disponibles = ["Todos"] + list(df['INSTRUMENTO'].unique())
-                activo_sel = col_f2.selectbox("Filtrar por Activo:", activos_disponibles)
-
-            # Aplicar Filtros al DF
-            df_filtrado = df[(df['FECHA'] >= f_inicio) & (df['FECHA'] <= f_fin)]
-            if activo_sel != "Todos":
-                df_filtrado = df_filtrado[df_filtrado['INSTRUMENTO'] == activo_sel]
-
-            if df_filtrado.empty:
-                st.warning("No hay datos para este periodo, socio. ¡A darle al mercado!")
+            
+            # Filtro por usuario
+            df = df[df["ID_USUARIO"].astype(str) == str(user["ID_USUARIO"])]
+            
+            if df.empty:
+                st.info("Socio, aún no hay datos registrados para generar reportes.")
                 st.stop()
 
-            # ---------------------------------------------------------
-            # 2. DASHBOARD DE KPIs
-            # ---------------------------------------------------------
-            st.divider()
-            # Cálculos
-            balance_neto = df_filtrado['RESULTADO_DINERO'].astype(float).sum()
-            total_trades = len(df_filtrado[df_filtrado['ESTADO_RESULTADO'] != 'PENDIENTE'])
-            ganados = len(df_filtrado[df_filtrado['ESTADO_RESULTADO'] == 'TP'])
-            win_rate = (ganados / total_trades * 100) if total_trades > 0 else 0
-            
-            # Ratio Promedio (Simplificado)
-            ratio_avg = df_filtrado[df_filtrado['ESTADO_RESULTADO'] == 'TP']['VALOR_BALA'].astype(float).mean() # Ejemplo lógico
+            # Limpieza de datos numéricos y fechas
+            def to_num(x):
+                try:
+                    if x == "" or x is None: return 0.0
+                    return float(str(x).replace(',', '.'))
+                except: return 0.0
 
-            k1, k2, k3, k4 = st.columns(4)
-            k1.metric("💰 Balance Neto", f"${balance_neto:,.2f}", delta=f"{balance_neto:.2f}")
-            k2.metric("🎯 Win Rate", f"{win_rate:.1f}%")
-            k3.metric("⚖️ Ratio Prom.", "1:2.4") # Aquí puedes vincular tu columna de ratio real
-            k4.metric("🔥 Racha", "5 Días") # Lógica de racha en desarrollo
-
-            # ---------------------------------------------------------
-            # 3. EL AUDITOR DE GRÁFICOS (TABS)
-            # ---------------------------------------------------------
-            st.divider()
-            tab_tp, tab_sl, tab_ge = st.tabs(["🟢 Victorias (TP)", "🔴 Aprendizajes (SL)", "⚪ Gestión (BE/Pend)"])
-
-            with tab_tp:
-                df_tp = df_filtrado[df_filtrado['ESTADO_RESULTADO'] == 'TP']
-                for _, r in df_tp.iterrows():
-                    with st.expander(f"✅ {r['INSTRUMENTO']} | Profit: ${r['RESULTADO_DINERO']} | {r['FECHA']}"):
-                        c_img1, c_img2 = st.columns(2)
-                        c_img1.write("**Análisis de Entrada**")
-                        c_img1.info(f"Lotaje: {r['LOTAJEMARGEN']}")
-                        # Aquí iría la lógica de mostrar la imagen de Cloudinary si existe el link
-                        c_img2.write("**Desarrollo / Resultado**")
-                        st.write(f"*Observaciones:* {r['OBSERVACIONES']}")
-
-            with tab_sl:
-                df_sl = df_filtrado[df_filtrado['ESTADO_RESULTADO'] == 'SL']
-                for _, r in df_sl.iterrows():
-                    with st.expander(f"❌ {r['INSTRUMENTO']} | Pérdida: ${r['RESULTADO_DINERO']} | {r['FECHA']}"):
-                        st.error(f"Motivo: {r['OBSERVACIONES']}")
-                        st.write("Analiza si fue error de lectura o gestión emocional.")
-
-            with tab_ge:
-                df_ge = df_filtrado[(df_filtrado['ESTADO_RESULTADO'] == 'BE') | (df_filtrado['ESTADO_RESULTADO'] == 'PENDIENTE')]
-                st.dataframe(df_ge[['FECHA', 'INSTRUMENTO', 'ACCION', 'ESTADO_RESULTADO']])
-
-            # ---------------------------------------------------------
-            # 4. PSICOLOGÍA Y CONSISTENCIA
-            # ---------------------------------------------------------
-            st.divider()
-            st.subheader("🧠 El Termómetro del Trader")
-            col_p1, col_p2 = st.columns(2)
-
-            with col_p1:
-                # Gráfico de Emociones (Circular)
-                if 'SEMAFORO_EMOCIONAL' in df_filtrado.columns:
-                    emo_counts = df_filtrado['SEMAFORO_EMOCIONAL'].value_counts()
-                    import plotly.express as px
-                    fig_emo = px.pie(values=emo_counts.values, names=emo_counts.index, 
-                                   title="Dominancia Emocional", color_discrete_sequence=px.colors.qualitative.Safe)
-                    st.plotly_chart(fig_emo, use_container_width=True)
-
-            with col_p2:
-                st.write("**Relación Emoción/Resultado**")
-                res_emo = df_filtrado.groupby(['SEMAFORO_EMOCIONAL', 'ESTADO_RESULTADO']).size().unstack(fill_value=0)
-                st.table(res_emo)
-
-            # ---------------------------------------------------------
-            # 5. EXPORTACIÓN
-            # ---------------------------------------------------------
-            st.divider()
-            csv = df_filtrado.to_csv(index=False).encode('utf-8')
-            st.download_button("📥 Descargar Reporte CSV", data=csv, file_name=f"Reporte_{f_inicio}.csv", mime='text/csv')
+            df["RESULTADO_DINERO"] = df["RESULTADO_DINERO"].apply(to_num)
+            df["FECHA_DT"] = pd.to_datetime(df["FECHA"])
 
         except Exception as e:
-            st.error(f"Error en el motor de reportes: {e}")
+            st.error(f"❌ Error al cargar motor de reportes: {e}")
+            st.stop()
 
-    elif menu == "💬 Forum":
-        st.header("💬 Forum de la Academia")
-        st.write("Próximamente: Espacio para compartir trades y análisis con otros socios.")
+        # --- FUNCIÓN GENERADORA DE PDF (DENTRO DE LA SECCIÓN) ---
+        def generar_pdf(dataframe):
+            try:
+                pdf = FPDF()
+                pdf.add_page()
+                pdf.set_font("Arial", "B", 16)
+                pdf.cell(190, 10, "REPORTE DE TRADING - BITACORA MASTER", ln=True, align="C")
+                pdf.ln(10)
+                
+                pdf.set_font("Arial", size=12)
+                total_pnl = dataframe["RESULTADO_DINERO"].sum()
+                tps = len(dataframe[dataframe["ESTADO_RESULTADO"] == "TP"])
+                wr = (tps / len(dataframe)) * 100 if len(dataframe) > 0 else 0
+                
+                pdf.cell(190, 8, f"Total Trades: {len(dataframe)}", ln=True)
+                pdf.cell(190, 8, f"PnL Acumulado: $ {total_pnl:.2f}", ln=True)
+                pdf.cell(190, 8, f"Win Rate: {wr:.1f}%", ln=True)
+                pdf.ln(5)
+                
+                # Encabezado de Tabla
+                pdf.set_fill_color(200, 220, 255)
+                pdf.set_font("Arial", "B", 10)
+                pdf.cell(30, 10, "FECHA", 1, 0, "C", True)
+                pdf.cell(60, 10, "INSTRUMENTO", 1, 0, "C", True)
+                pdf.cell(30, 10, "ESTADO", 1, 0, "C", True)
+                pdf.cell(40, 10, "RESULTADO", 1, 1, "C", True)
+                
+                pdf.set_font("Arial", size=10)
+                for _, row in dataframe.tail(15).iterrows():
+                    pdf.cell(30, 10, str(row["FECHA"]), 1)
+                    pdf.cell(60, 10, str(row["INSTRUMENTO"]), 1)
+                    pdf.cell(30, 10, str(row["ESTADO_RESULTADO"]), 1)
+                    pdf.cell(40, 10, f"$ {row['RESULTADO_DINERO']}", 1, 1)
+                
+                return pdf.output(dest="S").encode("latin-1")
+            except:
+                return None
+
+        # --- BOTÓN DE DESCARGA PDF ---
+        col_pdf, _ = st.columns([1, 2])
+        with col_pdf:
+            pdf_data = generar_pdf(df)
+            if pdf_data:
+                st.download_button(
+                    label="📥 Descargar Reporte PDF",
+                    data=pdf_data,
+                    file_name=f"Reporte_{datetime.now().strftime('%d_%m_%Y')}.pdf",
+                    mime="application/pdf",
+                    use_container_width=True
+                )
+
+        st.divider()
+
+        # --- 2. MÉTRICAS DASHBOARD ---
+        m1, m2, m3, m4 = st.columns(4)
+        tps_count = len(df[df["ESTADO_RESULTADO"] == "TP"])
+        win_rate_val = (tps_count / len(df) * 100) if len(df) > 0 else 0
+        
+        m1.metric("Trades", len(df))
+        m2.metric("Win Rate", f"{win_rate_val:.1f}%")
+        m3.metric("PnL Total", f"${df['RESULTADO_DINERO'].sum():.2f}")
+        m4.metric("BE", len(df[df["ESTADO_RESULTADO"] == "BE"]))
+
+        # --- 3. GRÁFICAS ---
+        g1, g2 = st.columns(2)
+
+        with g1:
+            st.subheader("🎯 Resultados")
+            conteo = df["ESTADO_RESULTADO"].value_counts().reset_index()
+            conteo.columns = ["Estado", "Cant"]
+            fig_bar = px.bar(conteo, x="Estado", y="Cant", color="Estado",
+                             color_discrete_map={"TP": "#00FF00", "SL": "#FF4B4B", "BE": "#FFA500"},
+                             template="plotly_dark", text_auto=True)
+            st.plotly_chart(fig_bar, use_container_width=True)
+
+        with g2:
+            st.subheader("📈 Rendimiento")
+            rend = df.groupby('FECHA_DT')['RESULTADO_DINERO'].sum().reset_index()
+            fig_line = px.line(rend, x="FECHA_DT", y="RESULTADO_DINERO", markers=True, template="plotly_dark")
+            fig_line.add_hline(y=0, line_dash="dash", line_color="white")
+            st.plotly_chart(fig_line, use_container_width=True)
+
+        st.divider()
+
+        # --- 4. VISOR DE EVIDENCIAS ---
+        st.subheader("🔍 Auditoría de Trades")
+        filtro_f = st.date_input("Fecha a revisar", value=date.today())
+        df_hoy = df[df["FECHA"].astype(str) == str(filtro_f)]
+
+        if df_hoy.empty:
+            st.warning("No hay trades en esta fecha.")
+        else:
+            for i, r in df_hoy.iterrows():
+                emo = "🟢" if r["ESTADO_RESULTADO"] == "TP" else "🔴" if r["ESTADO_RESULTADO"] == "SL" else "🟡"
+                with st.expander(f"{emo} {r['INSTRUMENTO']} | {r['HORA_ENTRADA']} | PnL: ${r['RESULTADO_DINERO']}"):
+                    c1, c2, c3, c4 = st.columns(4)
+                    cols_img = [('IMAGEN_MAYOR', c1), ('IMAGEN_MENOR', c2), ('IMAGEN_EJECUCION', c3), ('IMAGEN_RESULTADO', c4)]
+                    
+                    for col_name, col_st in cols_img:
+                        with col_st:
+                            url = r.get(col_name, "N/A")
+                            if "http" in str(url): st.image(url, use_container_width=True)
+                            else: st.write("🚫")
+                    
+                    st.write(f"**Notas:** {r.get('OBSERVACIONES', 'S/N')}")
 
 # =========================================================
 # # CONTROL DE FLUJO
