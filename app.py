@@ -691,35 +691,36 @@ def main_app():
             st.error(f"Error de conexión: {e}")
 
 # =========================================================
-# SECCION 11: REPORTES Y AUDITORÍA VISUAL (PRO)
+# SECCION 11: REPORTES Y AUDITORÍA VISUAL (SIN ERRORES)
 # =========================================================
 elif menu == "📊 Reportes":
     st.header("📊 Análisis de Rendimiento Profesional")
 
     try:
-        # 1. Obtener datos actualizados de la hoja que ya está conectada
-        data = hoja_operaciones.get_all_records()
-        if not data:
-            st.warning("No hay datos suficientes para generar reportes.")
+        # 1. Obtener datos con validación de seguridad
+        registros = hoja_operaciones.get_all_records()
+        
+        if not registros:
+            st.warning("⚠️ La base de datos está vacía o no tiene el formato correcto.")
         else:
-            df = pd.DataFrame(data)
+            df = pd.DataFrame(registros)
             
-            # Limpieza y preparación de datos para gráficos
+            # 2. Conversión de datos usando TUS nombres de columna
+            # Usamos errors='coerce' para que si hay una celda vacía no se caiga la app
             df['FECHA_DT'] = pd.to_datetime(df['FECHA'], dayfirst=True, errors='coerce')
             df['RESULTADO_DINERO'] = pd.to_numeric(df['RESULTADO_DINERO'], errors='coerce').fillna(0)
             df = df.dropna(subset=['FECHA_DT'])
 
-            # --- FILTROS DE RANGO EN SIDEBAR ---
+            # --- FILTROS EN SIDEBAR ---
             with st.sidebar:
                 st.subheader("📅 Filtros de Auditoría")
                 f_inicio = st.date_input("Desde", date.today() - timedelta(days=30))
                 f_fin = st.date_input("Hasta", date.today())
                 
-                # Filtro por Activo (FlipX, FXVOL20, etc)
                 activos = ["Todos"] + sorted(df['INSTRUMENTO'].unique().tolist())
                 filtro_activo = st.selectbox("Activo Específico", activos)
 
-            # Aplicar filtros al DataFrame
+            # Aplicar filtros
             mask = (df['FECHA_DT'].dt.date >= f_inicio) & (df['FECHA_DT'].dt.date <= f_fin)
             if filtro_activo != "Todos":
                 mask = mask & (df['INSTRUMENTO'] == filtro_activo)
@@ -727,87 +728,61 @@ elif menu == "📊 Reportes":
             df_filtrado = df.loc[mask].sort_values("FECHA_DT")
 
             if df_filtrado.empty:
-                st.info("No se encontraron trades en este rango de fechas con los filtros aplicados.")
+                st.info("No hay trades registrados en este rango de fechas.")
             else:
-                # --- 2. MÉTRICAS CLAVE (KPIs) ---
+                # --- 3. KPIs CON TUS DATOS ---
                 total_t = len(df_filtrado)
                 wins = len(df_filtrado[df_filtrado['ESTADO_RESULTADO'] == 'TP'])
-                losses = len(df_filtrado[df_filtrado['ESTADO_RESULTADO'] == 'SL'])
                 wr = (wins / total_t * 100) if total_t > 0 else 0
                 pnl_total = df_filtrado['RESULTADO_DINERO'].sum()
 
-                col1, col2, col3, col4 = st.columns(4)
-                col1.metric("Total Trades", total_t)
-                col2.metric("Win Rate", f"{wr:.1f}%")
-                col3.metric("PnL Total", f"${pnl_total:.2f}", delta=f"${pnl_total:.2f}")
-                col4.metric("Wins/Losses", f"{wins}W / {losses}L")
+                c1, c2, c3, c4 = st.columns(4)
+                c1.metric("Total Trades", total_t)
+                c2.metric("Win Rate", f"{wr:.1f}%")
+                c3.metric("PnL Total", f"${pnl_total:.2f}", delta=f"${pnl_total:.2f}")
+                c4.metric("Wins/Losses", f"{wins}W / {len(df_filtrado)-wins}L")
 
-                st.divider()
-
-                # --- 3. GRÁFICOS DE RENDIMIENTO (PLOTLY) ---
+                # --- 4. GRÁFICOS (PLOTLY) ---
                 col_g1, col_g2 = st.columns(2)
-                
                 with col_g1:
-                    st.subheader("📈 Curva de Equidad")
                     df_filtrado["EQUITY_CURVE"] = df_filtrado["RESULTADO_DINERO"].cumsum()
-                    fig_line = px.line(df_filtrado, x="FECHA_DT", y="EQUITY_CURVE", 
-                                       markers=True, title="Crecimiento del Capital")
+                    fig_line = px.line(df_filtrado, x="FECHA_DT", y="EQUITY_CURVE", markers=True, title="Curva de Equidad")
                     st.plotly_chart(fig_line, use_container_width=True)
-
                 with col_g2:
-                    st.subheader("🔍 PnL por Activo")
-                    pnl_por_activo = df_filtrado.groupby("INSTRUMENTO")["RESULTADO_DINERO"].sum().reset_index()
-                    fig_bar = px.bar(pnl_por_activo, x="INSTRUMENTO", y="RESULTADO_DINERO", 
-                                     color="RESULTADO_DINERO", title="Ganancia por Símbolo",
-                                     color_continuous_scale='RdYlGn')
+                    pnl_act = df_filtrado.groupby("INSTRUMENTO")["RESULTADO_DINERO"].sum().reset_index()
+                    fig_bar = px.bar(pnl_act, x="INSTRUMENTO", y="RESULTADO_DINERO", color="RESULTADO_DINERO", title="PnL por Activo")
                     st.plotly_chart(fig_bar, use_container_width=True)
 
                 st.divider()
 
-                # --- 4. AUDITORÍA VISUAL (GALERÍA DE CLOUDINARY) ---
-                st.subheader("📸 Auditoría de Evidencias (Cloudinary)")
-                st.write("Revisa tus capturas de pantalla para analizar tus entradas.")
-                
-                # Mostramos los trades del más reciente al más antiguo
+                # --- 5. AUDITORÍA VISUAL (CON TUS 27 COLUMNAS) ---
+                st.subheader("📸 Galería de Evidencias")
                 for i, r in df_filtrado.iloc[::-1].iterrows():
-                    # Icono visual según el resultado
-                    status_icon = "🟢" if r['ESTADO_RESULTADO'] == "TP" else "🔴" if r['ESTADO_RESULTADO'] == "SL" else "🟡"
+                    # Icono según resultado
+                    icon = "🟢" if r['ESTADO_RESULTADO'] == "TP" else "🔴" if r['ESTADO_RESULTADO'] == "SL" else "🟡"
                     
-                    with st.expander(f"{status_icon} {r['INSTRUMENTO']} | {r['FECHA']} | Bala: ${r['BALA']} | PnL: ${r['RESULTADO_DINERO']}"):
-                        # Usamos pestañas para no saturar la vista
-                        t1, t2, t3, t4 = st.tabs(["Análisis Mayor", "Análisis Menor", "Ejecución", "Resultado Final"])
+                    with st.expander(f"{icon} {r['INSTRUMENTO']} | {r['FECHA']} | PnL: ${r['RESULTADO_DINERO']}"):
+                        t1, t2, t3, t4 = st.tabs(["T. Mayor", "T. Menor", "Ejecución", "Resultado"])
                         
                         with t1:
-                            url = r.get('IMAGEN_MAYOR', 'N/A')
-                            if "http" in str(url): st.image(url, caption="Temporalidad Mayor")
-                            else: st.info("Sin captura de temporalidad mayor.")
-                            
+                            if "http" in str(r.get('IMAGEN_MAYOR', '')): st.image(r['IMAGEN_MAYOR'])
+                            else: st.write("Sin imagen.")
                         with t2:
-                            url = r.get('IMAGEN_MENOR', 'N/A')
-                            if "http" in str(url): st.image(url, caption="Temporalidad Menor")
-                            else: st.info("Sin captura de temporalidad menor.")
-                            
+                            if "http" in str(r.get('IMAGEN_MENOR', '')): st.image(r['IMAGEN_MENOR'])
+                            else: st.write("Sin imagen.")
                         with t3:
-                            url = r.get('IMAGEN_EJECUCION', 'N/A')
-                            if "http" in str(url): st.image(url, caption="Punto de Entrada")
-                            else: st.info("Sin captura de ejecución.")
-                            
+                            if "http" in str(r.get('IMAGEN_EJECUCION', '')): st.image(r['IMAGEN_EJECUCION'])
+                            else: st.write("Sin imagen.")
                         with t4:
-                            url = r.get('IMAGEN_RESULTADO', 'N/A')
-                            if "http" in str(url): st.image(url, caption="Resultado del Trade")
-                            else: st.info("Este trade aún no tiene captura de cierre.")
+                            if "http" in str(r.get('IMAGEN_RESULTADO', '')): st.image(r['IMAGEN_RESULTADO'])
+                            else: st.write("Trade aún abierto.")
                         
-                        st.markdown(f"**Observaciones:** {r.get('OBSERVACIONES', 'Sin notas adicionales')}")
-                        st.markdown(f"**Estado Emocional:** {r.get('ESTADO_EMOCIONAL', 'No registrado')}")
-
-                # --- 5. EXPORTACIÓN ---
-                st.divider()
-                if st.button("📄 Generar Reporte PDF"):
-                    st.info("Preparando datos para el reporte PDF... (Función en desarrollo)")
+                        st.write(f"**Observaciones:** {r.get('OBSERVACIONES', 'N/A')}")
+                        st.write(f"**Emoción:** {r.get('ESTADO_EMOCIONAL', 'N/A')}")
 
     except Exception as e:
-        st.error(f"Ocurrió un error al cargar los reportes: {e}")
-        st.info("Verifica que las columnas 'IMAGEN_MAYOR', 'IMAGEN_MENOR', 'IMAGEN_EJECUCION' e 'IMAGEN_RESULTADO' existan en tu Google Sheets.")
+        st.error(f"Error de sincronización: {e}")
+        st.info("Revisa que los encabezados en Google Sheets sean exactamente los 27 que me pasaste.")
 
 
 # =========================================================
