@@ -417,12 +417,12 @@ def main_app():
         monto_final = st.number_input("Monto Resultante ($)", format="%.2f", key=monto_key)
         observaciones = st.text_area("Observaciones", key=f"obs_{v}")
 
-# --- 6. BOTÓN DE GUARDAR (VERSIÓN DEFINITIVA: 27 COLUMNAS) ---
+# --- 6. BOTÓN DE GUARDAR (ORDEN DE COLUMNAS PARA ANOTACIÓN) ---
         if st.button("💾 GUARDAR REGISTRO", use_container_width=True, key=f"btn_save_{v}"):
             if p_ent == 0 or p_sl == 0 or bala == 0:
                 st.warning("⚠️ Socio, faltan datos técnicos (Entrada, SL o Bala).")
             else:
-                with st.spinner("🚀 Sincronizando con el servidor y Cloudinary..."):
+                with st.spinner("🚀 Sincronizando y respetando columnas de notas..."):
                     try:
                         import cloudinary
                         import cloudinary.uploader
@@ -435,7 +435,7 @@ def main_app():
                         )
 
                         # Función para subir y obtener URL
-                        def subir_a_cloudinary(archivo, etiqueta):
+                        def subir_a_nube(archivo, etiqueta):
                             if archivo:
                                 res = cloudinary.uploader.upload(
                                     archivo, 
@@ -446,15 +446,15 @@ def main_app():
                             return "N/A"
 
                         # 2. Ejecutar subidas
-                        url_may = subir_a_cloudinary(img_may, "MAYOR")
-                        url_men = subir_a_cloudinary(img_men, "MENOR")
-                        url_ent = subir_a_cloudinary(img_ent, "EJECUCION")
-                        url_res = subir_a_cloudinary(img_res, "RESULTADO")
+                        url_may = subir_a_nube(img_may, "MAYOR")
+                        url_men = subir_a_nube(img_men, "MENOR")
+                        url_ent = subir_a_nube(img_ent, "EJECUCION")
+                        url_res = subir_a_nube(img_res, "RESULTADO")
 
                         monto_final_val = float(monto_final)
                         hora_actual = datetime.now().strftime("%H:%M:%S")
 
-                        # 3. MAPEO MAESTRO DE 27 COLUMNAS (Índices 0 a 26)
+                        # 3. MAPEO MAESTRO (1-27) - AJUSTADO PARA COLUMNAS DE ANOTACIÓN
                         nueva_fila = [""] * 27 
 
                         nueva_fila[0]  = len(hoja_b.get_all_values()) # 1: ID_BITACORA
@@ -471,24 +471,27 @@ def main_app():
                         nueva_fila[11] = hora_actual                 # 12: HORA_ENTRADA
                         nueva_fila[12] = "N/A"                       # 13: HORA_SALIDA
                         nueva_fila[13] = "N/A"                       # 14: TIEMPO_TOTAL
-                        nueva_fila[14] = url_may                     # 15: DIRECCION_MAYOR
-                        nueva_fila[15] = url_may                     # 16: IMAGEN_MAYOR
-                        nueva_fila[16] = url_men                     # 17: DIRECCION_MENOR
-                        nueva_fila[17] = url_men                     # 18: IMAGEN_MENOR
-                        nueva_fila[18] = url_ent                     # 19: DIRECCION_EJECUCION
-                        nueva_fila[19] = url_ent                     # 20: IMAGEN_EJECUCION
+                        
+                        # --- SECCIÓN DE IMÁGENES Y NOTAS ---
+                        nueva_fila[14] = "N/A"                       # 15: DIRECCION_MAYOR (Anotación)
+                        nueva_fila[15] = url_may                     # 16: IMAGEN_MAYOR ✅
+                        nueva_fila[16] = "N/A"                       # 17: DIRECCION_MENOR (Anotación)
+                        nueva_fila[17] = url_men                     # 18: IMAGEN_MENOR ✅
+                        nueva_fila[18] = "N/A"                       # 19: DIRECCION_EJECUCION (Anotación)
+                        nueva_fila[19] = url_ent                     # 20: IMAGEN_EJECUCION ✅
+                        
                         nueva_fila[20] = tipo_final                  # 21: ESTADO_RESULTADO
                         nueva_fila[21] = monto_final_val             # 22: RESULTADO_DINERO
                         nueva_fila[22] = "NO"                        # 23: LLEGO_11
                         nueva_fila[23] = 0                           # 24: DRAWDOWN
-                        nueva_fila[24] = url_res                     # 25: IMAGEN_RESULTADO
+                        nueva_fila[24] = url_res                     # 25: IMAGEN_RESULTADO ✅
                         nueva_fila[25] = observaciones               # 26: OBSERVACIONES
                         nueva_fila[26] = semaforo                    # 27: ESTADO_EMOCIONAL
 
                         # 4. Guardado en Google Sheets
                         hoja_b.append_row(nueva_fila)
                         
-                        # 5. Actualizar Finanzas (Solo si cerró)
+                        # 5. Actualizar Finanzas
                         if tipo_final != "PENDIENTE":
                             ing = monto_final_val if monto_final_val > 0 else 0
                             egr = abs(monto_final_val) if monto_final_val < 0 else 0
@@ -504,13 +507,13 @@ def main_app():
                                 "APP"
                             ])
                         
-                        st.success(f"✅ ¡Operación registrada! Cada dato en su columna. Resultado: ${monto_final_val:.2f}")
+                        st.success(f"✅ ¡Guardado! Las columnas de anotación quedaron libres. Resultado: ${monto_final_val:.2f}")
                         st.balloons()
                         time.sleep(2)
                         limpiar_todo_al_final()
 
                     except Exception as e:
-                        st.error(f"❌ Error crítico de guardado: {e}")
+                        st.error(f"❌ Error crítico: {e}")
 # =========================================================
     # # SECCIÓN 8: CIERRE DE CICLO (CON CÁMARA INTEGRADA - 100%)
     # =========================================================
