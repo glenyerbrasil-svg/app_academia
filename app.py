@@ -691,9 +691,8 @@ def main_app():
             st.error(f"Error de conexión: {e}")
 
 # --- SECCION 11: REPORTES (EL MOTOR DE TUS ESTADÍSTICAS) ---
-    elif menu == "Reportes":
-        st.header("Proximos reportes")
-        st.info("Próximamente: podras ver los reportes.")
+    elif menu == "📈 Reportes":
+        st.header("📊 Reportes Master: Auditoría de Operaciones")
 
 # --- SECCION 12: FORUM (OPCIONAL) ---
     elif menu == "💬 Forum":
