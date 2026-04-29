@@ -6,14 +6,15 @@ import time
 import cloudinary
 import cloudinary.uploader
 import pandas as pd
+import plotly.express as px
+import smtplib
 from datetime import datetime, date, timedelta
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 # =========================================================
-# # SECCION 1: CONFIGURACIÓN DE APIS Y SEGURIDAD
+# SECCION 1: CONFIGURACIÓN DE APIS Y SEGURIDAD
 # =========================================================
-# Cloudinary (Imágenes)
 cloudinary.config(
     cloud_name = "dlr7idm80",
     api_key = "694985462176285",
@@ -35,23 +36,16 @@ def conectar_google():
             return gspread.service_account_from_dict(creds)
         return gspread.service_account(filename="credenciales.json")
     except Exception as e:
-        st.error(f"Error de conexión: {e}")
+        st.error(f"Error conexión Google: {e}")
         return None
 
-def hash_pass(p): 
-    return bcrypt.hashpw(p.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+client = conectar_google()
+if client:
+    sh = client.open("NOMBRE_DE_TU_ARCHIVO") # <--- ASEGURATE QUE ESTE NOMBRE SEA EXACTO
+    hoja_usuarios = sh.worksheet("Usuarios")
+    hoja_operaciones = sh.worksheet("Bitacora")
+    hoja_finanzas = sh.worksheet("Finanzas")
 
-def check_pass(p, h): 
-    try: return bcrypt.checkpw(p.encode('utf-8'), h.encode('utf-8'))
-    except: return False
-
-def subir_a_cloudinary(archivo):
-    if archivo is not None:
-        try:
-            upload_result = cloudinary.uploader.upload(archivo)
-            return upload_result["secure_url"]
-        except: return ""
-    return ""
 
 # =========================================================
 # # SECCION 2: INTERFAZ DE ACCESO (REGISTRO, ESTÉTICA Y VERIFICACIÓN)
@@ -690,9 +684,102 @@ def main_app():
         except Exception as e:
             st.error(f"Error de conexión: {e}")
 
-# --- SECCION 11: REPORTES (EL MOTOR DE TUS ESTADÍSTICAS) ---
-    elif menu == "📈 Reportes":
-        st.header("📊 Reportes Master: Auditoría de Operaciones")
+# =========================================================
+# SECCION 11: REPORTES Y AUDITORÍA VISUAL (ESTRUCTURA CORREGIDA)
+# =========================================================
+# Nota: Aquí corregimos el error de 'hoja_operaiones' y el KeyError 'FECHA'
+
+def seccion_reportes():
+    st.header("📈 Reportes Master: Auditoría de Operaciones")
+
+    try:
+        # 1. Obtener datos (Variable corregida con C: hoja_operaciones)
+        data = hoja_operaciones.get_all_records()
+        
+        if not data:
+            st.warning("⚠️ No hay datos en la Bitácora.")
+        else:
+            df = pd.DataFrame(data)
+            
+            # --- LIMPIEZA DE COLUMNAS (Evita el KeyError 'FECHA') ---
+            df.columns = [str(c).strip() for c in df.columns]
+
+            if 'FECHA' not in df.columns:
+                st.error("❌ No se encontró la columna 'FECHA'. Revisa tu Excel.")
+                st.write("Columnas detectadas:", list(df.columns))
+            else:
+                # Conversión segura
+                df['FECHA_DT'] = pd.to_datetime(df['FECHA'], dayfirst=True, errors='coerce')
+                df['RESULTADO_DINERO'] = pd.to_numeric(df['RESULTADO_DINERO'], errors='coerce').fillna(0)
+                df = df.dropna(subset=['FECHA_DT'])
+
+                # --- FILTROS SIDEBAR ---
+                with st.sidebar:
+                    st.subheader("📅 Filtros de Auditoría")
+                    f_inicio = st.date_input("Desde", date.today() - timedelta(days=30))
+                    f_fin = st.date_input("Hasta", date.today())
+                    
+                    activos = ["Todos"] + sorted(df['INSTRUMENTO'].unique().tolist())
+                    filtro_activo = st.selectbox("Instrumento", activos)
+
+                # Aplicar Filtros
+                mask = (df['FECHA_DT'].dt.date >= f_inicio) & (df['FECHA_DT'].dt.date <= f_fin)
+                if filtro_activo != "Todos":
+                    mask = mask & (df['INSTRUMENTO'] == filtro_activo)
+                
+                df_filtrado = df.loc[mask].sort_values("FECHA_DT", ascending=False)
+
+                if df_filtrado.empty:
+                    st.info("No hay registros para este filtro.")
+                else:
+                    # KPIs
+                    total_t = len(df_filtrado)
+                    wins = len(df_filtrado[df_filtrado['ESTADO_RESULTADO'] == 'TP'])
+                    wr = (wins/total_t*100) if total_t > 0 else 0
+                    pnl_neto = df_filtrado['RESULTADO_DINERO'].sum()
+
+                    c1, c2, c3 = st.columns(3)
+                    c1.metric("Total Trades", total_t)
+                    c2.metric("Win Rate", f"{wr:.1f}%")
+                    c3.metric("PnL Neto", f"${pnl_neto:.2f}")
+
+                    # Gráficos
+                    st.subheader("📊 Gráficos de Rendimiento")
+                    col_g1, col_g2 = st.columns(2)
+                    with col_g1:
+                        df_filtrado['EQUITY'] = df_filtrado['RESULTADO_DINERO'][::-1].cumsum()
+                        st.plotly_chart(px.line(df_filtrado, x='FECHA_DT', y='EQUITY', title="Crecimiento"), use_container_width=True)
+                    with col_g2:
+                        pnl_x = df_filtrado.groupby('INSTRUMENTO')['RESULTADO_DINERO'].sum().reset_index()
+                        st.plotly_chart(px.bar(pnl_x, x='INSTRUMENTO', y='RESULTADO_DINERO', title="PnL por Activo"), use_container_width=True)
+
+                    st.divider()
+
+                    # AUDITORÍA DE IMÁGENES (Tus 27 columnas)
+                    st.subheader("📸 Auditoría Visual")
+                    for i, r in df_filtrado.iterrows():
+                        icon = "🟢" if r['ESTADO_RESULTADO'] == "TP" else "🔴" if r['ESTADO_RESULTADO'] == "SL" else "🟡"
+                        with st.expander(f"{icon} {r['INSTRUMENTO']} | {r['FECHA']} | PnL: ${r['RESULTADO_DINERO']}"):
+                            t1, t2, t3, t4 = st.tabs(["Mayor", "Menor", "Entrada", "Resultado"])
+                            with t1:
+                                if "http" in str(r.get('IMAGEN_MAYOR','')): st.image(r['IMAGEN_MAYOR'])
+                                else: st.write("N/A")
+                            with t2:
+                                if "http" in str(r.get('IMAGEN_MENOR','')): st.image(r['IMAGEN_MENOR'])
+                                else: st.write("N/A")
+                            with t3:
+                                if "http" in str(r.get('IMAGEN_EJECUCION','')): st.image(r['IMAGEN_EJECUCION'])
+                                else: st.write("N/A")
+                            with t4:
+                                if "http" in str(r.get('IMAGEN_RESULTADO','')): st.image(r['IMAGEN_RESULTADO'])
+                                else: st.write("Abierto")
+                            
+                            st.write(f"**Notas:** {r.get('OBSERVACIONES','...')}")
+
+    except Exception as e:
+        st.error(f"Error en Sección 11: {e}")
+
+
 
 # --- SECCION 12: FORUM (OPCIONAL) ---
     elif menu == "💬 Forum":
