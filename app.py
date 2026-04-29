@@ -38,19 +38,20 @@ def conectar_google():
         st.error(f"Error de conexión: {e}")
         return None
 
-cliente = conectar_google()
+# --- INICIALIZACIÓN GLOBAL DE CONEXIÓN ---
+cliente_google = conectar_google()
 
-if cliente:
+if cliente_google:
     try:
-        # Abrimos el archivo (Asegúrate que el nombre en Drive sea exacto)
-        sh = cliente.open("Trading Bitacora") 
+        # Intento abrir el archivo. SI EL NOMBRE ES OTRO, EL USUARIO DEBE CAMBIARLO AQUÍ
+        sh = cliente_google.open("Trading Bitacora") 
         
-        # DEFINICIÓN GLOBAL DE LAS HOJAS - Esto evita el NameError
         hoja_usuarios = sh.worksheet("Usuarios")
         hoja_operaciones = sh.worksheet("Bitacora")
         hoja_f = sh.worksheet("Finanzas")
     except Exception as e:
-        st.error(f"Error: No se encontraron las pestañas en el Excel. Revisa los nombres: {e}")
+        st.error(f"Error al acceder a las pestañas: {e}")
+        st.info("Revisa que el archivo se llame 'Trading Bitacora' y tenga las pestañas: Usuarios, Bitacora, Finanzas")
 
 
 def hash_pass(p): 
@@ -708,89 +709,100 @@ def main_app():
 # =========================================================
 # SECCION 11: BUSCADOR DE OPERACIONES (PASO 1)
 # =========================================================
-    # =========================================================
-# # SECCION 11: BUSCADOR DE OPERACIONES (PASO 1)
+    
+# =========================================================
+# # SECCION 11: BUSCADOR DE TRADES (PASO 1)
 # =========================================================
     elif menu == "📈 Reportes":
-        st.header("🔍 Buscador de Operaciones")
+        st.header("🔍 Buscador y Auditoría Visual")
 
         try:
-            # Obtenemos los registros de la variable global hoja_operaciones
+            # Intentamos obtener los datos de la variable global definida en la Sección 1
             registros = hoja_operaciones.get_all_records()
             
             if not registros:
-                st.warning("⚠️ No hay datos registrados en la Bitácora.")
+                st.warning("⚠️ No se encontraron registros en la hoja 'Bitacora'.")
             else:
                 df = pd.DataFrame(registros)
                 
-                # Limpieza de columnas para evitar el error de 'FECHA'
+                # Limpieza de nombres de columnas (Quita espacios extras)
                 df.columns = [str(c).strip() for c in df.columns]
 
-                # Convertimos la fecha para que el calendario la entienda
+                # Convertir FECHA a formato datetime para que el calendario funcione
                 df['FECHA_DT'] = pd.to_datetime(df['FECHA'], dayfirst=True, errors='coerce')
 
-                # --- BLOQUE DE FILTROS ---
-                st.subheader("Filtros de Búsqueda")
-                col_fecha, col_estado, col_inst = st.columns(3)
+                # --- FILTROS ---
+                st.markdown("### ⚙️ Filtros de búsqueda")
+                c1, c2, c3 = st.columns(3)
 
-                with col_fecha:
-                    fecha_sel = st.date_input("Día a consultar", value=date.today())
+                with c1:
+                    fecha_consulta = st.date_input("Selecciona una fecha", value=date.today())
                 
-                with col_estado:
-                    # Filtro por condición (TP, SL, BE) basado en tu columna ESTADO_RESULTADO
-                    estado_sel = st.selectbox("Condición", ["Todos", "TP", "SL", "BE", "ABIERTO"])
+                with c2:
+                    # Filtro por condición (basado en tu columna ESTADO_RESULTADO)
+                    condiciones = ["Todos", "TP", "SL", "BE", "ABIERTO"]
+                    filtro_estado = st.selectbox("Estado del Trade", condiciones)
                 
-                with col_inst:
-                    # Filtro por Activo
+                with c3:
+                    # Filtro por Instrumento
                     activos = ["Todos"] + sorted(df['INSTRUMENTO'].unique().tolist()) if 'INSTRUMENTO' in df.columns else ["Todos"]
-                    inst_sel = st.selectbox("Instrumento", activos)
+                    filtro_inst = st.selectbox("Instrumento", activos)
 
                 # --- LÓGICA DE FILTRADO ---
-                mask = (df['FECHA_DT'].dt.date == fecha_sel)
+                # 1. Filtro de fecha
+                mask = (df['FECHA_DT'].dt.date == fecha_consulta)
                 
-                if estado_sel != "Todos":
-                    mask = mask & (df['ESTADO_RESULTADO'] == estado_sel)
+                # 2. Filtro de estado
+                if filtro_estado != "Todos":
+                    mask = mask & (df['ESTADO_RESULTADO'] == filtro_estado)
                 
-                if inst_sel != "Todos":
-                    mask = mask & (df['INSTRUMENTO'] == inst_sel)
+                # 3. Filtro de instrumento
+                if filtro_inst != "Todos":
+                    mask = mask & (df['INSTRUMENTO'] == filtro_inst)
                 
                 df_filtrado = df.loc[mask]
 
                 # --- MOSTRAR RESULTADOS ---
                 st.divider()
                 if df_filtrado.empty:
-                    st.info(f"No hay trades registrados para el {fecha_sel} con esos filtros.")
+                    st.info(f"No hay registros para el día {fecha_consulta} con esos filtros.")
                 else:
                     st.success(f"Se encontraron {len(df_filtrado)} operaciones")
                     
-                    for i, r in df_filtrado.iterrows():
-                        icon = "🟢" if r['ESTADO_RESULTADO'] == "TP" else "🔴" if r['ESTADO_RESULTADO'] == "SL" else "🟡"
+                    for idx, row in df_filtrado.iterrows():
+                        # Icono según el resultado
+                        res = str(row.get('ESTADO_RESULTADO', ''))
+                        icon = "🟢" if res == "TP" else "🔴" if res == "SL" else "🟡"
                         
-                        with st.expander(f"{icon} {r['INSTRUMENTO']} | Entrada: {r['HORA_ENTRADA']} | PnL: ${r['RESULTADO_DINERO']}"):
-                            # Visualizador de imágenes de Cloudinary en pestañas
-                            t1, t2, t3, t4 = st.tabs(["🖼️ Mayor", "🖼️ Menor", "🎯 Entrada", "🏁 Resultado"])
+                        with st.expander(f"{icon} {row['INSTRUMENTO']} | Entrada: {row['HORA_ENTRADA']} | PnL: ${row['RESULTADO_DINERO']}"):
+                            # Visor de imágenes de Cloudinary en pestañas
+                            tab_m1, tab_m2, tab_ent, tab_res = st.tabs(["🖼️ Mayor", "🖼️ Menor", "🎯 Entrada", "🏁 Resultado"])
                             
-                            with t1:
-                                url = r.get('IMAGEN_MAYOR', '')
+                            with tab_m1:
+                                url = row.get('IMAGEN_MAYOR', '')
                                 if "http" in str(url): st.image(url, caption="Temp. Mayor")
-                                else: st.write("Sin imagen.")
-                            with t2:
-                                url = r.get('IMAGEN_MENOR', '')
+                                else: st.info("Sin imagen de temporalidad mayor.")
+                                
+                            with tab_m2:
+                                url = row.get('IMAGEN_MENOR', '')
                                 if "http" in str(url): st.image(url, caption="Temp. Menor")
-                                else: st.write("Sin imagen.")
-                            with t3:
-                                url = r.get('IMAGEN_EJECUCION', '')
-                                if "http" in str(url): st.image(url, caption="Ejecución")
-                                else: st.write("Sin imagen.")
-                            with t4:
-                                url = r.get('IMAGEN_RESULTADO', '')
-                                if "http" in str(url): st.image(url, caption="Resultado")
-                                else: st.write("Trade sin cierre visual.")
-                            
-                            st.write(f"**Notas:** {r.get('OBSERVACIONES', '...')}")
-                            st.write(f"**Emoción:** {r.get('ESTADO_EMOCIONAL', 'N/A')}")
+                                else: st.info("Sin imagen de temporalidad menor.")
+                                
+                            with tab_ent:
+                                url = row.get('IMAGEN_EJECUCION', '')
+                                if "http" in str(url): st.image(url, caption="Punto de Entrada")
+                                else: st.info("Sin imagen de ejecución.")
+                                
+                            with tab_res:
+                                url = row.get('IMAGEN_RESULTADO', '')
+                                if "http" in str(url): st.image(url, caption="Resultado Final")
+                                else: st.info("Trade abierto o sin captura final.")
+
+                            st.write(f"**Observaciones:** {row.get('OBSERVACIONES', 'N/A')}")
+                            st.write(f"**Emoción:** {row.get('ESTADO_EMOCIONAL', 'N/A')}")
+
         except Exception as e:
-            st.error(f"Error en el buscador: {e}")
+            st.error(f"Error en la sección de reportes: {e}")
 elif menu == "💬 Forum":
         st.header("💬 Comunidad de Traders")
         st.info("Próximamente: Comparte tus señales y análisis con otros socios.")
