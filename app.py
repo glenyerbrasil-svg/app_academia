@@ -691,102 +691,79 @@ def main_app():
             st.error(f"Error de conexión: {e}")
 
 # =========================================================
-# SECCION 11: BUSCADOR DE TRADES Y AUDITORÍA VISUAL
+# SECCION 11: BUSCADOR DE OPERACIONES (PASO 1)
 # =========================================================
     elif menu == "📈 Reportes":
-        st.header("🔍 Buscador y Auditoría de Trades")
+        st.header("🔍 Buscador de Trades")
 
         try:
-            # 1. Conexión segura (Asegúrate que esta variable coincida con tu Sección 1)
-            # Si en tu código la variable se llama diferente, cámbiala aquí:
-            registros = hoja_operaciones.get_all_records()
+            # 1. CONEXIÓN A LA HOJA
+            # IMPORTANTE: Revisa en tu SECCION 1 si tu variable se llama 'hoja_operaciones'
+            # Si no, cámbiala aquí abajo por el nombre que usaste.
+            data = hoja_operaciones.get_all_records()
             
-            if not registros:
-                st.warning("⚠️ La bitácora está vacía.")
+            if not data:
+                st.warning("⚠️ No hay datos en la Bitácora.")
             else:
-                df = pd.DataFrame(registros)
+                df = pd.DataFrame(data)
                 
-                # Limpieza de nombres de columnas para evitar el error 'FECHA'
+                # Limpieza de columnas para evitar el error de 'FECHA'
                 df.columns = [str(c).strip() for c in df.columns]
 
-                # Convertir FECHA a formato de fecha para el calendario
+                # Convertimos la fecha para que el calendario la entienda
                 df['FECHA_DT'] = pd.to_datetime(df['FECHA'], dayfirst=True, errors='coerce')
 
-                # --- FILTROS DE BÚSQUEDA ---
-                st.write("### ⚙️ Configura tu búsqueda")
-                c_f1, c_f2, c_f3 = st.columns(3)
+                # --- FILTROS ---
+                st.subheader("Filtros de Búsqueda")
+                col_fecha, col_estado = st.columns(2)
 
-                with c_f1:
-                    # 1. Calendario
-                    fecha_sel = st.date_input("Día de la operación", value=date.today())
+                with col_fecha:
+                    fecha_selección = st.date_input("Selecciona el día", value=date.today())
                 
-                with c_f2:
-                    # 2. Condición (TP, SL, BE)
-                    # Usamos ESTADO_RESULTADO que es tu columna 21
-                    condiciones = ["Todos", "TP", "SL", "BE", "ABIERTO"]
-                    filtro_estado = st.selectbox("Resultado", condiciones)
-                
-                with c_f3:
-                    # 3. Instrumento (FlipX, Volatility, etc.)
-                    activos = ["Todos"] + sorted(df['INSTRUMENTO'].unique().tolist())
-                    filtro_activo = st.selectbox("Activo", activos)
+                with col_estado:
+                    # Filtro por TP, SL, BE
+                    estado_selección = st.selectbox("Estado", ["Todos", "TP", "SL", "BE", "ABIERTO"])
 
-                # --- APLICACIÓN DE LA LÓGICA DE FILTRADO ---
-                mask = (df['FECHA_DT'].dt.date == fecha_sel)
+                # --- LÓGICA DE FILTRADO ---
+                mask = (df['FECHA_DT'].dt.date == fecha_selección)
                 
-                if filtro_estado != "Todos":
-                    mask = mask & (df['ESTADO_RESULTADO'] == filtro_estado)
+                if estado_selección != "Todos":
+                    mask = mask & (df['ESTADO_RESULTADO'] == estado_selección)
                 
-                if filtro_activo != "Todos":
-                    mask = mask & (df['INSTRUMENTO'] == filtro_activo)
+                df_filtrado = df.loc[mask]
 
-                df_final = df.loc[mask]
-
-                # --- MOSTRAR RESULTADOS ---
+                # --- RESULTADOS ---
                 st.divider()
-                
-                if df_final.empty:
-                    st.info(f"No hay trades registrados para el {fecha_sel} con esos filtros.")
+                if df_filtrado.empty:
+                    st.info(f"No hay trades registrados para el {fecha_selección}.")
                 else:
-                    st.success(f"Se encontraron {len(df_final)} operaciones")
+                    st.success(f"Se encontraron {len(df_filtrado)} trades")
                     
-                    for i, r in df_final.iterrows():
-                        # Icono visual rápido
+                    for i, r in df_filtrado.iterrows():
                         icon = "🟢" if r['ESTADO_RESULTADO'] == "TP" else "🔴" if r['ESTADO_RESULTADO'] == "SL" else "🟡"
                         
-                        label_expander = f"{icon} {r['INSTRUMENTO']} | {r['HORA_ENTRADA']} | PnL: ${r['RESULTADO_DINERO']}"
-                        
-                        with st.expander(label_expander):
-                            # Pestañas para las 4 imágenes de Cloudinary
-                            t_mayor, t_menor, t_ejec, t_res = st.tabs([
-                                "🖼️ T. Mayor", "🖼️ T. Menor", "🎯 Entrada", "🏁 Resultado"
-                            ])
+                        with st.expander(f"{icon} {r['INSTRUMENTO']} | {r['HORA_ENTRADA']} | PnL: ${r['RESULTADO_DINERO']}"):
+                            # Visualizador de imágenes de Cloudinary
+                            t1, t2, t3, t4 = st.tabs(["T. Mayor", "T. Menor", "Entrada", "Resultado"])
                             
-                            with t_mayor:
-                                url = r.get('IMAGEN_MAYOR', '')
-                                if "http" in str(url): st.image(url, caption="Análisis H4/H1")
-                                else: st.write("No hay imagen.")
-
-                            with t_menor:
-                                url = r.get('IMAGEN_MENOR', '')
-                                if "http" in str(url): st.image(url, caption="Análisis M15")
-                                else: st.write("No hay imagen.")
-
-                            with t_ejec:
-                                url = r.get('IMAGEN_EJECUCION', '')
-                                if "http" in str(url): st.image(url, caption="Punto de Entrada")
-                                else: st.write("No hay imagen.")
-
-                            with t_res:
-                                url = r.get('IMAGEN_RESULTADO', '')
-                                if "http" in str(url): st.image(url, caption="Resultado Final")
-                                else: st.write("Trade aún abierto o sin captura.")
-
-                            st.write(f"**Observaciones:** {r.get('OBSERVACIONES', 'Sin notas')}")
+                            with t1:
+                                if "http" in str(r.get('IMAGEN_MAYOR', '')): st.image(r['IMAGEN_MAYOR'])
+                                else: st.write("Sin imagen.")
+                            with t2:
+                                if "http" in str(r.get('IMAGEN_MENOR', '')): st.image(r['IMAGEN_MENOR'])
+                                else: st.write("Sin imagen.")
+                            with t3:
+                                if "http" in str(r.get('IMAGEN_EJECUCION', '')): st.image(r['IMAGEN_EJECUCION'])
+                                else: st.write("Sin imagen.")
+                            with t4:
+                                if "http" in str(r.get('IMAGEN_RESULTADO', '')): st.image(r['IMAGEN_RESULTADO'])
+                                else: st.write("Aún no se ha registrado cierre.")
+                            
+                            st.write(f"**Notas:** {r.get('OBSERVACIONES', '...')}")
 
         except Exception as e:
-            st.error(f"Error en el buscador: {e}")
-            st.info("Asegúrate de que la variable 'hoja_operaciones' esté bien definida en la Sección 1.")
+            st.error(f"Error: {e}")
+            st.info("💡 Consejo: Revisa si en tu Sección 1 definiste 'hoja_operaciones'.")
 
 # --- SECCION 12: FORUM (OPCIONAL) ---
     elif menu == "💬 Forum":
