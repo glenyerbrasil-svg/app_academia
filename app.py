@@ -694,7 +694,86 @@ def main_app():
 # SECCION 11: BUSCADOR DE OPERACIONES (PASO 1)
 # =========================================================
     elif menu == "📈 Reportes":
-        st.header("🔍 Buscador de Trades")
+        st.header("🔍 Buscador y Auditoría de Trades")
+
+        try:
+            # Obtenemos los registros de la variable global
+            registros = hoja_operaciones.get_all_records()
+            
+            if not registros:
+                st.warning("⚠️ No hay datos en la Bitácora.")
+            else:
+                df = pd.DataFrame(registros)
+                
+                # Limpieza de nombres de columnas anti-error 'FECHA'
+                df.columns = [str(c).strip() for c in df.columns]
+
+                # Conversión de fecha para el calendario
+                df['FECHA_DT'] = pd.to_datetime(df['FECHA'], dayfirst=True, errors='coerce')
+
+                # --- FILTROS ---
+                st.write("### ⚙️ Filtros de Búsqueda")
+                c_f1, c_f2, c_f3 = st.columns(3)
+
+                with c_f1:
+                    fecha_sel = st.date_input("Día de la operación", value=date.today())
+                
+                with c_f2:
+                    condiciones = ["Todos", "TP", "SL", "BE", "ABIERTO"]
+                    filtro_estado = st.selectbox("Estado del Trade", condiciones)
+                
+                with c_f3:
+                    instrumentos = ["Todos"] + sorted(df['INSTRUMENTO'].unique().tolist())
+                    filtro_activo = st.selectbox("Activo", instrumentos)
+
+                # --- LÓGICA DE FILTRADO ---
+                mask = (df['FECHA_DT'].dt.date == fecha_sel)
+                
+                if filtro_estado != "Todos":
+                    mask = mask & (df['ESTADO_RESULTADO'] == filtro_estado)
+                
+                if filtro_activo != "Todos":
+                    mask = mask & (df['INSTRUMENTO'] == filtro_activo)
+
+                df_final = df.loc[mask]
+
+                # --- RESULTADOS ---
+                st.divider()
+                if df_final.empty:
+                    st.info(f"No hay registros para el {fecha_sel} con esos filtros.")
+                else:
+                    st.success(f"Se encontraron {len(df_final)} operaciones")
+                    
+                    for i, r in df_final.iterrows():
+                        icon = "🟢" if r['ESTADO_RESULTADO'] == "TP" else "🔴" if r['ESTADO_RESULTADO'] == "SL" else "🟡"
+                        
+                        with st.expander(f"{icon} {r['INSTRUMENTO']} | Entrada: {r['HORA_ENTRADA']} | PnL: ${r['RESULTADO_DINERO']}"):
+                            # Pestañas para las imágenes de Cloudinary
+                            t_m1, t_m2, t_en, t_re = st.tabs(["🖼️ T. Mayor", "🖼️ T. Menor", "🎯 Entrada", "🏁 Resultado"])
+                            
+                            with t_m1:
+                                url = r.get('IMAGEN_MAYOR', '')
+                                if "http" in str(url): st.image(url)
+                                else: st.info("Sin imagen.")
+                            with t_m2:
+                                url = r.get('IMAGEN_MENOR', '')
+                                if "http" in str(url): st.image(url)
+                                else: st.info("Sin imagen.")
+                            with t_en:
+                                url = r.get('IMAGEN_EJECUCION', '')
+                                if "http" in str(url): st.image(url)
+                                else: st.info("Sin imagen.")
+                            with t_re:
+                                url = r.get('IMAGEN_RESULTADO', '')
+                                if "http" in str(url): st.image(url)
+                                else: st.info("Abierto / Sin captura.")
+
+                            st.write(f"**Observaciones:** {r.get('OBSERVACIONES', '...')}")
+                            st.write(f"**Emoción:** {r.get('ESTADO_EMOCIONAL', 'N/A')}")
+
+        except Exception as e:
+            st.error(f"Error en el buscador: {e}")
+
 	
         
 # --- SECCION 12: FORUM (OPCIONAL) ---
