@@ -695,76 +695,9 @@ def main_app():
 # =========================================================
     elif menu == "📈 Reportes":
         st.header("🔍 Buscador de Trades")
+	st.info("Próximamente: Comparte tus señales y análisis con otros socios.")
 
-        try:
-            # 1. CONEXIÓN A LA HOJA
-            # IMPORTANTE: Revisa en tu SECCION 1 si tu variable se llama 'hoja_operaciones'
-            # Si no, cámbiala aquí abajo por el nombre que usaste.
-            data = hoja_operaciones.get_all_records()
-            
-            if not data:
-                st.warning("⚠️ No hay datos en la Bitácora.")
-            else:
-                df = pd.DataFrame(data)
-                
-                # Limpieza de columnas para evitar el error de 'FECHA'
-                df.columns = [str(c).strip() for c in df.columns]
-
-                # Convertimos la fecha para que el calendario la entienda
-                df['FECHA_DT'] = pd.to_datetime(df['FECHA'], dayfirst=True, errors='coerce')
-
-                # --- FILTROS ---
-                st.subheader("Filtros de Búsqueda")
-                col_fecha, col_estado = st.columns(2)
-
-                with col_fecha:
-                    fecha_selección = st.date_input("Selecciona el día", value=date.today())
-                
-                with col_estado:
-                    # Filtro por TP, SL, BE
-                    estado_selección = st.selectbox("Estado", ["Todos", "TP", "SL", "BE", "ABIERTO"])
-
-                # --- LÓGICA DE FILTRADO ---
-                mask = (df['FECHA_DT'].dt.date == fecha_selección)
-                
-                if estado_selección != "Todos":
-                    mask = mask & (df['ESTADO_RESULTADO'] == estado_selección)
-                
-                df_filtrado = df.loc[mask]
-
-                # --- RESULTADOS ---
-                st.divider()
-                if df_filtrado.empty:
-                    st.info(f"No hay trades registrados para el {fecha_selección}.")
-                else:
-                    st.success(f"Se encontraron {len(df_filtrado)} trades")
-                    
-                    for i, r in df_filtrado.iterrows():
-                        icon = "🟢" if r['ESTADO_RESULTADO'] == "TP" else "🔴" if r['ESTADO_RESULTADO'] == "SL" else "🟡"
-                        
-                        with st.expander(f"{icon} {r['INSTRUMENTO']} | {r['HORA_ENTRADA']} | PnL: ${r['RESULTADO_DINERO']}"):
-                            # Visualizador de imágenes de Cloudinary
-                            t1, t2, t3, t4 = st.tabs(["T. Mayor", "T. Menor", "Entrada", "Resultado"])
-                            
-                            with t1:
-                                if "http" in str(r.get('IMAGEN_MAYOR', '')): st.image(r['IMAGEN_MAYOR'])
-                                else: st.write("Sin imagen.")
-                            with t2:
-                                if "http" in str(r.get('IMAGEN_MENOR', '')): st.image(r['IMAGEN_MENOR'])
-                                else: st.write("Sin imagen.")
-                            with t3:
-                                if "http" in str(r.get('IMAGEN_EJECUCION', '')): st.image(r['IMAGEN_EJECUCION'])
-                                else: st.write("Sin imagen.")
-                            with t4:
-                                if "http" in str(r.get('IMAGEN_RESULTADO', '')): st.image(r['IMAGEN_RESULTADO'])
-                                else: st.write("Aún no se ha registrado cierre.")
-                            
-                            st.write(f"**Notas:** {r.get('OBSERVACIONES', '...')}")
-
-        except Exception as e:
-            st.error(f"Error: {e}")
-            st.info("💡 Consejo: Revisa si en tu Sección 1 definiste 'hoja_operaciones'.")
-
+        
 # --- SECCION 12: FORUM (OPCIONAL) ---
     elif menu == "💬 Forum":
         st.header("💬 Comunidad de Traders")
