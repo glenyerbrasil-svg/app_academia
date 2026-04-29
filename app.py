@@ -695,8 +695,7 @@ def main_app():
 # =========================================================
     elif menu == "📈 Reportes":
         st.header("🔍 Buscador de Trades")
-	st.info("Próximamente: Comparte tus señales y análisis con otros socios.")
-
+	
         
 # --- SECCION 12: FORUM (OPCIONAL) ---
     elif menu == "💬 Forum":
