@@ -722,7 +722,7 @@ def main_app():
                 # Usamos la conexión que ya está en la "mochila"
                 cliente_google = st.session_state['cliente_google']
                 
-                # 2. Apertura del libro y hoja específicos que me diste
+                # 2. Apertura del libro y hoja específicos
                 sh = cliente_google.open("Bitacora_Academia1") 
                 hoja_bitacora = sh.worksheet("Bitacora")
                 
@@ -732,29 +732,38 @@ def main_app():
                     st.warning("⚠️ La hoja 'Bitacora' no tiene registros actualmente.")
                 else:
                     df = pd.DataFrame(registros)
-                    # Limpieza de encabezados para evitar errores de espacios
+                    # Limpieza de encabezados
                     df.columns = [str(c).strip() for c in df.columns]
                     
-                    # Conversión de FECHA (Columna 3)
+                    # Conversión de FECHA
                     df['FECHA_DT'] = pd.to_datetime(df['FECHA'], dayfirst=True, errors='coerce')
 
-                    # --- INTERFAZ DE FILTROS ---
+                    # --- INTERFAZ DE FILTROS (DENTRO DEL BLOQUE CORRECTO) ---
                     st.write("### ⚙️ Parámetros de Búsqueda")
-                    f1, f2, f3 = st.columns(3)
+                    f1, f2, f3 = st.columns([2, 1, 1])
 
                     with f1:
-                        f_fecha = st.date_input("Día operado:", value=date.today())
+                        rango_fechas = st.date_input(
+                            "Periodo a auditar:",
+                            value=[date.today(), date.today()],
+                            help="Haz clic en la fecha de inicio y luego en la de fin."
+                        )
                     with f2:
-                        # Columna 21: ESTADO_RESULTADO
                         res_list = ["Todos"] + sorted(df['ESTADO_RESULTADO'].unique().tolist())
                         f_res = st.selectbox("Resultado:", res_list)
                     with f3:
-                        # Columna 4: INSTRUMENTO
                         act_list = ["Todos"] + sorted(df['INSTRUMENTO'].unique().tolist())
                         f_act = st.selectbox("Activo:", act_list)
 
-                    # --- FILTRADO DE DATOS ---
-                    mask = (df['FECHA_DT'].dt.date == f_fecha)
+                    # --- LÓGICA DE FILTRADO DE FECHAS ---
+                    if isinstance(rango_fechas, (list, tuple)) and len(rango_fechas) == 2:
+                        inicio, fin = rango_fechas
+                        mask = (df['FECHA_DT'].dt.date >= inicio) & (df['FECHA_DT'].dt.date <= fin)
+                    elif isinstance(rango_fechas, (list, tuple)) and len(rango_fechas) == 1:
+                        mask = (df['FECHA_DT'].dt.date == rango_fechas[0])
+                    else:
+                        mask = (df['FECHA_DT'].dt.date == rango_fechas)
+
                     if f_res != "Todos":
                         mask = mask & (df['ESTADO_RESULTADO'] == f_res)
                     if f_act != "Todos":
@@ -765,17 +774,15 @@ def main_app():
                     # --- DESPLIEGUE DE TRADES ---
                     st.divider()
                     if df_final.empty:
-                        st.info(f"No se encontraron trades para el día {f_fecha}.")
+                        st.info("No se encontraron trades para los filtros seleccionados.")
                     else:
                         st.success(f"Se encontraron {len(df_final)} operaciones.")
                         
                         for i, r in df_final.iterrows():
-                            # Encabezado visual (Col 21, 4, 12, 22)
                             color = "🟢" if r['ESTADO_RESULTADO'] == "TP" else "🔴" if r['ESTADO_RESULTADO'] == "SL" else "🟡"
                             titulo = f"{color} {r['INSTRUMENTO']} | Entra: {r['HORA_ENTRADA']} | PnL: ${r['RESULTADO_DINERO']}"
                             
                             with st.expander(titulo):
-                                # Pestañas para las imágenes de Cloudinary
                                 t_analisis, t_gatillo, t_cierre = st.tabs(["📊 Análisis", "🎯 Gatillo", "🏁 Cierre"])
                                 
                                 with t_analisis:
@@ -784,26 +791,21 @@ def main_app():
                                         st.caption(f"Temp. Mayor: {r['DIRECCION_MAYOR']}")
                                         img1 = r.get('IMAGEN_MAYOR', '')
                                         if "http" in str(img1): st.image(img1, use_container_width=True)
-                                        else: st.write("Sin imagen")
                                     with c_men:
                                         st.caption(f"Temp. Menor: {r['DIRECCION_MENOR']}")
                                         img2 = r.get('IMAGEN_MENOR', '')
                                         if "http" in str(img2): st.image(img2, use_container_width=True)
-                                        else: st.write("Sin imagen")
 
                                 with t_gatillo:
                                     st.caption(f"Ejecución: {r['DIRECCION_EJECUCION']}")
                                     img3 = r.get('IMAGEN_EJECUCION', '')
                                     if "http" in str(img3): st.image(img3, use_container_width=True)
-                                    else: st.info("No hay captura del gatillo.")
 
                                 with t_cierre:
                                     st.caption("Captura final del trade")
                                     img4 = r.get('IMAGEN_RESULTADO', '')
                                     if "http" in str(img4): st.image(img4, use_container_width=True)
-                                    else: st.info("Trade abierto o sin imagen de cierre.")
 
-                                # --- DATOS TÉCNICOS ADICIONALES ---
                                 st.divider()
                                 info1, info2, info3 = st.columns(3)
                                 with info1:
