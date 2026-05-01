@@ -656,10 +656,7 @@ def main_app():
 # =========================================================
 #  # # SECCION 9: BACKTESTING
 # =========================================================
-   
-# =========================================================
-# SECCIÓN: LABORATÓRIO DE BACKTESTING
-# =========================================================
+  
     elif menu == "🧪 Backtesting":
         st.header("🧪 Laboratorio de Backtesting")
         st.info("Registra tus estudios estadísticos para validar tu ventaja en el mercado.")
