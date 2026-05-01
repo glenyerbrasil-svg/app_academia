@@ -818,7 +818,72 @@ def main_app():
                                     st.write(f"**Emoción:** {r['ESTADO_EMOCIONAL']}")
                                 
                                 st.info(f"**Notas:** {r['OBSERVACIONES']}")
+	
 
+            # --- FILTRADO DE DATOS (YA LO TIENES) ---
+                    df_final = df.loc[mask]
+
+                    # --- NUEVA INTEGRACIÓN: PESTAÑAS DE VISUALIZACIÓN ---
+                    st.divider()
+                    tab_registros, tab_rendimiento, tab_psico = st.tabs([
+                        "📋 Detalle de Trades", 
+                        "💰 Análisis de Rendimiento", 
+                        "🧠 Auditoría Psicológica"
+                    ])
+
+                    # --- PESTAÑA 1: TUS TRADES (EL CÓDIGO QUE YA FUNCIONA) ---
+                    with tab_registros:
+                        if df_final.empty:
+                            st.info("No se encontraron trades para este periodo.")
+                        else:
+                            st.success(f"Se encontraron {len(df_final)} operaciones.")
+                            for i, r in df_final.iterrows():
+                                # Aquí va tu bucle actual 'for i, r in df_final.iterrows():' 
+                                # con los expanders, tabs de imágenes y datos técnicos.
+                                color = "🟢" if r['ESTADO_RESULTADO'] == "TP" else "🔴" if r['ESTADO_RESULTADO'] == "SL" else "🟡"
+                                titulo = f"{color} {r['INSTRUMENTO']} | PnL: ${r['RESULTADO_DINERO']}"
+                                with st.expander(titulo):
+                                    st.write(f"**Notas:** {r['OBSERVACIONES']}") # (Resumen para no alargar)
+
+                    # --- PESTAÑA 2: RENDIMIENTO (NUEVO) ---
+                    with tab_rendimiento:
+                        if not df_final.empty:
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                st.subheader("Curva de Crecimiento")
+                                df_sorted = df_final.sort_values('FECHA_DT')
+                                df_sorted['Acumulado'] = df_sorted['RESULTADO_DINERO'].cumsum()
+                                st.line_chart(df_sorted.set_index('FECHA_DT')['Acumulado'])
+                            
+                            with col2:
+                                st.subheader("Win Rate del Periodo")
+                                counts = df_final['ESTADO_RESULTADO'].value_counts()
+                                st.bar_chart(counts)
+                                
+                            st.subheader("Eficiencia por Instrumento")
+                            inst_stats = df_final.groupby('INSTRUMENTO')['RESULTADO_DINERO'].sum()
+                            st.bar_chart(inst_stats)
+                        else:
+                            st.write("Sin datos para graficar.")
+
+                    # --- PESTAÑA 3: PSICOLOGÍA (NUEVO) ---
+                    with tab_psico:
+                        if not df_final.empty:
+                            c1, c2 = st.columns(2)
+                            with c1:
+                                st.subheader("PnL vs Estado Emocional")
+                                if 'ESTADO_EMOCIONAL' in df_final.columns:
+                                    emo_pnl = df_final.groupby('ESTADO_EMOCIONAL')['RESULTADO_DINERO'].sum()
+                                    st.bar_chart(emo_pnl)
+                            
+                            with c2:
+                                st.subheader("Análisis de Sobre-operativa")
+                                # Cuenta trades por cada día en el rango seleccionado
+                                sobre_op = df_final.groupby(df_final['FECHA_DT'].dt.date).size()
+                                st.area_chart(sobre_op)
+                                st.caption("Picos altos sugieren días donde la emoción te hizo operar más balas.")
+                        else:
+                            st.write("Sin datos para graficar.")
             except Exception as e:
                 st.error(f"Error al procesar la Bitácora: {e}")
 
