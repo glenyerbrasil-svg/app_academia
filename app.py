@@ -654,77 +654,12 @@ def main_app():
                             st.error(f"❌ Error al subir a Cloudinary: {e}")
 
 # =========================================================
-#  # # SECCION 9: BACKTESTING (SINCRONIZADA CON TU EXCEL)
+#  # # SECCION 9: BACKTESTING
 # =========================================================
-
-elif menu == "📊 Backtesting":
-    import uuid
-    st.header("🧪 Laboratorio de Backtesting")
-    
-    try:
-        # Conexión directa a la pestaña que veo en tu imagen
-        hoja_bt = doc.worksheet("Backtesting")
-    except:
-        st.error("❌ No se pudo conectar con la pestaña 'Backtesting'.")
-        st.stop()
-
-    with st.form("form_bt_glenyer", clear_on_submit=True):
-        col1, col2 = st.columns(2)
-        with col1:
-            fecha_bt = st.date_input("Fecha", date.today())
-            inst_bt = st.selectbox("Instrumento", ["FLIPX1", "FLIPX2", "FLIPX3", "FLIPX4", "FLIPX5", "FXVOL99"])
-            estrat_bt = st.text_input("Estrategia", placeholder="Ej: Fibo + Resistencia")
-        
-        with col2:
-            h_ini = st.time_input("Hora Inicial", value=datetime.now().time())
-            h_fin = st.time_input("Hora Final", value=datetime.now().time())
-            res_bt = st.selectbox("Resultado", ["TP", "SL", "BE"])
-            rr_bt = st.number_input("Ratio R:R Logrado", min_value=0.0, step=0.1, value=1.0)
-
-        conf_bt = st.multiselect("Confluencias", ["Tendencia", "Fibo", "S/R", "EMA", "Order Block"])
-        
-        st.write("---")
-        st.subheader("🖼️ Carga de Capturas (Columnas I, J, K)")
-        c1, c2, c3 = st.columns(3)
-        img1 = c1.file_uploader("CAPTURA_MAYOR", type=['png', 'jpg'])
-        img2 = c2.file_uploader("CAPTURA_MENOR", type=['png', 'jpg'])
-        img3 = c3.file_uploader("CAPTURA_EJEC", type=['png', 'jpg'])
-        
-        submit_bt = st.form_submit_button("📥 Guardar Estudio")
-
-        if submit_bt:
-            with st.spinner("Subiendo imágenes..."):
-                # Subida a Cloudinary
-                url1 = subir_a_cloudinary(img1) if img1 else "N/A"
-                url2 = subir_a_cloudinary(img2) if img2 else "N/A"
-                url3 = subir_a_cloudinary(img3) if img3 else "N/A"
-
-                # Cálculo de PnL en Unidades R
-                pnl_r = rr_bt if res_bt == "TP" else (-1.0 if res_bt == "SL" else 0.0)
-
-                # FILA EXACTA SEGÚN TU IMAGEN (Columnas A a K + Extras)
-                # A: ID_REGISTRO, B: ID_USUARIO, C: FECHA, D: ESTRATEGIA, E: INSTRUMENTO...
-                nueva_fila = [
-                    str(uuid.uuid4())[:8],  # A: ID_REGISTRO
-                    user["NOMBRE"],         # B: ID_USUARIO (Glenyer)
-                    str(fecha_bt),          # C: FECHA
-                    estrat_bt,              # D: ESTRATEGIA
-                    inst_bt,                # E: INSTRUMENTO
-                    str(h_ini),             # F: HORA_INICIAL
-                    str(h_fin),             # G: HORA_FINAL
-                    ", ".join(conf_bt),     # H: CONFLUENCIAS
-                    url1,                   # I: CAPTURA_MAYOR
-                    url2,                   # J: CAPTURA_MENOR
-                    url3,                   # K: CAPTURA_EJEC
-                    res_bt,                 # L: RESULTADO (Nueva)
-                    rr_bt,                  # M: RATIO_RR (Nueva)
-                    pnl_r                   # N: PNL_R (Nueva)
-                ]
-                
-                hoja_bt.append_row(nueva_fila)
-                st.success(f"✅ ¡Backtesting despertó! Registro guardado.")
-                st.balloons()
-                st.rerun()
+   
+    elif menu == "📊 Backtesting":
+        st.header("📊 Entrenamiento de Simulación (Backtesting)")
+        st.info("Aquí los resultados no afectan tu capital real de la hoja de Finanzas.")
 
 # =========================================================
 # # SECCION 10: FINANZAS
@@ -769,135 +704,121 @@ elif menu == "📊 Backtesting":
             st.error(f"Error de conexión: {e}")
 
 # =========================================================
-# SECCION 11: AUDITORÍA (COLORES FIJOS Y PESTAÑAS ORIGINALES)
+# SECCION 11: AUDITORÍA DE GRÁFICOS (VERSIÓN FINAL COMPLETA)
 # =========================================================
     elif menu == "📈 Reportes":
         st.header("🔍 Auditoría de Gráficos y Análisis Técnico")
 
+        # 1. Verificación de seguridad de la conexión DESDE EL SESSION STATE
         if st.session_state.get('cliente_google') is None:
             with st.spinner("🔄 Reintentando conexión con Google Sheets..."):
                 st.session_state['cliente_google'] = conectar_google()
 
         if st.session_state.get('cliente_google') is None:
-            st.error("❌ Error de conexión. Revisa tus credenciales.")
+            st.error("❌ Error de conexión: No se pudo acceder a la llave de Google Sheets.")
+            st.info("Refresca la página (F5). Si el error persiste, revisa tus credenciales.")
         else:
             try:
+                # Usamos la conexión que ya está en la "mochila"
                 cliente_google = st.session_state['cliente_google']
+                
+                # 2. Apertura del libro y hoja específicos que me diste
                 sh = cliente_google.open("Bitacora_Academia1") 
                 hoja_bitacora = sh.worksheet("Bitacora")
+                
                 registros = hoja_bitacora.get_all_records()
                 
                 if not registros:
-                    st.warning("⚠️ La hoja 'Bitacora' está vacía.")
+                    st.warning("⚠️ La hoja 'Bitacora' no tiene registros actualmente.")
                 else:
                     df = pd.DataFrame(registros)
+                    # Limpieza de encabezados para evitar errores de espacios
                     df.columns = [str(c).strip() for c in df.columns]
+                    
+                    # Conversión de FECHA (Columna 3)
                     df['FECHA_DT'] = pd.to_datetime(df['FECHA'], dayfirst=True, errors='coerce')
 
                     # --- INTERFAZ DE FILTROS ---
                     st.write("### ⚙️ Parámetros de Búsqueda")
-                    f1, f2, f3 = st.columns([2, 1, 1])
+                    f1, f2, f3 = st.columns(3)
 
                     with f1:
-                        rango_fechas = st.date_input(
-                            "Periodo a auditar:",
-                            value=[date.today(), date.today()],
-                            help="Selecciona inicio y fin en el calendario."
-                        )
+                        f_fecha = st.date_input("Día operado:", value=date.today())
                     with f2:
+                        # Columna 21: ESTADO_RESULTADO
                         res_list = ["Todos"] + sorted(df['ESTADO_RESULTADO'].unique().tolist())
                         f_res = st.selectbox("Resultado:", res_list)
                     with f3:
+                        # Columna 4: INSTRUMENTO
                         act_list = ["Todos"] + sorted(df['INSTRUMENTO'].unique().tolist())
                         f_act = st.selectbox("Activo:", act_list)
 
-                    # --- LÓGICA DE FILTRADO ---
-                    if isinstance(rango_fechas, (list, tuple)) and len(rango_fechas) == 2:
-                        inicio, fin = rango_fechas
-                        mask = (df['FECHA_DT'].dt.date >= inicio) & (df['FECHA_DT'].dt.date <= fin)
-                    else:
-                        mask = (df['FECHA_DT'].dt.date == (rango_fechas[0] if isinstance(rango_fechas, list) else rango_fechas))
+                    # --- FILTRADO DE DATOS ---
+                    mask = (df['FECHA_DT'].dt.date == f_fecha)
+                    if f_res != "Todos":
+                        mask = mask & (df['ESTADO_RESULTADO'] == f_res)
+                    if f_act != "Todos":
+                        mask = mask & (df['INSTRUMENTO'] == f_act)
 
-                    if f_res != "Todos": mask = mask & (df['ESTADO_RESULTADO'] == f_res)
-                    if f_act != "Todos": mask = mask & (df['INSTRUMENTO'] == f_act)
                     df_final = df.loc[mask]
 
-                    # --- INTEGRACIÓN: PESTAÑAS CON COLORES DINÁMICOS ---
+                    # --- DESPLIEGUE DE TRADES ---
                     st.divider()
-                    tab_registros, tab_rendimiento, tab_psico = st.tabs([
-                        "📋 Detalle de Trades", 
-                        "💰 Análisis de Rendimiento", 
-                        "🧠 Auditoría Psicológica"
-                    ])
-
-                    # --- PESTAÑA 1: DETALLE DE TRADES ---
-                    with tab_registros:
-                        if df_final.empty:
-                            st.info("No se encontraron trades.")
-                        else:
-                            st.success(f"Se encontraron {len(df_final)} operaciones.")
-                            for i, r in df_final.iterrows():
-                                icono = "🟢" if r['ESTADO_RESULTADO'] == "TP" else "🔴" if r['ESTADO_RESULTADO'] == "SL" else "🟡"
-                                titulo = f"{icono} {r['INSTRUMENTO']} | Entra: {r['HORA_ENTRADA']} | PnL: ${r['RESULTADO_DINERO']}"
-                                with st.expander(titulo):
-                                    t_an, t_ga, t_ci = st.tabs(["📊 Análisis", "🎯 Gatillo", "🏁 Cierre"])
-                                    with t_an:
-                                        c_may, c_men = st.columns(2)
-                                        if "http" in str(r['IMAGEN_MAYOR']): c_may.image(r['IMAGEN_MAYOR'], caption="Temporalidad Mayor")
-                                        if "http" in str(r['IMAGEN_MENOR']): c_men.image(r['IMAGEN_MENOR'], caption="Temporalidad Menor")
-                                    with t_ga:
-                                        if "http" in str(r['IMAGEN_EJECUCION']): st.image(r['IMAGEN_EJECUCION'])
-                                    with t_ci:
-                                        if "http" in str(r['IMAGEN_RESULTADO']): st.image(r['IMAGEN_RESULTADO'])
-                                    st.write(f"**Bala:** ${r['VALOR_BALA']} | **Lotaje:** {r['LOTAJE']} | **Emoción:** {r['ESTADO_EMOCIONAL']}")
-
-                    # --- PESTAÑA 2: ANÁLISIS DE RENDIMIENTO ---
-                    with tab_rendimiento:
-                        if not df_final.empty:
-                            col1, col2 = st.columns(2)
-                            with col1:
-                                st.subheader("Curva de Crecimiento")
-                                df_grow = df_final.sort_values('FECHA_DT').copy()
-                                df_grow['Acumulado'] = df_grow['RESULTADO_DINERO'].cumsum()
-                                st.area_chart(df_grow.set_index('FECHA_DT')['Acumulado'])
+                    if df_final.empty:
+                        st.info(f"No se encontraron trades para el día {f_fecha}.")
+                    else:
+                        st.success(f"Se encontraron {len(df_final)} operaciones.")
+                        
+                        for i, r in df_final.iterrows():
+                            # Encabezado visual (Col 21, 4, 12, 22)
+                            color = "🟢" if r['ESTADO_RESULTADO'] == "TP" else "🔴" if r['ESTADO_RESULTADO'] == "SL" else "🟡"
+                            titulo = f"{color} {r['INSTRUMENTO']} | Entra: {r['HORA_ENTRADA']} | PnL: ${r['RESULTADO_DINERO']}"
                             
-                            with col2:
-                                st.subheader("Win Rate (Estado)")
-                                counts = df_final['ESTADO_RESULTADO'].value_counts().reset_index()
-                                counts.columns = ['Estado', 'Cantidad']
-                                # Mapeo de colores estricto
-                                color_res = {"TP": "#00FF00", "SL": "#FF0000", "BE": "#FFFF00"}
-                                counts['Color'] = counts['Estado'].map(color_res)
-                                st.bar_chart(counts, x="Estado", y="Cantidad", color="Color")
-                            
-                            st.subheader("Rendimiento por Instrumento")
-                            inst_stats = df_final.groupby('INSTRUMENTO')['RESULTADO_DINERO'].sum().reset_index()
-                            inst_stats['Color_Inst'] = inst_stats['RESULTADO_DINERO'].apply(lambda x: "#00FF00" if x > 0 else "#FF0000")
-                            st.bar_chart(inst_stats, x="INSTRUMENTO", y="RESULTADO_DINERO", color="Color_Inst")
+                            with st.expander(titulo):
+                                # Pestañas para las imágenes de Cloudinary
+                                t_analisis, t_gatillo, t_cierre = st.tabs(["📊 Análisis", "🎯 Gatillo", "🏁 Cierre"])
+                                
+                                with t_analisis:
+                                    c_may, c_men = st.columns(2)
+                                    with c_may:
+                                        st.caption(f"Temp. Mayor: {r['DIRECCION_MAYOR']}")
+                                        img1 = r.get('IMAGEN_MAYOR', '')
+                                        if "http" in str(img1): st.image(img1, use_container_width=True)
+                                        else: st.write("Sin imagen")
+                                    with c_men:
+                                        st.caption(f"Temp. Menor: {r['DIRECCION_MENOR']}")
+                                        img2 = r.get('IMAGEN_MENOR', '')
+                                        if "http" in str(img2): st.image(img2, use_container_width=True)
+                                        else: st.write("Sin imagen")
 
-                    # --- PESTAÑA 3: AUDITORÍA PSICOLÓGICA ---
-                    with tab_psico:
-                        if not df_final.empty:
-                            c1, c2 = st.columns(2)
-                            with c1:
-                                st.subheader("PnL por Emoción")
-                                emo_stats = df_final.groupby('ESTADO_EMOCIONAL')['RESULTADO_DINERO'].sum().reset_index()
-                                # Mapeo emocional solicitado
-                                color_emo = {
-                                    "Zen": "#0000FF", 
-                                    "Calma": "#008000", 
-                                    "Neutral": "#808080", 
-                                    "Nervioso": "#FFA500"
-                                }
-                                emo_stats['Color_E'] = emo_stats['ESTADO_EMOCIONAL'].map(color_emo).fillna("#D3D3D3")
-                                st.bar_chart(emo_stats, x="ESTADO_EMOCIONAL", y="RESULTADO_DINERO", color="Color_E")
-                            with c2:
-                                st.subheader("Alerta Sobre-operativa")
-                                sobre_op = df_final.groupby(df_final['FECHA_DT'].dt.date).size().reset_index(name='Trades')
-                                st.line_chart(sobre_op.set_index('FECHA_DT')['Trades'])
+                                with t_gatillo:
+                                    st.caption(f"Ejecución: {r['DIRECCION_EJECUCION']}")
+                                    img3 = r.get('IMAGEN_EJECUCION', '')
+                                    if "http" in str(img3): st.image(img3, use_container_width=True)
+                                    else: st.info("No hay captura del gatillo.")
+
+                                with t_cierre:
+                                    st.caption("Captura final del trade")
+                                    img4 = r.get('IMAGEN_RESULTADO', '')
+                                    if "http" in str(img4): st.image(img4, use_container_width=True)
+                                    else: st.info("Trade abierto o sin imagen de cierre.")
+
+                                # --- DATOS TÉCNICOS ADICIONALES ---
+                                st.divider()
+                                info1, info2, info3 = st.columns(3)
+                                with info1:
+                                    st.write(f"**Bala:** ${r['VALOR_BALA']}")
+                                    st.write(f"**Llegó 1:1:** {r['LLEGO_11']}")
+                                with info2:
+                                    st.write(f"**Lotaje:** {r['LOTAJE']}")
+                                    st.write(f"**Drawdown:** {r['DRAWDOWN']}")
+                                with info3:
+                                    st.write(f"**Emoción:** {r['ESTADO_EMOCIONAL']}")
+                                
+                                st.info(f"**Notas:** {r['OBSERVACIONES']}")
 
             except Exception as e:
-                st.error(f"Error técnico: {e}")
+                st.error(f"Error al procesar la Bitácora: {e}")
 
 	
         
