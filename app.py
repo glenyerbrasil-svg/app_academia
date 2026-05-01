@@ -704,17 +704,17 @@ def main_app():
             st.error(f"Error de conexión: {e}")
 
 # =========================================================
-# SECCION 11: AUDITORÍA (CORRECCIÓN FINAL DE COLORES PNL/EMOCIÓN)
+# SECCION 11: AUDITORÍA (INTEGRACIÓN COMPLETA Y DINÁMICA)
 # =========================================================
     elif menu == "📈 Reportes":
         st.header("🔍 Auditoría de Gráficos y Análisis Técnico")
 
         if st.session_state.get('cliente_google') is None:
-            with st.spinner("🔄 Reintentando conexión..."):
+            with st.spinner("🔄 Reintentando conexión con Google Sheets..."):
                 st.session_state['cliente_google'] = conectar_google()
 
         if st.session_state.get('cliente_google') is None:
-            st.error("❌ Error de conexión.")
+            st.error("❌ Error de conexión. Revisa tus credenciales.")
         else:
             try:
                 cliente_google = st.session_state['cliente_google']
@@ -723,16 +723,22 @@ def main_app():
                 registros = hoja_bitacora.get_all_records()
                 
                 if not registros:
-                    st.warning("⚠️ Sin registros.")
+                    st.warning("⚠️ La hoja 'Bitacora' está vacía.")
                 else:
                     df = pd.DataFrame(registros)
                     df.columns = [str(c).strip() for c in df.columns]
                     df['FECHA_DT'] = pd.to_datetime(df['FECHA'], dayfirst=True, errors='coerce')
 
-                    # --- FILTROS ---
+                    # --- INTERFAZ DE FILTROS ---
+                    st.write("### ⚙️ Parámetros de Búsqueda")
                     f1, f2, f3 = st.columns([2, 1, 1])
+
                     with f1:
-                        rango = st.date_input("Periodo a auditar:", value=[date.today(), date.today()])
+                        rango_fechas = st.date_input(
+                            "Periodo a auditar:",
+                            value=[date.today(), date.today()],
+                            help="Selecciona inicio y fin en el calendario."
+                        )
                     with f2:
                         res_list = ["Todos"] + sorted(df['ESTADO_RESULTADO'].unique().tolist())
                         f_res = st.selectbox("Resultado:", res_list)
@@ -740,14 +746,18 @@ def main_app():
                         act_list = ["Todos"] + sorted(df['INSTRUMENTO'].unique().tolist())
                         f_act = st.selectbox("Activo:", act_list)
 
-                    # Lógica de filtrado
-                    if isinstance(rango, (list, tuple)) and len(rango) == 2:
-                        mask = (df['FECHA_DT'].dt.date >= rango[0]) & (df['FECHA_DT'].dt.date <= rango[1])
+                    # --- LÓGICA DE FILTRADO ---
+                    if isinstance(rango_fechas, (list, tuple)) and len(rango_fechas) == 2:
+                        inicio, fin = rango_fechas
+                        mask = (df['FECHA_DT'].dt.date >= inicio) & (df['FECHA_DT'].dt.date <= fin)
                     else:
-                        mask = (df['FECHA_DT'].dt.date == (rango[0] if isinstance(rango, list) else rango))
-                    
-                    if f_res != "Todos": mask = mask & (df['ESTADO_RESULTADO'] == f_res)
-                    if f_act != "Todos": mask = mask & (df['INSTRUMENTO'] == f_act)
+                        mask = (df['FECHA_DT'].dt.date == (rango_fechas[0] if isinstance(rango_fechas, list) else rango_fechas))
+
+                    if f_res != "Todos":
+                        mask = mask & (df['ESTADO_RESULTADO'] == f_res)
+                    if f_act != "Todos":
+                        mask = mask & (df['INSTRUMENTO'] == f_act)
+
                     df_final = df.loc[mask]
 
                     # --- INTEGRACIÓN: PESTAÑAS CON COLORES DINÁMICOS ---
@@ -758,60 +768,79 @@ def main_app():
                         "🧠 Auditoría Psicológica"
                     ])
 
+                    # --- PESTAÑA 1: DETALLE DE TRADES ---
                     with tab_registros:
-                        # (Código de detalles se mantiene igual)
-                        if df_final.empty: st.info("Sin trades.")
-                        else: st.success(f"Se encontraron {len(df_final)} operaciones.")
+                        if df_final.empty:
+                            st.info("No se encontraron trades para este periodo.")
+                        else:
+                            st.success(f"Se encontraron {len(df_final)} operaciones.")
+                            for i, r in df_final.iterrows():
+                                icono = "🟢" if r['ESTADO_RESULTADO'] == "TP" else "🔴" if r['ESTADO_RESULTADO'] == "SL" else "🟡"
+                                titulo = f"{icono} {r['INSTRUMENTO']} | Entra: {r['HORA_ENTRADA']} | PnL: ${r['RESULTADO_DINERO']}"
+                                
+                                with st.expander(titulo):
+                                    t_an, t_ga, t_ci = st.tabs(["📊 Análisis", "🎯 Gatillo", "🏁 Cierre"])
+                                    with t_an:
+                                        c_may, c_men = st.columns(2)
+                                        with c_may:
+                                            st.caption(f"Mayor: {r['DIRECCION_MAYOR']}")
+                                            if "http" in str(r['IMAGEN_MAYOR']): st.image(r['IMAGEN_MAYOR'], use_container_width=True)
+                                        with c_men:
+                                            st.caption(f"Menor: {r['DIRECCION_MENOR']}")
+                                            if "http" in str(r['IMAGEN_MENOR']): st.image(r['IMAGEN_MENOR'], use_container_width=True)
+                                    with t_ga:
+                                        if "http" in str(r['IMAGEN_EJECUCION']): st.image(r['IMAGEN_EJECUCION'], use_container_width=True)
+                                    with t_ci:
+                                        if "http" in str(r['IMAGEN_RESULTADO']): st.image(r['IMAGEN_RESULTADO'], use_container_width=True)
 
+                                    st.divider()
+                                    in1, in2, in3 = st.columns(3)
+                                    in1.write(f"**Bala:** ${r['VALOR_BALA']}")
+                                    in2.write(f"**Lotaje:** {r['LOTAJE']}")
+                                    in3.write(f"**Emoción:** {r['ESTADO_EMOCIONAL']}")
+                                    st.info(f"**Notas:** {r['OBSERVACIONES']}")
+
+                    # --- PESTAÑA 2: ANÁLISIS DE RENDIMIENTO ---
                     with tab_rendimiento:
                         if not df_final.empty:
-                            c_r1, c_r2 = st.columns(2)
-                            with c_r1:
+                            col1, col2 = st.columns(2)
+                            with col1:
                                 st.subheader("Curva de Crecimiento")
-                                df_c = df_final.sort_values('FECHA_DT').copy()
-                                df_c['Acumulado'] = df_c['RESULTADO_DINERO'].cumsum()
-                                st.area_chart(df_c.set_index('FECHA_DT')['Acumulado'])
-                            with c_r2:
+                                df_sorted = df_final.sort_values('FECHA_DT').copy()
+                                df_sorted['Acumulado'] = df_sorted['RESULTADO_DINERO'].cumsum()
+                                st.area_chart(df_sorted.set_index('FECHA_DT')['Acumulado'])
+                            
+                            with col2:
                                 st.subheader("Win Rate (Estado)")
-                                c_res = df_final['ESTADO_RESULTADO'].value_counts().reset_index()
-                                c_res.columns = ['Estado', 'Cantidad']
-                                # Colores exactos para TP/SL/BE
-                                c_res['Color'] = c_res['Estado'].map({"TP": "#00FF00", "SL": "#FF0000", "BE": "#FFFF00"})
-                                st.bar_chart(c_res, x="Estado", y="Cantidad", color="Color")
+                                counts = df_final['ESTADO_RESULTADO'].value_counts().reset_index()
+                                counts.columns = ['Estado', 'Cantidad']
+                                # Usamos 'Estado' para el color, Streamlit se encarga de la compatibilidad
+                                st.bar_chart(counts, x="Estado", y="Cantidad", color="Estado")
+                            
+                            st.subheader("Rendimiento Neto por Instrumento")
+                            inst_stats = df_final.groupby('INSTRUMENTO')['RESULTADO_DINERO'].sum().reset_index()
+                            inst_stats['Balance'] = inst_stats['RESULTADO_DINERO'].apply(lambda x: "Positivo" if x > 0 else "Negativo")
+                            st.bar_chart(inst_stats, x="INSTRUMENTO", y="RESULTADO_DINERO", color="Balance")
+                        else:
+                            st.write("Sin datos para mostrar en rendimiento.")
 
+                    # --- PESTAÑA 3: AUDITORÍA PSICOLÓGICA ---
                     with tab_psico:
                         if not df_final.empty:
                             c1, c2 = st.columns(2)
                             with c1:
                                 st.subheader("PnL por Emoción")
-                                emo_stats = df_final.groupby('ESTADO_EMOCIONAL')['RESULTADO_DINERO'].sum().reset_index()
-                                
-                                # MAPEO DE COLORES SOLICITADO
-                                color_map_emo = {
-                                    "Zen": "#0000FF",       # Azul
-                                    "Calma": "#008000",     # Verde
-                                    "Neutral": "#808080",   # Gris/Amarillo
-                                    "Nervioso": "#FFA500"   # Naranja/Rojo
-                                }
-                                
-                                # Aplicamos el color y forzamos que no sea nulo
-                                emo_stats['Color_Emocion'] = emo_stats['ESTADO_EMOCIONAL'].map(color_map_emo).fillna("#D3D3D3")
-                                
-                                # GRAFICAR FORZANDO LA COLUMNA DE COLOR
-                                st.bar_chart(
-                                    emo_stats, 
-                                    x="ESTADO_EMOCIONAL", 
-                                    y="RESULTADO_DINERO", 
-                                    color="Color_Emocion"
-                                )
-                                
+                                emo_pnl = df_final.groupby('ESTADO_EMOCIONAL')['RESULTADO_DINERO'].sum().reset_index()
+                                st.bar_chart(emo_pnl, x="ESTADO_EMOCIONAL", y="RESULTADO_DINERO", color="ESTADO_EMOCIONAL")
                             with c2:
                                 st.subheader("Alerta Sobre-operativa")
-                                sobre_op = df_final.groupby(df_final['FECHA_DT'].dt.date).size().reset_index(name='Trades')
-                                st.line_chart(sobre_op.set_index('FECHA_DT')['Trades'])
+                                sobre_op = df_final.groupby(df_final['FECHA_DT'].dt.date).size().reset_index(name='Cantidad')
+                                st.line_chart(sobre_op.set_index('FECHA_DT')['Cantidad'])
+                        else:
+                            st.write("Sin datos para auditoría psicológica.")
 
             except Exception as e:
-                st.error(f"Error al procesar: {e}")
+                st.error(f"Error al procesar la Bitácora: {e}")
 
 	
         
