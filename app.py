@@ -654,72 +654,89 @@ def main_app():
                             st.error(f"❌ Error al subir a Cloudinary: {e}")
 
 # =========================================================
-#  # # SECCION 9: BACKTESTING
+#  # # SECCION 9: BACKTESTING (ESTRUCTURA DE 15 COLUMNAS)
 # =========================================================
-  
-    elif menu == "🧪 Backtesting":
-        st.header("🧪 Laboratorio de Backtesting")
-        st.info("Registra tus estudios estadísticos para validar tu ventaja en el mercado.")
 
-        with st.form("form_backtesting", clear_on_submit=True):
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                fecha_bt = st.date_input("Fecha del Setup", date.today())
-                estrategia = st.text_input("Estrategia", placeholder="Ej: Fibo + EMA 200")
-            with col2:
-                inst_bt = st.selectbox("Instrumento", [
-                    "FLIPX1", "FLIPX2", "FLIPX3", "FLIPX4", "FLIPX5",
-                    "FXVOL20", "FXVOL40", "FXVOL60", "FXVOL80", "FXVOL99",
-                    "SFXVOL20", "SFXVOL40", "SFXVOL60", "SFXVOL80", "SFXVOL99"
-                ])
-                resultado_bt = st.selectbox("Resultado", ["TP", "SL", "BE"])
-            with col3:
-                h_inicio = st.time_input("Hora Inicial", value=None)
-                h_final = st.time_input("Hora Final", value=None)
-                ratio_rr = st.number_input("Ratio R:R Realizado", min_value=0.0, step=0.1, value=1.0)
+elif menu == "📊 Backtesting":
+    import uuid
+    st.header("🧪 Laboratorio de Backtesting")
+    
+    try:
+        # Conexión a la pestaña confirmada en la imagen
+        hoja_bt = doc.worksheet("Backtesting")
+    except:
+        st.error("❌ No se pudo conectar con la pestaña 'Backtesting'.")
+        st.stop()
 
-            confluencias = st.multiselect("Confluencias Cumplidas", 
-                ["Tendencia a Favor", "Nivel Fibo", "Zona S/R", "Cruce EMAs", "Divergencia RSI", "Order Block"])
-            
-            st.write("---")
-            st.subheader("🖼️ Evidencia Visual")
-            c1, c2, c3 = st.columns(3)
-            img_mayor = c1.file_uploader("Captura MAYOR", type=['png', 'jpg', 'jpeg'])
-            img_menor = c2.file_uploader("Captura MENOR", type=['png', 'jpg', 'jpeg'])
-            img_exec = c3.file_uploader("Captura EJECUCIÓN", type=['png', 'jpg', 'jpeg'])
-            
-            notas_bt = st.text_area("Observaciones del estudio")
-            
-            submit_bt = st.form_submit_button("📥 Guardar en Base de Datos")
-
-            if submit_bt:
-                # Lógica de cálculo de PnL en Unidades R
-                pnl_u = ratio_rr if resultado_bt == "TP" else (-1.0 if resultado_bt == "SL" else 0.0)
-                
-                # Aquí iría tu función de subida a Cloudinary (reutilizando la que ya tienes)
-                # url_mayor = subir_cloudinary(img_mayor) ... etc
-                
-                nuevo_registro = [
-                    str(uuid.uuid4())[:8], "Glenyer", str(fecha_bt), estrategia, inst_bt,
-                    str(h_inicio), str(h_final), ", ".join(confluencias),
-                    "url_cloudinary_1", "url_cloudinary_2", "url_cloudinary_3",
-                    resultado_bt, ratio_rr, pnl_u, notas_bt
-                ]
-                
-                # hoja_backtesting.append_row(nuevo_registro)
-                st.success(f"✅ Estudio guardado. PnL Teórico: {pnl_u}R")
-
-        # --- ÁREA DE CONSULTA Y ESTADÍSTICAS ---
-        st.divider()
-        st.subheader("📊 Análisis de Estrategias")
+    with st.form("form_bt_glenyer", clear_on_submit=True):
+        col1, col2 = st.columns(2)
+        with col1:
+            fecha_bt = st.date_input("3. Fecha del Trade Histórico", date.today())
+            estrat_bt = st.text_input("4. Estrategia", placeholder="Ej: Order Block + Fibo")
+            inst_bt = st.selectbox("5. Instrumento", [
+                "FLIPX1", "FLIPX2", "FLIPX3", "FLIPX4", "FLIPX5",
+                "FXVOL20", "FXVOL40", "FXVOL60", "FXVOL80", "FXVOL99",
+                "SFXVOL20", "SFXVOL40", "SFXVOL60", "SFXVOL80", "SFXVOL99"
+            ])
         
-        # Filtros de visualización
-        f_col1, f_col2 = st.columns(2)
-        filtro_est = f_col1.selectbox("Filtrar por Estrategia:", ["Todas"] + ["Fibo", "EMAs"]) # Esto vendría del DF
-        filtro_fecha = f_col2.date_input("Desde:", value=date.today() - timedelta(days=30))
+        with col2:
+            h_ini = st.time_input("6. Hora Inicial", value=datetime.now().time())
+            h_fin = st.time_input("7. Hora Final", value=datetime.now().time())
+            res_bt = st.selectbox("12. Resultado", ["TP", "SL", "BE"])
+            rr_bt = st.number_input("13. Ratio R:R Real", min_value=0.0, step=0.1, value=1.0)
+
+        conf_bt = st.multiselect("8. Confluencias Cumplidas", 
+                                 ["Tendencia", "Fibo 61.8", "S/R Nivel", "EMA Cross", "Order Block", "RSI Divergencia"])
         
-        # Aquí programaremos los gráficos de Esperanza Matemática y el Muro de Imágenes
-        st.write("*(Próximo paso: Integración de gráficos de rendimiento por estrategia)*")
+        st.write("---")
+        st.subheader("🖼️ Capturas de Pantalla (Cloudinary)")
+        c1, c2, c3 = st.columns(3)
+        img_macro = c1.file_uploader("9. CAPTURA_MAYOR", type=['png', 'jpg'])
+        img_med = c2.file_uploader("10. CAPTURA_MENOR", type=['png', 'jpg'])
+        img_exec = c3.file_uploader("11. CAPTURA_EJECUCION", type=['png', 'jpg'])
+        
+        notas_bt = st.text_area("15. Observaciones (Detalles del precio)")
+        
+        submit_bt = st.form_submit_button("📥 Registrar Estudio en Bitácora")
+
+        if submit_bt:
+            with st.spinner("🚀 Subiendo evidencias y procesando datos..."):
+                try:
+                    # Subida a Cloudinary
+                    url1 = subir_a_cloudinary(img_macro) if img_macro else "N/A"
+                    url2 = subir_a_cloudinary(img_med) if img_med else "N/A"
+                    url3 = subir_a_cloudinary(img_exec) if img_exec else "N/A"
+
+                    # 14. Cálculo automático de PNL UNIDADES
+                    # Basado en tu lógica: Si TP -> Ratio_RR; Si SL -> -1
+                    pnl_unidades = rr_bt if res_bt == "TP" else (-1.0 if res_bt == "SL" else 0.0)
+
+                    # CONSTRUCCIÓN DE LA FILA (1 a 15)
+                    nueva_fila = [
+                        f"BT-{str(uuid.uuid4())[:5].upper()}", # 1. ID_REGISTRO
+                        user["NOMBRE"],                         # 2. ID_USUARIO
+                        str(fecha_bt),                          # 3. FECHA
+                        estrat_bt,                              # 4. ESTRATEGIA
+                        inst_bt,                                # 5. INSTRUMENTO
+                        str(h_ini),                             # 6. HORA_INICIAL
+                        str(h_fin),                             # 7. HORA_FINAL
+                        ", ".join(conf_bt),                     # 8. CONFLUENCIAS
+                        url1,                                   # 9. CAPTURA_MAYOR
+                        url2,                                   # 10. CAPTURA_MENOR
+                        url3,                                   # 11. CAPTURA_EJECUCION
+                        res_bt,                                 # 12. RESULTADO
+                        float(rr_bt),                           # 13. RATIO_RR
+                        float(pnl_unidades),                    # 14. PNL_UNIDADES
+                        notas_bt                                # 15. OBSERVACIONES
+                    ]
+                    
+                    hoja_bt.append_row(nueva_fila)
+                    st.success(f"✅ ¡Backtesting despertó! Registrado con {pnl_unidades}R.")
+                    st.balloons()
+                    time.sleep(1)
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Hubo un error al guardar: {e}")
 
 # =========================================================
 # # SECCION 10: FINANZAS
