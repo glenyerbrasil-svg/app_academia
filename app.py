@@ -657,9 +657,72 @@ def main_app():
 #  # # SECCION 9: BACKTESTING
 # =========================================================
    
-    elif menu == "📊 Backtesting":
-        st.header("📊 Entrenamiento de Simulación (Backtesting)")
-        st.info("Aquí los resultados no afectan tu capital real de la hoja de Finanzas.")
+# =========================================================
+# SECCIÓN: LABORATÓRIO DE BACKTESTING
+# =========================================================
+    elif menu == "🧪 Backtesting":
+        st.header("🧪 Laboratorio de Backtesting")
+        st.info("Registra tus estudios estadísticos para validar tu ventaja en el mercado.")
+
+        with st.form("form_backtesting", clear_on_submit=True):
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                fecha_bt = st.date_input("Fecha del Setup", date.today())
+                estrategia = st.text_input("Estrategia", placeholder="Ej: Fibo + EMA 200")
+            with col2:
+                inst_bt = st.selectbox("Instrumento", [
+                    "FLIPX1", "FLIPX2", "FLIPX3", "FLIPX4", "FLIPX5",
+                    "FXVOL20", "FXVOL40", "FXVOL60", "FXVOL80", "FXVOL99",
+                    "SFXVOL20", "SFXVOL40", "SFXVOL60", "SFXVOL80", "SFXVOL99"
+                ])
+                resultado_bt = st.selectbox("Resultado", ["TP", "SL", "BE"])
+            with col3:
+                h_inicio = st.time_input("Hora Inicial", value=None)
+                h_final = st.time_input("Hora Final", value=None)
+                ratio_rr = st.number_input("Ratio R:R Realizado", min_value=0.0, step=0.1, value=1.0)
+
+            confluencias = st.multiselect("Confluencias Cumplidas", 
+                ["Tendencia a Favor", "Nivel Fibo", "Zona S/R", "Cruce EMAs", "Divergencia RSI", "Order Block"])
+            
+            st.write("---")
+            st.subheader("🖼️ Evidencia Visual")
+            c1, c2, c3 = st.columns(3)
+            img_mayor = c1.file_uploader("Captura MAYOR", type=['png', 'jpg', 'jpeg'])
+            img_menor = c2.file_uploader("Captura MENOR", type=['png', 'jpg', 'jpeg'])
+            img_exec = c3.file_uploader("Captura EJECUCIÓN", type=['png', 'jpg', 'jpeg'])
+            
+            notas_bt = st.text_area("Observaciones del estudio")
+            
+            submit_bt = st.form_submit_button("📥 Guardar en Base de Datos")
+
+            if submit_bt:
+                # Lógica de cálculo de PnL en Unidades R
+                pnl_u = ratio_rr if resultado_bt == "TP" else (-1.0 if resultado_bt == "SL" else 0.0)
+                
+                # Aquí iría tu función de subida a Cloudinary (reutilizando la que ya tienes)
+                # url_mayor = subir_cloudinary(img_mayor) ... etc
+                
+                nuevo_registro = [
+                    str(uuid.uuid4())[:8], "Glenyer", str(fecha_bt), estrategia, inst_bt,
+                    str(h_inicio), str(h_final), ", ".join(confluencias),
+                    "url_cloudinary_1", "url_cloudinary_2", "url_cloudinary_3",
+                    resultado_bt, ratio_rr, pnl_u, notas_bt
+                ]
+                
+                # hoja_backtesting.append_row(nuevo_registro)
+                st.success(f"✅ Estudio guardado. PnL Teórico: {pnl_u}R")
+
+        # --- ÁREA DE CONSULTA Y ESTADÍSTICAS ---
+        st.divider()
+        st.subheader("📊 Análisis de Estrategias")
+        
+        # Filtros de visualización
+        f_col1, f_col2 = st.columns(2)
+        filtro_est = f_col1.selectbox("Filtrar por Estrategia:", ["Todas"] + ["Fibo", "EMAs"]) # Esto vendría del DF
+        filtro_fecha = f_col2.date_input("Desde:", value=date.today() - timedelta(days=30))
+        
+        # Aquí programaremos los gráficos de Esperanza Matemática y el Muro de Imágenes
+        st.write("*(Próximo paso: Integración de gráficos de rendimiento por estrategia)*")
 
 # =========================================================
 # # SECCION 10: FINANZAS
