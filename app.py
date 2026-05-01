@@ -704,100 +704,111 @@ def main_app():
             st.error(f"Error de conexión: {e}")
 
 # =========================================================
-# SECCION 11: BUSCADOR Y AUDITORÍA DE TRADES (GRÁFICOS)
+# SECCION 11: AUDITORÍA DE GRÁFICOS (ACTUALIZADA)
 # =========================================================
     elif menu == "📈 Reportes":
-        st.header("🔍 Auditoría de Gráficos y Análisis")
+        st.header("🔍 Auditoría de Gráficos y Análisis Técnico")
 
         try:
-            # 1. Obtener datos de la hoja global configurada ayer
-            registros = hoja_operaciones.get_all_records()
+            # 1. Conexión al libro específico que me indicaste
+            # Asegúrate que el JSON de credenciales tenga acceso a este nombre
+            sh = cliente_google.open("Bitacora_Academia1") 
+            hoja_bitacora = sh.worksheet("Bitacora")
+            
+            registros = hoja_bitacora.get_all_records()
             
             if not registros:
-                st.warning("⚠️ Todavía no hay operaciones registradas en tu bitácora.")
+                st.warning("⚠️ La hoja 'Bitacora' está vacía.")
             else:
                 df = pd.DataFrame(registros)
-                # Limpiar nombres de columnas para evitar errores de espacios
+                # Limpieza de seguridad para nombres de columnas
                 df.columns = [str(c).strip() for c in df.columns]
                 
-                # Convertir la columna FECHA a formato datetime para que Streamlit la entienda
+                # Conversión de la columna FECHA (Columna 3)
                 df['FECHA_DT'] = pd.to_datetime(df['FECHA'], dayfirst=True, errors='coerce')
 
-                # --- ZONA DE FILTROS (Simples y potentes) ---
+                # --- FILTROS ---
                 st.write("### ⚙️ Filtros de Búsqueda")
-                col_f1, col_f2, col_f3 = st.columns(3)
+                c1, c2, c3 = st.columns(3)
 
-                with col_f1:
-                    # Calendario para elegir el día del trade
-                    fecha_consulta = st.date_input("Selecciona el día:", value=date.today())
-                
-                with col_f2:
-                    # Filtro por resultado (TP/SL) para estudiar aciertos o fallos
-                    estados = ["Todos", "TP", "SL", "BE", "ABIERTO"]
-                    filtro_res = st.selectbox("Resultado:", estados)
-                
-                with col_f3:
-                    # Filtro por activo (Volatility, Jump, etc.)
-                    activos = ["Todos"] + sorted(df['INSTRUMENTO'].unique().tolist())
-                    filtro_activo = st.selectbox("Activo:", activos)
+                with c1:
+                    f_fecha = st.date_input("Día de la operación:", value=date.today())
+                with c2:
+                    # Filtro basado en tu columna 21: ESTADO_RESULTADO
+                    opciones_res = ["Todos"] + sorted(df['ESTADO_RESULTADO'].unique().tolist())
+                    f_res = st.selectbox("Resultado:", opciones_res)
+                with c3:
+                    # Filtro basado en tu columna 4: INSTRUMENTO
+                    opciones_act = ["Todos"] + sorted(df['INSTRUMENTO'].unique().tolist())
+                    f_act = st.selectbox("Activo:", opciones_act)
 
-                # --- LÓGICA DE FILTRADO ---
-                mask = (df['FECHA_DT'].dt.date == fecha_consulta)
-                if filtro_res != "Todos":
-                    mask = mask & (df['ESTADO_RESULTADO'] == filtro_res)
-                if filtro_activo != "Todos":
-                    mask = mask & (df['INSTRUMENTO'] == filtro_activo)
+                # --- APLICAR FILTROS ---
+                mask = (df['FECHA_DT'].dt.date == f_fecha)
+                if f_res != "Todos":
+                    mask = mask & (df['ESTADO_RESULTADO'] == f_res)
+                if f_act != "Todos":
+                    mask = mask & (df['INSTRUMENTO'] == f_act)
 
-                df_filtrado = df.loc[mask]
+                df_final = df.loc[mask]
 
-                # --- MOSTRAR RESULTADOS ---
+                # --- VISUALIZACIÓN ---
                 st.divider()
-                if df_filtrado.empty:
-                    st.info(f"No se encontraron trades para el día {fecha_consulta} con esos filtros.")
+                if df_final.empty:
+                    st.info(f"No hay registros para el {f_fecha} con estos filtros.")
                 else:
-                    st.success(f"Se encontraron {len(df_filtrado)} operaciones para analizar.")
+                    st.success(f"Analizando {len(df_final)} trades encontrados")
                     
-                    for index, row in df_filtrado.iterrows():
-                        # Etiqueta visual según el resultado
-                        emoji = "🟢" if row['ESTADO_RESULTADO'] == "TP" else "🔴" if row['ESTADO_RESULTADO'] == "SL" else "🟡"
-                        titulo_trade = f"{emoji} {row['INSTRUMENTO']} | {row['HORA_ENTRADA']} | PnL: ${row['RESULTADO_DINERO']}"
+                    for i, r in df_final.iterrows():
+                        # Personalización del título con tus datos (Col 4, 12 y 22)
+                        res_val = r['ESTADO_RESULTADO']
+                        emoji = "🟢" if res_val == "TP" else "🔴" if res_val == "SL" else "🟡"
+                        header = f"{emoji} {r['INSTRUMENTO']} | {r['HORA_ENTRADA']} | PnL: ${r['RESULTADO_DINERO']}"
                         
-                        with st.expander(titulo_trade):
-                            # SISTEMA DE PESTAÑAS PARA LAS IMÁGENES DE CLOUDINARY
-                            tab_analisis, tab_gatillo, tab_resultado = st.tabs(["📊 Análisis", "🎯 Ejecución", "🏁 Desenlace"])
+                        with st.expander(header):
+                            # PESTAÑAS SEGÚN TUS COLUMNAS DE IMÁGENES (16, 18, 20, 25)
+                            t_an, t_ej, t_fin = st.tabs(["📊 Análisis", "🎯 Ejecución", "🏁 Resultado"])
                             
-                            with tab_analisis:
-                                c1, c2 = st.columns(2)
-                                with c1:
-                                    st.write("**Temp. Mayor**")
-                                    img_m = row.get('IMAGEN_MAYOR', '')
-                                    if "http" in str(img_m): st.image(img_m, use_container_width=True)
-                                    else: st.caption("Sin imagen")
-                                with c2:
-                                    st.write("**Temp. Menor**")
-                                    img_n = row.get('IMAGEN_MENOR', '')
-                                    if "http" in str(img_n): st.image(img_n, use_container_width=True)
-                                    else: st.caption("Sin imagen")
+                            with t_an:
+                                col_a, col_b = st.columns(2)
+                                with col_a:
+                                    st.write(f"**Temp. Mayor:** {r['DIRECCION_MAYOR']}")
+                                    img1 = r.get('IMAGEN_MAYOR', '')
+                                    if "http" in str(img1): st.image(img1, use_container_width=True)
+                                    else: st.caption("Sin captura mayor")
+                                with col_b:
+                                    st.write(f"**Temp. Menor:** {r['DIRECCION_MENOR']}")
+                                    img2 = r.get('IMAGEN_MENOR', '')
+                                    if "http" in str(img2): st.image(img2, use_container_width=True)
+                                    else: st.caption("Sin captura menor")
 
-                            with tab_gatillo:
-                                st.write("**Captura del Gatillo / Entrada**")
-                                img_e = row.get('IMAGEN_EJECUCION', '')
-                                if "http" in str(img_e): st.image(img_e, use_container_width=True)
-                                else: st.info("No se guardó imagen de la ejecución.")
+                            with t_ej:
+                                st.write(f"**Gatillo:** {r['DIRECCION_EJECUCION']}")
+                                img3 = r.get('IMAGEN_EJECUCION', '')
+                                if "http" in str(img3): st.image(img3, use_container_width=True)
+                                else: st.info("Sin captura de ejecución")
 
-                            with tab_resultado:
-                                st.write("**Captura del Cierre**")
-                                img_r = row.get('IMAGEN_RESULTADO', '')
-                                if "http" in str(img_r): st.image(img_r, use_container_width=True)
-                                else: st.info("Operación abierta o sin captura de resultado.")
+                            with t_fin:
+                                st.write(f"**Cierre de Operación**")
+                                img4 = r.get('IMAGEN_RESULTADO', '')
+                                if "http" in str(img4): st.image(img4, use_container_width=True)
+                                else: st.info("Sin captura final")
 
-                            # Panel de Feedback Emocional y Notas
+                            # DATOS TÉCNICOS ADICIONALES
                             st.divider()
-                            st.write(f"**🧠 Estado Emocional:** {row.get('ESTADO_EMOCIONAL', 'No registrado')}")
-                            st.write(f"**📝 Notas:** {row.get('OBSERVACIONES', 'Sin notas')}")
+                            ca, cb, cc = st.columns(3)
+                            with ca:
+                                st.write(f"**Bala:** ${r['VALOR_BALA']}")
+                                st.write(f"**Lotaje:** {r['LOTAJE']}")
+                            with cb:
+                                st.write(f"**Llegó 1:1:** {r['LLEGO_11']}")
+                                st.write(f"**Drawdown:** {r['DRAWDOWN']}")
+                            with cc:
+                                st.write(f"**Emoción:** {r['ESTADO_EMOCIONAL']}")
+                            
+                            st.write(f"**📝 Notas:** {r['OBSERVACIONES']}")
 
         except Exception as e:
-            st.error(f"Error al cargar el buscador de gráficos: {e}")
+            st.error(f"Error técnico: {e}")
 
 	
         
