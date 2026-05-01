@@ -704,18 +704,25 @@ def main_app():
             st.error(f"Error de conexión: {e}")
 
 # =========================================================
-# SECCION 11: AUDITORÍA DE GRÁFICOS (CORREGIDA Y ESTABLE)
+# SECCION 11: AUDITORÍA DE GRÁFICOS (VERSIÓN FINAL COMPLETA)
 # =========================================================
     elif menu == "📈 Reportes":
         st.header("🔍 Auditoría de Gráficos y Análisis Técnico")
 
-        # 1. Verificación de seguridad de la conexión global
-        if 'cliente_google' not in globals() or cliente_google is None:
-            st.error("❌ Error de conexión: La variable 'cliente_google' no está definida o es nula.")
-            st.info("Asegúrate de que la conexión se ejecute al inicio del script.")
+        # 1. Verificación de seguridad de la conexión DESDE EL SESSION STATE
+        if st.session_state.get('cliente_google') is None:
+            with st.spinner("🔄 Reintentando conexión con Google Sheets..."):
+                st.session_state['cliente_google'] = conectar_google()
+
+        if st.session_state.get('cliente_google') is None:
+            st.error("❌ Error de conexión: No se pudo acceder a la llave de Google Sheets.")
+            st.info("Refresca la página (F5). Si el error persiste, revisa tus credenciales.")
         else:
             try:
-                # 2. Apertura del libro y hoja específicos
+                # Usamos la conexión que ya está en la "mochila"
+                cliente_google = st.session_state['cliente_google']
+                
+                # 2. Apertura del libro y hoja específicos que me diste
                 sh = cliente_google.open("Bitacora_Academia1") 
                 hoja_bitacora = sh.worksheet("Bitacora")
                 
@@ -725,25 +732,24 @@ def main_app():
                     st.warning("⚠️ La hoja 'Bitacora' no tiene registros actualmente.")
                 else:
                     df = pd.DataFrame(registros)
-                    # Limpieza profunda de encabezados para evitar errores de matching
+                    # Limpieza de encabezados para evitar errores de espacios
                     df.columns = [str(c).strip() for c in df.columns]
                     
-                    # Conversión de FECHA (Columna 3) para el filtro de calendario
+                    # Conversión de FECHA (Columna 3)
                     df['FECHA_DT'] = pd.to_datetime(df['FECHA'], dayfirst=True, errors='coerce')
 
                     # --- INTERFAZ DE FILTROS ---
                     st.write("### ⚙️ Parámetros de Búsqueda")
-                    # Usamos columnas solo para los filtros superiores
                     f1, f2, f3 = st.columns(3)
 
                     with f1:
                         f_fecha = st.date_input("Día operado:", value=date.today())
                     with f2:
-                        # Basado en tu columna 21: ESTADO_RESULTADO
+                        # Columna 21: ESTADO_RESULTADO
                         res_list = ["Todos"] + sorted(df['ESTADO_RESULTADO'].unique().tolist())
                         f_res = st.selectbox("Resultado:", res_list)
                     with f3:
-                        # Basado en tu columna 4: INSTRUMENTO
+                        # Columna 4: INSTRUMENTO
                         act_list = ["Todos"] + sorted(df['INSTRUMENTO'].unique().tolist())
                         f_act = st.selectbox("Activo:", act_list)
 
@@ -764,43 +770,37 @@ def main_app():
                         st.success(f"Se encontraron {len(df_final)} operaciones.")
                         
                         for i, r in df_final.iterrows():
-                            # Configuración de encabezado visual
+                            # Encabezado visual (Col 21, 4, 12, 22)
                             color = "🟢" if r['ESTADO_RESULTADO'] == "TP" else "🔴" if r['ESTADO_RESULTADO'] == "SL" else "🟡"
                             titulo = f"{color} {r['INSTRUMENTO']} | Entra: {r['HORA_ENTRADA']} | PnL: ${r['RESULTADO_DINERO']}"
                             
                             with st.expander(titulo):
-                                # Usamos pestañas para organizar las imágenes de Cloudinary
-                                # Esto soluciona los problemas de margen al no amontonar todo
-                                t_analisis, t_ejecucion, t_resultado = st.tabs(["📊 Análisis", "🎯 Gatillo", "🏁 Cierre"])
+                                # Pestañas para las imágenes de Cloudinary
+                                t_analisis, t_gatillo, t_cierre = st.tabs(["📊 Análisis", "🎯 Gatillo", "🏁 Cierre"])
                                 
                                 with t_analisis:
-                                    # Sub-columnas para ver las dos temporalidades juntas
                                     c_may, c_men = st.columns(2)
                                     with c_may:
-                                        st.caption(f"Dirección Mayor: {r['DIRECCION_MAYOR']}")
+                                        st.caption(f"Temp. Mayor: {r['DIRECCION_MAYOR']}")
                                         img1 = r.get('IMAGEN_MAYOR', '')
-                                        if "http" in str(img1): 
-                                            st.image(img1, use_container_width=True)
+                                        if "http" in str(img1): st.image(img1, use_container_width=True)
                                         else: st.write("Sin imagen")
                                     with c_men:
-                                        st.caption(f"Dirección Menor: {r['DIRECCION_MENOR']}")
+                                        st.caption(f"Temp. Menor: {r['DIRECCION_MENOR']}")
                                         img2 = r.get('IMAGEN_MENOR', '')
-                                        if "http" in str(img2): 
-                                            st.image(img2, use_container_width=True)
+                                        if "http" in str(img2): st.image(img2, use_container_width=True)
                                         else: st.write("Sin imagen")
 
-                                with t_ejecucion:
+                                with t_gatillo:
                                     st.caption(f"Ejecución: {r['DIRECCION_EJECUCION']}")
                                     img3 = r.get('IMAGEN_EJECUCION', '')
-                                    if "http" in str(img3): 
-                                        st.image(img3, use_container_width=True)
+                                    if "http" in str(img3): st.image(img3, use_container_width=True)
                                     else: st.info("No hay captura del gatillo.")
 
-                                with t_resultado:
+                                with t_cierre:
                                     st.caption("Captura final del trade")
                                     img4 = r.get('IMAGEN_RESULTADO', '')
-                                    if "http" in str(img4): 
-                                        st.image(img4, use_container_width=True)
+                                    if "http" in str(img4): st.image(img4, use_container_width=True)
                                     else: st.info("Trade abierto o sin imagen de cierre.")
 
                                 # --- DATOS TÉCNICOS ADICIONALES ---
@@ -808,7 +808,7 @@ def main_app():
                                 info1, info2, info3 = st.columns(3)
                                 with info1:
                                     st.write(f"**Bala:** ${r['VALOR_BALA']}")
-                                    st.write(f"**Llego 1:1:** {r['LLEGO_11']}")
+                                    st.write(f"**Llegó 1:1:** {r['LLEGO_11']}")
                                 with info2:
                                     st.write(f"**Lotaje:** {r['LOTAJE']}")
                                     st.write(f"**Drawdown:** {r['DRAWDOWN']}")
