@@ -706,16 +706,19 @@ def main_app():
 # =========================================================
 # SECCION 11: AUDITORÍA DE GRÁFICOS (ACTUALIZADA)
 # =========================================================
-    elif menu == "📈 Reportes":
+	elif menu == "📈 Reportes":
         st.header("🔍 Auditoría de Gráficos y Análisis Técnico")
 
-        try:
-            # 1. Conexión al libro específico que me indicaste
-            # Asegúrate que el JSON de credenciales tenga acceso a este nombre
-            sh = cliente_google.open("Bitacora_Academia1") 
-            hoja_bitacora = sh.worksheet("Bitacora")
-            
-            registros = hoja_bitacora.get_all_records()
+        # Verificamos si la conexión global existe
+        if cliente_google is None:
+            st.error("❌ No hay conexión con Google Sheets. Verifica tus credenciales.")
+        else:
+            try:
+                # Abrimos el libro usando la conexión global
+                sh = cliente_google.open("Bitacora_Academia1") 
+                hoja_bitacora = sh.worksheet("Bitacora")
+                
+                registros = hoja_bitacora.get_all_records()
             
             if not registros:
                 st.warning("⚠️ La hoja 'Bitacora' está vacía.")
