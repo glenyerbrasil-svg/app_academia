@@ -654,7 +654,7 @@ def main_app():
                             st.error(f"❌ Error al subir a Cloudinary: {e}")
 
 # =========================================================
-#  # # SECCION 9: BACKTESTING (ESTRUCTURA DE 15 COLUMNAS)
+#  # # SECCION 9: BACKTESTING (SINCRONIZADA CON TU EXCEL)
 # =========================================================
 
 elif menu == "📊 Backtesting":
@@ -662,7 +662,7 @@ elif menu == "📊 Backtesting":
     st.header("🧪 Laboratorio de Backtesting")
     
     try:
-        # Conexión a la pestaña confirmada en la imagen
+        # Conexión directa a la pestaña que veo en tu imagen
         hoja_bt = doc.worksheet("Backtesting")
     except:
         st.error("❌ No se pudo conectar con la pestaña 'Backtesting'.")
@@ -671,72 +671,60 @@ elif menu == "📊 Backtesting":
     with st.form("form_bt_glenyer", clear_on_submit=True):
         col1, col2 = st.columns(2)
         with col1:
-            fecha_bt = st.date_input("3. Fecha del Trade Histórico", date.today())
-            estrat_bt = st.text_input("4. Estrategia", placeholder="Ej: Order Block + Fibo")
-            inst_bt = st.selectbox("5. Instrumento", [
-                "FLIPX1", "FLIPX2", "FLIPX3", "FLIPX4", "FLIPX5",
-                "FXVOL20", "FXVOL40", "FXVOL60", "FXVOL80", "FXVOL99",
-                "SFXVOL20", "SFXVOL40", "SFXVOL60", "SFXVOL80", "SFXVOL99"
-            ])
+            fecha_bt = st.date_input("Fecha", date.today())
+            inst_bt = st.selectbox("Instrumento", ["FLIPX1", "FLIPX2", "FLIPX3", "FLIPX4", "FLIPX5", "FXVOL99"])
+            estrat_bt = st.text_input("Estrategia", placeholder="Ej: Fibo + Resistencia")
         
         with col2:
-            h_ini = st.time_input("6. Hora Inicial", value=datetime.now().time())
-            h_fin = st.time_input("7. Hora Final", value=datetime.now().time())
-            res_bt = st.selectbox("12. Resultado", ["TP", "SL", "BE"])
-            rr_bt = st.number_input("13. Ratio R:R Real", min_value=0.0, step=0.1, value=1.0)
+            h_ini = st.time_input("Hora Inicial", value=datetime.now().time())
+            h_fin = st.time_input("Hora Final", value=datetime.now().time())
+            res_bt = st.selectbox("Resultado", ["TP", "SL", "BE"])
+            rr_bt = st.number_input("Ratio R:R Logrado", min_value=0.0, step=0.1, value=1.0)
 
-        conf_bt = st.multiselect("8. Confluencias Cumplidas", 
-                                 ["Tendencia", "Fibo 61.8", "S/R Nivel", "EMA Cross", "Order Block", "RSI Divergencia"])
+        conf_bt = st.multiselect("Confluencias", ["Tendencia", "Fibo", "S/R", "EMA", "Order Block"])
         
         st.write("---")
-        st.subheader("🖼️ Capturas de Pantalla (Cloudinary)")
+        st.subheader("🖼️ Carga de Capturas (Columnas I, J, K)")
         c1, c2, c3 = st.columns(3)
-        img_macro = c1.file_uploader("9. CAPTURA_MAYOR", type=['png', 'jpg'])
-        img_med = c2.file_uploader("10. CAPTURA_MENOR", type=['png', 'jpg'])
-        img_exec = c3.file_uploader("11. CAPTURA_EJECUCION", type=['png', 'jpg'])
+        img1 = c1.file_uploader("CAPTURA_MAYOR", type=['png', 'jpg'])
+        img2 = c2.file_uploader("CAPTURA_MENOR", type=['png', 'jpg'])
+        img3 = c3.file_uploader("CAPTURA_EJEC", type=['png', 'jpg'])
         
-        notas_bt = st.text_area("15. Observaciones (Detalles del precio)")
-        
-        submit_bt = st.form_submit_button("📥 Registrar Estudio en Bitácora")
+        submit_bt = st.form_submit_button("📥 Guardar Estudio")
 
         if submit_bt:
-            with st.spinner("🚀 Subiendo evidencias y procesando datos..."):
-                try:
-                    # Subida a Cloudinary
-                    url1 = subir_a_cloudinary(img_macro) if img_macro else "N/A"
-                    url2 = subir_a_cloudinary(img_med) if img_med else "N/A"
-                    url3 = subir_a_cloudinary(img_exec) if img_exec else "N/A"
+            with st.spinner("Subiendo imágenes..."):
+                # Subida a Cloudinary
+                url1 = subir_a_cloudinary(img1) if img1 else "N/A"
+                url2 = subir_a_cloudinary(img2) if img2 else "N/A"
+                url3 = subir_a_cloudinary(img3) if img3 else "N/A"
 
-                    # 14. Cálculo automático de PNL UNIDADES
-                    # Basado en tu lógica: Si TP -> Ratio_RR; Si SL -> -1
-                    pnl_unidades = rr_bt if res_bt == "TP" else (-1.0 if res_bt == "SL" else 0.0)
+                # Cálculo de PnL en Unidades R
+                pnl_r = rr_bt if res_bt == "TP" else (-1.0 if res_bt == "SL" else 0.0)
 
-                    # CONSTRUCCIÓN DE LA FILA (1 a 15)
-                    nueva_fila = [
-                        f"BT-{str(uuid.uuid4())[:5].upper()}", # 1. ID_REGISTRO
-                        user["NOMBRE"],                         # 2. ID_USUARIO
-                        str(fecha_bt),                          # 3. FECHA
-                        estrat_bt,                              # 4. ESTRATEGIA
-                        inst_bt,                                # 5. INSTRUMENTO
-                        str(h_ini),                             # 6. HORA_INICIAL
-                        str(h_fin),                             # 7. HORA_FINAL
-                        ", ".join(conf_bt),                     # 8. CONFLUENCIAS
-                        url1,                                   # 9. CAPTURA_MAYOR
-                        url2,                                   # 10. CAPTURA_MENOR
-                        url3,                                   # 11. CAPTURA_EJECUCION
-                        res_bt,                                 # 12. RESULTADO
-                        float(rr_bt),                           # 13. RATIO_RR
-                        float(pnl_unidades),                    # 14. PNL_UNIDADES
-                        notas_bt                                # 15. OBSERVACIONES
-                    ]
-                    
-                    hoja_bt.append_row(nueva_fila)
-                    st.success(f"✅ ¡Backtesting despertó! Registrado con {pnl_unidades}R.")
-                    st.balloons()
-                    time.sleep(1)
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Hubo un error al guardar: {e}")
+                # FILA EXACTA SEGÚN TU IMAGEN (Columnas A a K + Extras)
+                # A: ID_REGISTRO, B: ID_USUARIO, C: FECHA, D: ESTRATEGIA, E: INSTRUMENTO...
+                nueva_fila = [
+                    str(uuid.uuid4())[:8],  # A: ID_REGISTRO
+                    user["NOMBRE"],         # B: ID_USUARIO (Glenyer)
+                    str(fecha_bt),          # C: FECHA
+                    estrat_bt,              # D: ESTRATEGIA
+                    inst_bt,                # E: INSTRUMENTO
+                    str(h_ini),             # F: HORA_INICIAL
+                    str(h_fin),             # G: HORA_FINAL
+                    ", ".join(conf_bt),     # H: CONFLUENCIAS
+                    url1,                   # I: CAPTURA_MAYOR
+                    url2,                   # J: CAPTURA_MENOR
+                    url3,                   # K: CAPTURA_EJEC
+                    res_bt,                 # L: RESULTADO (Nueva)
+                    rr_bt,                  # M: RATIO_RR (Nueva)
+                    pnl_r                   # N: PNL_R (Nueva)
+                ]
+                
+                hoja_bt.append_row(nueva_fila)
+                st.success(f"✅ ¡Backtesting despertó! Registro guardado.")
+                st.balloons()
+                st.rerun()
 
 # =========================================================
 # # SECCION 10: FINANZAS
