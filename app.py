@@ -665,9 +665,8 @@ def main_app():
 
   
     elif menu == "📊 Backtesting":
-        import uuid
-        
-        import time
+        # Nota: Se eliminaron los imports internos (uuid, datetime, date) 
+        # para evitar el error UnboundLocalError visto en image_143ef8.png.
         
         st.header("🧪 Laboratorio de Backtesting")
         
@@ -681,6 +680,7 @@ def main_app():
         with st.form("form_bt_glenyer", clear_on_submit=True):
             col1, col2 = st.columns(2)
             with col1:
+                # Usamos date.today() definido globalmente al inicio
                 fecha_bt = st.date_input("3. Fecha del Trade Histórico", date.today())
                 estrat_bt = st.text_input("4. Estrategia", placeholder="Ej: Order Block + Fibo")
                 inst_bt = st.selectbox("5. Instrumento", [
@@ -690,6 +690,7 @@ def main_app():
                 ])
             
             with col2:
+                # Usamos datetime.now() definido globalmente para evitar el error de la línea 693
                 h_ini = st.time_input("6. Hora Inicial", value=datetime.now().time())
                 h_fin = st.time_input("7. Hora Final", value=datetime.now().time())
                 res_bt = st.selectbox("12. Resultado", ["TP", "SL", "BE"])
@@ -707,23 +708,23 @@ def main_app():
             
             notas_bt = st.text_area("15. Observaciones (Detalles del precio)")
             
+            # Al arreglar el error de arriba, este botón volverá a ser visible
             submit_bt = st.form_submit_button("📥 Registrar Estudio en Bitácora")
 
             if submit_bt:
                 with st.spinner("🚀 Subiendo evidencias y procesando datos..."):
                     try:
-                        # Subida a Cloudinary usando tu función global
+                        # Subida a Cloudinary usando tu función global definida en la Secc 1
                         url1 = subir_a_cloudinary(img_macro) if img_macro else "N/A"
                         url2 = subir_a_cloudinary(img_med) if img_med else "N/A"
                         url3 = subir_a_cloudinary(img_exec) if img_exec else "N/A"
 
                         # 14. Cálculo automático de PNL UNIDADES
-                        # Lógica: Si TP gana el Ratio; Si SL pierde la bala (-1)
                         pnl_unidades = rr_bt if res_bt == "TP" else (-1.0 if res_bt == "SL" else 0.0)
 
-                        # CONSTRUCCIÓN DE LA FILA (Exactamente 15 columnas)
+                        # CONSTRUCCIÓN DE LA FILA (15 columnas según tu estructura)
                         nueva_fila = [
-                            f"BT-{str(uuid.uuid4())[:5].upper()}", # 1. ID_REGISTRO
+                            f"BT-{str(uuid.uuid4())[:5].upper()}", # 1. ID_REGISTRO (Usa uuid global)
                             user["NOMBRE"],                         # 2. ID_USUARIO
                             str(fecha_bt),                          # 3. FECHA
                             estrat_bt,                              # 4. ESTRATEGIA
@@ -743,7 +744,7 @@ def main_app():
                         hoja_bt.append_row(nueva_fila)
                         st.success(f"✅ ¡Estudio guardado! PnL: {pnl_unidades}R")
                         st.balloons()
-                        time.sleep(1)
+                        time.sleep(1) # Usa el time.sleep() del módulo time global
                         st.rerun()
                     except Exception as e:
                         st.error(f"Hubo un error al guardar en la hoja: {e}")
