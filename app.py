@@ -6,13 +6,7 @@ import time
 import cloudinary
 import cloudinary.uploader
 import pandas as pd
-import uuid  # Para generar los IDs de backtesting
-import smtplib # Para el envío de correos
-
-# Importaciones de tiempo consolidadas para evitar el error de "local variable 'date'"
-from datetime import datetime, date, time as dt_time, timedelta
-
-# Importaciones para correos
+from datetime import datetime, date, timedelta
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
@@ -662,92 +656,10 @@ def main_app():
 # =========================================================
 #  # # SECCION 9: BACKTESTING
 # =========================================================
-
-  
+   
     elif menu == "📊 Backtesting":
-        # Nota: Se eliminaron los imports internos (uuid, datetime, date) 
-        # para evitar el error UnboundLocalError visto en image_143ef8.png.
-        
-        st.header("🧪 Laboratorio de Backtesting")
-        
-        try:
-            # Conexión a la pestaña confirmada en tu Google Sheets
-            hoja_bt = doc.worksheet("Backtesting")
-        except Exception as e:
-            st.error(f"❌ No se pudo conectar con la pestaña 'Backtesting'. Error: {e}")
-            st.stop()
-
-        with st.form("form_bt_glenyer", clear_on_submit=True):
-            col1, col2 = st.columns(2)
-            with col1:
-                # Usamos date.today() definido globalmente al inicio
-                fecha_bt = st.date_input("3. Fecha del Trade Histórico", date.today())
-                estrat_bt = st.text_input("4. Estrategia", placeholder="Ej: Order Block + Fibo")
-                inst_bt = st.selectbox("5. Instrumento", [
-                    "FLIPX1", "FLIPX2", "FLIPX3", "FLIPX4", "FLIPX5",
-                    "FXVOL20", "FXVOL40", "FXVOL60", "FXVOL80", "FXVOL99",
-                    "SFXVOL20", "SFXVOL40", "SFXVOL60", "SFXVOL80", "SFXVOL99"
-                ])
-            
-            with col2:
-                # Usamos datetime.now() definido globalmente para evitar el error de la línea 693
-                h_ini = st.time_input("6. Hora Inicial", value=datetime.now().time())
-                h_fin = st.time_input("7. Hora Final", value=datetime.now().time())
-                res_bt = st.selectbox("12. Resultado", ["TP", "SL", "BE"])
-                rr_bt = st.number_input("13. Ratio R:R Real", min_value=0.0, step=0.1, value=1.0)
-
-            conf_bt = st.multiselect("8. Confluencias Cumplidas", 
-                                     ["Tendencia", "Fibo 61.8", "S/R Nivel", "EMA Cross", "Order Block", "RSI Divergencia"])
-            
-            st.write("---")
-            st.subheader("🖼️ Capturas de Pantalla (Cloudinary)")
-            c1, c2, c3 = st.columns(3)
-            img_macro = c1.file_uploader("9. CAPTURA_MAYOR", type=['png', 'jpg'])
-            img_med = c2.file_uploader("10. CAPTURA_MENOR", type=['png', 'jpg'])
-            img_exec = c3.file_uploader("11. CAPTURA_EJECUCION", type=['png', 'jpg'])
-            
-            notas_bt = st.text_area("15. Observaciones (Detalles del precio)")
-            
-            # Al arreglar el error de arriba, este botón volverá a ser visible
-            submit_bt = st.form_submit_button("📥 Registrar Estudio en Bitácora")
-
-            if submit_bt:
-                with st.spinner("🚀 Subiendo evidencias y procesando datos..."):
-                    try:
-                        # Subida a Cloudinary usando tu función global definida en la Secc 1
-                        url1 = subir_a_cloudinary(img_macro) if img_macro else "N/A"
-                        url2 = subir_a_cloudinary(img_med) if img_med else "N/A"
-                        url3 = subir_a_cloudinary(img_exec) if img_exec else "N/A"
-
-                        # 14. Cálculo automático de PNL UNIDADES
-                        pnl_unidades = rr_bt if res_bt == "TP" else (-1.0 if res_bt == "SL" else 0.0)
-
-                        # CONSTRUCCIÓN DE LA FILA (15 columnas según tu estructura)
-                        nueva_fila = [
-                            f"BT-{str(uuid.uuid4())[:5].upper()}", # 1. ID_REGISTRO (Usa uuid global)
-                            user["NOMBRE"],                         # 2. ID_USUARIO
-                            str(fecha_bt),                          # 3. FECHA
-                            estrat_bt,                              # 4. ESTRATEGIA
-                            inst_bt,                                # 5. INSTRUMENTO
-                            str(h_ini),                             # 6. HORA_INICIAL
-                            str(h_fin),                             # 7. HORA_FINAL
-                            ", ".join(conf_bt),                     # 8. CONFLUENCIAS
-                            url1,                                   # 9. CAPTURA_MAYOR
-                            url2,                                   # 10. CAPTURA_MENOR
-                            url3,                                   # 11. CAPTURA_EJECUCION
-                            res_bt,                                 # 12. RESULTADO
-                            float(rr_bt),                           # 13. RATIO_RR
-                            float(pnl_unidades),                    # 14. PNL_UNIDADES
-                            notas_bt                                # 15. OBSERVACIONES
-                        ]
-                        
-                        hoja_bt.append_row(nueva_fila)
-                        st.success(f"✅ ¡Estudio guardado! PnL: {pnl_unidades}R")
-                        st.balloons()
-                        time.sleep(1) # Usa el time.sleep() del módulo time global
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Hubo un error al guardar en la hoja: {e}")
+        st.header("📊 Entrenamiento de Simulación (Backtesting)")
+        st.info("Aquí los resultados no afectan tu capital real de la hoja de Finanzas.")
 
 # =========================================================
 # # SECCION 10: FINANZAS
@@ -797,13 +709,15 @@ def main_app():
     elif menu == "📈 Reportes":
         st.header("🔍 Auditoría de Gráficos y Análisis Técnico")
 
-        # Usamos la función de conexión que ya definiste arriba
-        cliente_google = conectar_google() 
+        if st.session_state.get('cliente_google') is None:
+            with st.spinner("🔄 Reintentando conexión con Google Sheets..."):
+                st.session_state['cliente_google'] = conectar_google()
 
-        if not cliente_google:
+        if st.session_state.get('cliente_google') is None:
             st.error("❌ Error de conexión. Revisa tus credenciales.")
         else:
             try:
+                cliente_google = st.session_state['cliente_google']
                 sh = cliente_google.open("Bitacora_Academia1") 
                 hoja_bitacora = sh.worksheet("Bitacora")
                 registros = hoja_bitacora.get_all_records()
