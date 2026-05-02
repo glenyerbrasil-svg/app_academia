@@ -6,7 +6,13 @@ import time
 import cloudinary
 import cloudinary.uploader
 import pandas as pd
-from datetime import datetime, date, timedelta
+import uuid  # Para generar los IDs de backtesting
+import smtplib # Para el envío de correos
+
+# Importaciones de tiempo consolidadas para evitar el error de "local variable 'date'"
+from datetime import datetime, date, time as dt_time, timedelta
+
+# Importaciones para correos
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
