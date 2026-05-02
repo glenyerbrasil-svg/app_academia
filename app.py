@@ -666,7 +666,7 @@ def main_app():
   
     elif menu == "📊 Backtesting":
         import uuid
-        from datetime import date, datetime
+        
         import time
         
         st.header("🧪 Laboratorio de Backtesting")
@@ -796,15 +796,13 @@ def main_app():
     elif menu == "📈 Reportes":
         st.header("🔍 Auditoría de Gráficos y Análisis Técnico")
 
-        if st.session_state.get('cliente_google') is None:
-            with st.spinner("🔄 Reintentando conexión con Google Sheets..."):
-                st.session_state['cliente_google'] = conectar_google()
+        # Usamos la función de conexión que ya definiste arriba
+        cliente_google = conectar_google() 
 
-        if st.session_state.get('cliente_google') is None:
+        if not cliente_google:
             st.error("❌ Error de conexión. Revisa tus credenciales.")
         else:
             try:
-                cliente_google = st.session_state['cliente_google']
                 sh = cliente_google.open("Bitacora_Academia1") 
                 hoja_bitacora = sh.worksheet("Bitacora")
                 registros = hoja_bitacora.get_all_records()
