@@ -42,4 +42,11 @@ def editar_app(user):
 
             # Buscar fila en la hoja y actualizar
             fila = operaciones.index(op_seleccionada) + 2  # +2 porque get_all_records empieza en fila 2
-            hoja_b.update_cell(fila, list(op_seleccionada.keys()).
+
+            hoja_b.update_cell(fila, list(op_seleccionada.keys()).index("ESTADO_RESULTADO")+1, resultado)
+            hoja_b.update_cell(fila, list(op_seleccionada.keys()).index("RESULTADO_DINERO")+1, resultado_dinero)
+            hoja_b.update_cell(fila, list(op_seleccionada.keys()).index("HORA_SALIDA")+1, ahora())
+            hoja_b.update_cell(fila, list(op_seleccionada.keys()).index("IMAGEN_RESULTADO")+1, url_resultado)
+            hoja_b.update_cell(fila, list(op_seleccionada.keys()).index("OBSERVACIONES")+1, obs)
+
+            st.success("✅ Operación cerrada correctamente.")
