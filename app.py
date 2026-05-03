@@ -1,6 +1,7 @@
 import streamlit as st
 
-# Importar todos los módulos
+# Importar módulos
+from login import login_app
 from bienvenida import bienvenida_app
 from escuela import escuela_app
 from bitacora import bitacora_app
@@ -14,20 +15,15 @@ from membresias import membresias_app
 from metas import metas_app
 from reporte_estudiantes import reporte_estudiantes_app
 
-# Simulación de usuario actual (esto luego se conecta con login real)
-if "user" not in st.session_state:
-    st.session_state["user"] = {
-        "ID_USUARIO": "u001",
-        "USUARIO": "glenyer",
-        "NOMBRE": "Glenyer",
-        "ROL": "Administrador",  # Estudiante, Maestro, Administrador
-        "NIVEL": "Jedi",
-        "PROXIMO_VENCIMIENTO": "2026-06-01"
-    }
-
-user = st.session_state["user"]
-
 def main():
+    # Si no hay usuario en sesión, mostrar login
+    if "user" not in st.session_state:
+        login_app()
+        return
+
+    user = st.session_state["user"]
+
+    # Menú lateral
     st.sidebar.title("📚 Menú Principal")
     opcion = st.sidebar.radio("Selecciona una sección", [
         "Bienvenida",
@@ -42,9 +38,10 @@ def main():
         "Membresías",
         "Metas",
         "Reporte Estudiantes",
-        "Cerrar sesión"   # 👈 nueva opción
+        "Cerrar sesión"
     ])
 
+    # Navegación entre secciones
     if opcion == "Bienvenida":
         bienvenida_app(user)
     elif opcion == "Escuela":
