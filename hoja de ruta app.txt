@@ -1,0 +1,59 @@
+📌 Hoja de Ruta – App Academia de Trading
+
+FASE 1 – Base del Proyecto
+1. Crear utils.py
+   - Funciones comunes: conexión a Google Sheets, subida a Cloudinary, encriptar/verificar contraseñas, manejo de fechas.
+2. Crear auth.py
+   - Registro, login, verificación por correo, control de roles (Estudiante, Maestro, Administrador).
+3. Crear ui.py
+   - Sidebar y menú principal dinámico según rol del usuario.
+   - Mostrar nombre, rango, membresía y tiempo restante.
+
+FASE 2 – Módulos Académicos
+4. Crear bienvenida.py
+   - Mensajes motivacionales aleatorios (cambia cada 24h).
+   - Mostrar rango, membresía y estado de pago.
+5. Crear escuela.py
+   - Acceso jerárquico al material (Padawan, Jedi, Maestro Jedi).
+   - Los maestros asignan jerarquías.
+
+FASE 3 – Operativa de Trading
+6. Crear bitacora.py
+   - Registro de operaciones con cálculos automáticos (lotaje, TP).
+   - Evidencias gráficas (mayor, menor, ejecución, resultado).
+   - Semáforo emocional y anotaciones.
+   - Validación de riesgo (alerta si la bala >10% del saldo).
+7. Crear editar.py
+   - Cierre de operaciones pendientes (TP, SL, BE).
+   - Subida de gráfico final de resultado.
+8. Crear backtesting.py
+   - Estudio de estrategias con anotaciones y evidencias gráficas.
+
+FASE 4 – Finanzas y Reportes
+9. Crear finanzas.py
+   - Registro de saldo inicial, ingresos, retiros.
+   - Evidencia de pagos y estado de membresía.
+   - Histórico de pagos con filtros y recibos.
+10. Crear reportes.py
+    - Métricas: operaciones ganadas, perdidas, BE.
+    - Gráficas de rendimiento, días más efectivos, análisis emocional.
+    - Exportación de reportes en PDF.
+
+FASE 5 – Comunidad y Administración
+11. Crear forum.py
+    - Comunicación pública y privada (estudiantes ↔ maestros ↔ admin).
+12. Crear revision.py
+    - Revisión de operaciones (solo maestros y admin).
+    - Filtros por fecha, estudiante y resultado.
+13. Crear membresias.py
+    - Activación/desactivación de estudiantes (solo admin).
+    - Visualización de recibos y estado de pagos.
+    - Cambio de roles de usuario (Estudiante ↔ Maestro ↔ Administrador).
+14. Crear reporte_estudiantes.py
+    - Mostrar actividad de estudiantes: conexiones, operaciones, resultados.
+
+FASE 6 – Integración Final
+15. Integrar todo en app.py
+    - Punto de entrada de la aplicación.
+    - Importa todos los módulos y controla la navegación.
+    - Usa st.session_state para manejar login y roles.
