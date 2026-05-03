@@ -1,26 +1,18 @@
 import streamlit as st
-from bienvenida import bienvenida_app
-from escuela import escuela_app
-from bitacora import bitacora_app
-from editar import editar_app
-from backtesting import backtesting_app
-from finanzas import finanzas_app
-from reportes import reportes_app
-from forum import forum_app
-from revision import revision_app
-from membresias import membresias_app
-from metas import metas_app
-from reporte_estudiantes import reporte_estudiantes_app
+# ... tus imports de módulos
 
-# Simulación de usuario actual (luego se conecta con login)
-user = {
-    "ID_USUARIO": "u001",
-    "USUARIO": "glenyer",
-    "NOMBRE": "Glenyer",
-    "ROL": "Administrador",  # Estudiante, Maestro, Administrador
-    "NIVEL": "Jedi",
-    "PROXIMO_VENCIMIENTO": "2026-06-01"
-}
+# Simulación de usuario actual (esto luego se conecta con login real)
+if "user" not in st.session_state:
+    st.session_state["user"] = {
+        "ID_USUARIO": "u001",
+        "USUARIO": "glenyer",
+        "NOMBRE": "Glenyer",
+        "ROL": "Administrador",
+        "NIVEL": "Jedi",
+        "PROXIMO_VENCIMIENTO": "2026-06-01"
+    }
+
+user = st.session_state["user"]
 
 def main():
     st.sidebar.title("📚 Menú Principal")
@@ -36,7 +28,8 @@ def main():
         "Revisión",
         "Membresías",
         "Metas",
-        "Reporte Estudiantes"
+        "Reporte Estudiantes",
+        "Cerrar sesión"   # 👈 nueva opción
     ])
 
     if opcion == "Bienvenida":
@@ -63,6 +56,10 @@ def main():
         metas_app(user)
     elif opcion == "Reporte Estudiantes":
         reporte_estudiantes_app(user)
+    elif opcion == "Cerrar sesión":
+        st.session_state.clear()
+        st.success("Has cerrado sesión correctamente.")
+        st.rerun()
 
 if __name__ == "__main__":
     main()
