@@ -6,3 +6,4 @@ cloudinary
 oauth2client
 bcrypt
 plotly
+matplotlib
