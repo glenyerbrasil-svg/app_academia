@@ -1,5 +1,18 @@
 import streamlit as st
-# ... tus imports de módulos
+
+# Importar todos los módulos
+from bienvenida import bienvenida_app
+from escuela import escuela_app
+from bitacora import bitacora_app
+from editar import editar_app
+from backtesting import backtesting_app
+from finanzas import finanzas_app
+from reportes import reportes_app
+from forum import forum_app
+from revision import revision_app
+from membresias import membresias_app
+from metas import metas_app
+from reporte_estudiantes import reporte_estudiantes_app
 
 # Simulación de usuario actual (esto luego se conecta con login real)
 if "user" not in st.session_state:
@@ -7,7 +20,7 @@ if "user" not in st.session_state:
         "ID_USUARIO": "u001",
         "USUARIO": "glenyer",
         "NOMBRE": "Glenyer",
-        "ROL": "Administrador",
+        "ROL": "Administrador",  # Estudiante, Maestro, Administrador
         "NIVEL": "Jedi",
         "PROXIMO_VENCIMIENTO": "2026-06-01"
     }
