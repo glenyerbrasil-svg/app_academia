@@ -64,7 +64,6 @@ def registro_app():
     # --- Paso 1: Registro inicial ---
     if st.session_state["PASO_REGISTRO"] == 1:
         with st.form("registro_form"):
-            usuario = st.text_input("Usuario")
             nombre = st.text_input("Nombre completo")
             email = st.text_input("Correo electrónico")
             telefono = st.text_input("Teléfono")
@@ -80,7 +79,7 @@ def registro_app():
             submitted = st.form_submit_button("Registrarme")
 
             if submitted:
-                if not usuario or not nombre or not email or not password:
+                if not nombre or not email or not password:
                     st.error("Por favor completa los campos obligatorios.")
                     return
 
@@ -93,11 +92,11 @@ def registro_app():
                 if enviar_verificacion(email, codigo_gen):
                     nuevo_usuario = [
                         len(usuarios)+1,   # ID_USUARIO
-                        usuario,
+                        email,             # USUARIO = correo electrónico
                         nombre,
                         email,
                         telefono,
-                        hashed_password,   # <-- contraseña encriptada
+                        hashed_password,   # contraseña encriptada
                         pais,
                         "DEMO",            # ROL
                         "Padawan",         # NIVEL
