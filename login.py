@@ -1,40 +1,47 @@
 import streamlit as st
 from utils import conectar_google
+import bcrypt
+
+def check_pass(p, h): 
+    try:
+        return bcrypt.checkpw(p.encode('utf-8'), h.encode('utf-8'))
+    except:
+        return False
 
 def login_app():
-    st.header("🔐 Iniciar sesión")
+    st.title("🔑 Iniciar sesión")
 
-    usuario = st.text_input("Usuario")
-    clave = st.text_input("Contraseña", type="password")
+    cliente = conectar_google()
+    if not cliente:
+        st.error("No se pudo conectar con Google Sheets.")
+        return
 
-    if st.button("Entrar"):
-        cliente = conectar_google()
-        if not cliente:
-            st.error("No se pudo conectar con Google Sheets.")
-            return None
+    try:
+        doc = cliente.open("Bitacora_Academia1")
+        hoja_u = doc.worksheet("Usuarios")
+        datos = hoja_u.get_all_records()
+    except:
+        st.error("Error: No se encontró la pestaña 'Usuarios'.")
+        return
 
-        try:
-            doc = cliente.open("Bitacora_Academia1")
-            hoja_u = doc.worksheet("Usuarios")
-            usuarios = hoja_u.get_all_records()
-        except:
-            st.error("No se encontró la hoja 'Usuarios'.")
-            return None
+    with st.form("login_form"):
+        u = st.text_input("Usuario").strip().lower()
+        p = st.text_input("Contraseña", type="password")
+        submitted = st.form_submit_button("Entrar")
 
-        # Buscar usuario
-        datos = next((u for u in usuarios if u["USUARIO"] == usuario and u["CLAVE"] == clave), None)
+        if submitted:
+            user = next((r for r in datos if str(r.get("USUARIO")).lower() == u), None)
 
-        if datos:
-            st.success(f"Bienvenido {datos['NOMBRE']} 👋")
-            # Guardar sesión
-            st.session_state["user"] = {
-                "ID_USUARIO": datos["ID_USUARIO"],
-                "USUARIO": datos["USUARIO"],
-                "NOMBRE": datos["NOMBRE"],
-                "ROL": datos["ROL"],
-                "NIVEL": datos["NIVEL"],
-                "PROXIMO_VENCIMIENTO": datos["PROXIMO_VENCIMIENTO"]
-            }
-            st.rerun()
-        else:
-            st.error("Usuario o contraseña incorrectos.")
+            if user:
+                # Verificación de correo
+                if str(user.get("CORREO_VERIFICADO")).upper() == "NO":
+                    st.warning("⚠️ Tu cuenta no ha sido verificada. Revisa tu email.")
+                # Validación de contraseña
+                elif check_pass(p, str(user.get("PASSWORD"))):
+                    st.session_state["user"] = user
+                    st.success(f"Bienvenido {user.get('NOMBRE')} 👋")
+                    st.rerun()
+                else:
+                    st.error("Contraseña incorrecta.")
+            else:
+                st.error("El usuario no existe.")
