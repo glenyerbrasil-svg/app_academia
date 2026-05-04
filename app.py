@@ -2,6 +2,8 @@ import streamlit as st
 
 # Importar módulos
 from login import login_app
+from registro import registro_app
+from recuperar import recuperar_app
 from bienvenida import bienvenida_app
 from escuela import escuela_app
 from bitacora import bitacora_app
@@ -16,11 +18,23 @@ from metas import metas_app
 from reporte_estudiantes import reporte_estudiantes_app
 
 def main():
-    # Si no hay usuario en sesión, mostrar login
+    # Si no hay usuario en sesión, mostrar opciones de acceso
     if "user" not in st.session_state:
-        login_app()
+        st.sidebar.title("🔑 Acceso")
+        opcion_inicio = st.sidebar.radio(
+            "Selecciona una opción",
+            ["Login", "Registro", "Recuperar contraseña"]
+        )
+
+        if opcion_inicio == "Login":
+            login_app()
+        elif opcion_inicio == "Registro":
+            registro_app()
+        else:
+            recuperar_app()
         return
 
+    # Usuario autenticado
     user = st.session_state["user"]
 
     # Menú lateral
