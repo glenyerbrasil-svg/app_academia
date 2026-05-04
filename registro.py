@@ -11,7 +11,12 @@ def registro_app():
         telefono = st.text_input("Teléfono")
         password = st.text_input("Contraseña", type="password")
         pais = st.text_input("País")
-        fecha_cumple = st.date_input("Fecha de cumpleaños")
+        fecha_cumple = st.date_input(
+            "Fecha de cumpleaños",
+            value=datetime.date(2000, 1, 1),  # valor inicial
+            min_value=datetime.date(1900, 1, 1),  # mínimo permitido
+            max_value=datetime.date.today()       # máximo permitido
+        )
 
         submitted = st.form_submit_button("Registrarme")
 
@@ -28,13 +33,14 @@ def registro_app():
             try:
                 doc = cliente.open("Bitacora_Academia1")
                 hoja_u = doc.worksheet("Usuarios")
+                usuarios = hoja_u.get_all_records()
             except:
                 st.error("No se encontró la hoja 'Usuarios'.")
                 return
 
             # Crear nuevo registro
             nuevo_usuario = [
-                f"u{len(hoja_u.get_all_records())+1:03}",  # ID único
+                f"u{len(usuarios)+1:03}",  # ID único
                 email,
                 nombre,
                 telefono,
