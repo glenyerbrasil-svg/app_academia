@@ -1,29 +1,45 @@
 import streamlit as st
 import random
-from utils import conectar_google, hoy
+import datetime
+from utils import conectar_google
 
-def bienvenida_app(user):
-    st.header("🏠 Bienvenida")
+def bienvenida_app():
+    st.header("🌟 Bienvenida")
 
-    # Mostrar datos del usuario
-    st.write(f"👋 Hola **{user['NOMBRE']}**")
-    st.write(f"🎓 Nivel: {user['NIVEL']}")
-    st.write(f"📜 Membresía: {user['ROL']}")
-    st.write(f"⏳ Próximo vencimiento: {user['PROXIMO_VENCIMIENTO']}")
+    # Datos del usuario en sesión
+    user = st.session_state.get("user", {})
+    nombre = user.get("NOMBRE", "Usuario")
+    nivel = user.get("NIVEL", "Padawan")
+    membresia = user.get("ROL", "DEMO")
+    vencimiento = user.get("PROXIMO_VENCIMIENTO", "N/A")
 
-    # Conectar a Google Sheets y obtener mensajes
+    st.write(f"Hola {nombre}")
+    st.write(f"Nivel: {nivel}")
+    st.write(f"Membresía: {membresia}")
+    st.write(f"Próximo vencimiento: {vencimiento}")
+
+    # Conectar a Google Sheets
     cliente = conectar_google()
-    if cliente:
-        try:
-            doc = cliente.open("Bitacora_Academia1")
-            hoja_m = doc.worksheet("Mensajes")
-            mensajes = hoja_m.col_values(1)  # Columna A con los mensajes
-        except:
-            mensajes = ["Error al cargar mensajes."]
+    if not cliente:
+        st.warning("No se pudo conectar con la base de datos.")
+        return
 
-    # Mensaje motivacional aleatorio (cambia cada 24h)
-    if "MENSAJE_FECHA" not in st.session_state or st.session_state["MENSAJE_FECHA"] != hoy():
-        st.session_state["MENSAJE_FECHA"] = hoy()
-        st.session_state["MENSAJE_TEXTO"] = random.choice(mensajes)
+    try:
+        doc = cliente.open("Bitacora_Academia1")
+        hoja_m = doc.worksheet("Mensajes")
 
-    st.info(f"💡 {st.session_state['MENSAJE_TEXTO']}")
+        # Leer mensajes desde fila 2 hasta 62
+        mensajes = hoja_m.col_values(1)[1:62]  # [1:62] excluye encabezado y toma hasta fila 62
+        mensajes = [m for m in mensajes if m.strip()]  # limpiar vacíos
+
+        if mensajes:
+            # Selección diaria: usar el día del año como semilla
+            hoy = datetime.date.today().timetuple().tm_yday
+            random.seed(hoy)  # misma semilla para todo el día
+            consejo = random.choice(mensajes)
+
+            st.info(f"💡 Consejo del día:\n\n{consejo}")
+        else:
+            st.warning("No hay mensajes cargados en la hoja.")
+    except Exception as e:
+        st.error(f"Error al cargar mensajes: {e}")
