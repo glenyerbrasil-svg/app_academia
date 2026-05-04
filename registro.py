@@ -5,9 +5,14 @@ import random
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import smtplib
+import bcrypt
 
 EMAIL_EMISOR = "glenyerbrasil@gmail.com"
 EMAIL_PASSWORD = "tpnk mizj ccul vfuv"  # Contraseña de aplicación de Gmail
+
+# --- Función para encriptar contraseñas ---
+def hash_pass(password):
+    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
 def enviar_verificacion(email_destino, codigo):
     msg = MIMEMultipart()
@@ -79,6 +84,9 @@ def registro_app():
                     st.error("Por favor completa los campos obligatorios.")
                     return
 
+                # Encriptar contraseña
+                hashed_password = hash_pass(password)
+
                 # Generar código de verificación
                 codigo_gen = str(random.randint(100000, 999999))
 
@@ -89,7 +97,7 @@ def registro_app():
                         nombre,
                         email,
                         telefono,
-                        password,
+                        hashed_password,   # <-- contraseña encriptada
                         pais,
                         "DEMO",            # ROL
                         "Padawan",         # NIVEL
@@ -125,7 +133,6 @@ def registro_app():
 
         if st.button("Validar código"):
             if str(codigo_ingresado).strip() == str(st.session_state["CODIGO_TEMP"]).strip():
-                # Buscar fila del usuario
                 datos = hoja_u.get_all_records()
                 user = next((u for u in datos if u["EMAIL"] == st.session_state["EMAIL_TEMP"]), None)
                 if user:
