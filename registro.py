@@ -17,17 +17,10 @@ def enviar_verificacion(email_destino, codigo):
 
     cuerpo = f"""
     <html>
-        <body style="font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px;">
-            <div style="max-width: 600px; margin: auto; background: white; padding: 20px; border-radius: 10px; border: 1px solid #ddd;">
-                <h2 style="color: #007bff; text-align: center;">¡Bienvenido a la Academia!</h2>
-                <p>Usa este código para activar tu cuenta:</p>
-                <div style="background: #e9ecef; padding: 15px; text-align: center; font-size: 24px; font-weight: bold; letter-spacing: 5px; border-radius: 5px;">
-                    {codigo}
-                </div>
-                <p style="font-size: 12px; color: #777; text-align: center; margin-top: 20px;">
-                    Si no solicitaste este registro, puedes ignorar este correo.
-                </p>
-            </div>
+        <body>
+            <h2>¡Bienvenido a la Academia!</h2>
+            <p>Usa este código para activar tu cuenta:</p>
+            <h1>{codigo}</h1>
         </body>
     </html>
     """
@@ -47,7 +40,6 @@ def enviar_verificacion(email_destino, codigo):
 def registro_app():
     st.header("📝 Registro de nuevo usuario")
 
-    # Paso de registro controlado por sesión
     if "PASO_REGISTRO" not in st.session_state:
         st.session_state["PASO_REGISTRO"] = 1
 
@@ -67,6 +59,7 @@ def registro_app():
     # --- Paso 1: Registro inicial ---
     if st.session_state["PASO_REGISTRO"] == 1:
         with st.form("registro_form"):
+            usuario = st.text_input("Usuario")
             nombre = st.text_input("Nombre completo")
             email = st.text_input("Correo electrónico")
             telefono = st.text_input("Teléfono")
@@ -82,7 +75,7 @@ def registro_app():
             submitted = st.form_submit_button("Registrarme")
 
             if submitted:
-                if not nombre or not email or not password:
+                if not usuario or not nombre or not email or not password:
                     st.error("Por favor completa los campos obligatorios.")
                     return
 
@@ -91,22 +84,34 @@ def registro_app():
 
                 if enviar_verificacion(email, codigo_gen):
                     nuevo_usuario = [
-                        f"u{len(usuarios)+1:03}",  # ID único
-                        email,
+                        len(usuarios)+1,   # ID_USUARIO
+                        usuario,
                         nombre,
+                        email,
                         telefono,
                         password,
                         pais,
+                        "DEMO",            # ROL
+                        "Padawan",         # NIVEL
+                        "ACTIVO",          # ESTADO
+                        str(datetime.date.today()),  # FECHA_REGISTRO
                         fecha_cumple.strftime("%Y-%m-%d"),
-                        "Estudiante",   # Rol inicial
-                        "Demo",         # Nivel inicial
-                        (datetime.date.today() + datetime.timedelta(days=7)).strftime("%Y-%m-%d"),  # Vencimiento demo
-                        "NO",           # Correo verificado
-                        codigo_gen      # Código de verificación
+                        "NO",              # REGALO_CUMPLE_RECLAMADO
+                        "N/A",             # ULTIMO_PAGO
+                        (datetime.date.today() + datetime.timedelta(days=7)).strftime("%Y-%m-%d"), # PROXIMO_VENCIMIENTO
+                        (datetime.date.today() + datetime.timedelta(days=9)).strftime("%Y-%m-%d"), # FECHA_GRACIA
+                        "N/A",             # COMPROBANTE_PAGO
+                        "PRUEBA",          # TIPO_PLAN
+                        1,                 # DISPOSITIVOS_ACTIVOS
+                        "NO",              # CORREO_VERIFICADO
+                        str(datetime.datetime.now()), # ULTIMA_CONEXION
+                        "PENDIENTE",       # ESTADO_PAGO
+                        0.0                # MONTO_ULTIMO_PAGO
                     ]
 
                     hoja_u.append_row(nuevo_usuario)
                     st.session_state["EMAIL_TEMP"] = email
+                    st.session_state["CODIGO_TEMP"] = codigo_gen
                     st.session_state["PASO_REGISTRO"] = 2
                     st.success("✅ Registro exitoso. Revisa tu correo para confirmar tu cuenta.")
                     st.rerun()
@@ -119,17 +124,16 @@ def registro_app():
         codigo_ingresado = st.text_input("Código de verificación (6 dígitos)")
 
         if st.button("Validar código"):
-            # Buscar usuario en la hoja
-            datos = hoja_u.get_all_records()
-            user = next((u for u in datos if u["EMAIL"] == st.session_state["EMAIL_TEMP"]), None)
-
-            if user and str(user.get("CODIGO_VERIFICACION")) == codigo_ingresado:
-                # Actualizar estado de verificación
-                fila = datos.index(user) + 2  # +2 porque get_all_records empieza en fila 2
-                hoja_u.update_cell(fila, 11, "SI")  # Columna CORREO_VERIFICADO
-                hoja_u.update_cell(fila, 12, "N/A") # Limpiar código
-                st.success("🎉 Cuenta verificada con éxito. Ya puedes iniciar sesión.")
-                st.session_state["PASO_REGISTRO"] = 1
-                del st.session_state["EMAIL_TEMP"]
+            if str(codigo_ingresado).strip() == str(st.session_state["CODIGO_TEMP"]).strip():
+                # Buscar fila del usuario
+                datos = hoja_u.get_all_records()
+                user = next((u for u in datos if u["EMAIL"] == st.session_state["EMAIL_TEMP"]), None)
+                if user:
+                    fila = datos.index(user) + 2
+                    hoja_u.update_cell(fila, 20, "SI")  # Columna CORREO_VERIFICADO
+                    st.success("🎉 Cuenta verificada con éxito. Ya puedes iniciar sesión.")
+                    st.session_state["PASO_REGISTRO"] = 1
+                    del st.session_state["EMAIL_TEMP"]
+                    del st.session_state["CODIGO_TEMP"]
             else:
                 st.error("Código incorrecto.")
