@@ -151,4 +151,10 @@ def bitacora_app(user):
 
                     hoja_b.append_row(nueva_fila)
 
-                    st.success("✅ Operación registrada en
+                    st.success("✅ Operación registrada en la Bitácora.")
+                    st.balloons()
+                    time.sleep(2)
+                    st.rerun()
+
+                except Exception as e:
+                    st.error(f"❌ Error crítico: {e}")
