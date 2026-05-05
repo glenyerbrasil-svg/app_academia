@@ -19,10 +19,15 @@ def bitacora_app(user):
         st.error(f"Error de conexión: {e}")
         return
 
-    # Saldo actual
+    # Mostrar saldo actual
     df_f = pd.DataFrame(hoja_f.get_all_records())
     saldo_actual = float(df_f.iloc[-1].get("SALDO_FINAL", 0)) if not df_f.empty else 0.0
-    st.info(f"💰 **Saldo disponible:** ${saldo_actual:,.2f}")
+    st.info(f"💵 **Saldo actual:** ${saldo_actual:,.2f}")
+
+    # Bloquear si no hay saldo
+    if saldo_actual <= 0:
+        st.warning("⚠️ Debes realizar tu primer depósito en Finanzas antes de abrir operaciones.")
+        return
 
     # --- FORMULARIO DE NUEVA OPERACIÓN ---
     st.subheader("🚀 Nueva Operación")
@@ -48,6 +53,11 @@ def bitacora_app(user):
     if p_ent > 0 and p_sl > 0 and bala > 0:
         st.success(f"📊 Lotaje calculado: **{lotaje:.2f}** | TP sugerido: **{tp_sugerido:.4f}**")
 
+        # Advertencia de gestión de riesgo
+        if bala > (saldo_actual * 0.10):
+            st.warning("🚨 Cuidado: Tu bala supera el 10% de tu saldo. "
+                       "Recuerda que los traders consistentes protegen su capital antes de buscar ganancias.")
+
     # --- EVIDENCIA VISUAL ---
     st.divider()
     st.write("🖼️ Evidencia Visual")
@@ -58,16 +68,14 @@ def bitacora_app(user):
     img_ent = g_c3.file_uploader("Gráfico Ejecución", type=['png','jpg','jpeg'])
     img_res = g_c4.file_uploader("Gráfico Resultado", type=['png','jpg','jpeg'])
 
-    # --- ESTADO EMOCIONAL (tipo barra) ---
+    # --- ESTADO EMOCIONAL (slider tipo barra) ---
     st.divider()
     estado_emocional = st.slider(
         "Estado Emocional",
         min_value=1,
         max_value=3,
-        value=1,
-        format="%d"
+        value=1
     )
-    # Mapear valores a caritas y colores
     if estado_emocional == 1:
         estado_emocional_str = "🙂 Normal"
     elif estado_emocional == 2:
@@ -146,7 +154,4 @@ def bitacora_app(user):
                     st.success("✅ Operación registrada en la Bitácora.")
                     st.balloons()
                     time.sleep(2)
-                    st.rerun()
-
-                except Exception as e:
-                    st.error(f"❌ Error crítico: {e}")
+                    st
