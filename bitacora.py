@@ -151,7 +151,4 @@ def bitacora_app(user):
 
                     hoja_b.append_row(nueva_fila)
 
-                    st.success("✅ Operación registrada en la Bitácora.")
-                    st.balloons()
-                    time.sleep(2)
-                    st
+                    st.success("✅ Operación registrada en
