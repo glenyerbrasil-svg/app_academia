@@ -28,16 +28,24 @@ def bienvenida_app(user):
         hoja_m = doc.worksheet("Mensajes")
 
         # Leer mensajes desde fila 2 hasta 62
-        mensajes = hoja_m.col_values(1)[1:62]  # excluye encabezado y toma hasta fila 62
-        mensajes = [m for m in mensajes if m.strip()]  # limpiar vacíos
+        mensajes = hoja_m.col_values(1)[1:62]
+        mensajes = [m for m in mensajes if m.strip()]
 
         if mensajes:
             # Selección diaria: usar el día del año como semilla
             hoy = datetime.date.today().timetuple().tm_yday
-            random.seed(hoy)  # misma semilla para todo el día
+            random.seed(hoy)
             consejo = random.choice(mensajes)
 
-            st.info(f"💡 Consejo del día:\n\n{consejo}")
+            # Mostrar consejo con estilo llamativo
+            st.markdown(f"""
+                <div style="background-color:#1e1e1e; padding:25px; border-radius:15px; border-left:10px solid #007bff;">
+                    <h2 style="color:#007bff; text-align:center; margin-top:0;">💡 Consejo del día</h2>
+                    <p style="font-size:22px; line-height:1.6; color:#e0e0e0; text-align:center; font-weight:bold;">
+                        {consejo}
+                    </p>
+                </div>
+            """, unsafe_allow_html=True)
         else:
             st.warning("No hay mensajes cargados en la hoja.")
     except Exception as e:
