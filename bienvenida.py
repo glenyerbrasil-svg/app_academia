@@ -56,10 +56,7 @@ def bienvenida_app(user):
             }
             logo_url = logos.get(nivel, logos["Padawan"])
 
-            st.markdown(
-                f"<div style='text-align:center;'><img src='{logo_url}' style='width:150px;'></div>",
-                unsafe_allow_html=True
-            )
+            st.image(logo_url, caption=f"Tu rango actual: {nivel}", width=150)
 
         else:
             st.warning("No hay mensajes cargados en la hoja.")
