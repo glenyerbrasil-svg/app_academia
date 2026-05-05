@@ -3,11 +3,10 @@ import random
 import datetime
 from utils import conectar_google
 
-def bienvenida_app():
+def bienvenida_app(user):
     st.header("🌟 Bienvenida")
 
-    # Datos del usuario en sesión
-    user = st.session_state.get("user", {})
+    # Datos del usuario
     nombre = user.get("NOMBRE", "Usuario")
     nivel = user.get("NIVEL", "Padawan")
     membresia = user.get("ROL", "DEMO")
@@ -29,7 +28,7 @@ def bienvenida_app():
         hoja_m = doc.worksheet("Mensajes")
 
         # Leer mensajes desde fila 2 hasta 62
-        mensajes = hoja_m.col_values(1)[1:62]  # [1:62] excluye encabezado y toma hasta fila 62
+        mensajes = hoja_m.col_values(1)[1:62]  # excluye encabezado y toma hasta fila 62
         mensajes = [m for m in mensajes if m.strip()]  # limpiar vacíos
 
         if mensajes:
