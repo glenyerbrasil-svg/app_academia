@@ -36,14 +36,14 @@ def bitacora_app(user):
     instrumentos = ["FLIPX1","FLIPX2","FLIPX3","FLIPX4","FLIPX5",
                     "FXVOL20","FXVOL40","FXVOL60","FXVOL80","FXVOL99",
                     "SFXVOL20","SFXVOL40","SFXVOL60","SFXVOL80","SFXVOL99"]
-    ins = c1.selectbox("Instrumento", instrumentos)
-    acc = c2.selectbox("Acción", ["COMPRA", "VENTA"])
-    bala = c3.number_input("Valor de la Bala ($)", min_value=0.0, step=0.5, format="%.2f")
+    ins = c1.selectbox("Instrumento", instrumentos, key="ins")
+    acc = c2.selectbox("Acción", ["COMPRA", "VENTA"], key="acc")
+    bala = c3.number_input("Valor de la Bala ($)", min_value=0.0, step=0.5, format="%.2f", key="bala")
 
     c_rat, c_ent, c_sl = st.columns(3)
-    ratio = c_rat.number_input("Ratio Objetivo (1:X)", min_value=0.1, value=1.0, step=0.1)
-    p_ent = c_ent.number_input("Precio de Entrada", format="%.4f")
-    p_sl = c_sl.number_input("Precio de SL", format="%.4f")
+    ratio = c_rat.number_input("Ratio Objetivo (1:X)", min_value=0.1, value=1.0, step=0.1, key="rat")
+    p_ent = c_ent.number_input("Precio de Entrada", format="%.4f", key="ent")
+    p_sl = c_sl.number_input("Precio de SL", format="%.4f", key="sl")
 
     # Cálculos automáticos
     distancia = abs(p_ent - p_sl)
@@ -62,20 +62,15 @@ def bitacora_app(user):
     st.divider()
     st.write("🖼️ Evidencia Visual")
     g_c1, g_c2 = st.columns(2)
-    img_may = g_c1.file_uploader("Gráfico Mayor", type=['png','jpg','jpeg'])
-    img_men = g_c2.file_uploader("Gráfico Menor", type=['png','jpg','jpeg'])
+    img_may = g_c1.file_uploader("Gráfico Mayor", type=['png','jpg','jpeg'], key="img_may")
+    img_men = g_c2.file_uploader("Gráfico Menor", type=['png','jpg','jpeg'], key="img_men")
     g_c3, g_c4 = st.columns(2)
-    img_ent = g_c3.file_uploader("Gráfico Ejecución", type=['png','jpg','jpeg'])
-    img_res = g_c4.file_uploader("Gráfico Resultado", type=['png','jpg','jpeg'])
+    img_ent = g_c3.file_uploader("Gráfico Ejecución", type=['png','jpg','jpeg'], key="img_ent")
+    img_res = g_c4.file_uploader("Gráfico Resultado", type=['png','jpg','jpeg'], key="img_res")
 
     # --- ESTADO EMOCIONAL (slider tipo barra) ---
     st.divider()
-    estado_emocional = st.slider(
-        "Estado Emocional",
-        min_value=1,
-        max_value=3,
-        value=1
-    )
+    estado_emocional = st.slider("Estado Emocional", min_value=1, max_value=3, value=1, key="emo")
     if estado_emocional == 1:
         estado_emocional_str = "🙂 Normal"
     elif estado_emocional == 2:
@@ -86,8 +81,15 @@ def bitacora_app(user):
     st.write(f"Seleccionado: {estado_emocional_str}")
 
     # --- OBSERVACIONES ---
-    observaciones = st.text_area("Observaciones (análisis posterior)")
+    observaciones = st.text_area("Observaciones (análisis posterior)", key="obs")
 
+    # --- Función para limpiar formulario ---
+    def limpiar_formulario():
+        for key in ["ins","acc","bala","rat","ent","sl","img_may","img_men","img_ent","img_res","emo","obs"]:
+            if key in st.session_state:
+                del st.session_state[key]
+
+##### a partir de aqui segunda parte
     # --- BOTÓN GUARDAR ---
     if st.button("💾 Guardar Registro", use_container_width=True):
         if p_ent == 0 or p_sl == 0 or bala == 0:
@@ -158,4 +160,3 @@ def bitacora_app(user):
 
                 except Exception as e:
                     st.error(f"❌ Error crítico: {e}")
-
