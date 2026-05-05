@@ -158,3 +158,4 @@ def bitacora_app(user):
 
                 except Exception as e:
                     st.error(f"❌ Error crítico: {e}")
+
