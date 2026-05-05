@@ -47,12 +47,11 @@ def bienvenida_app(user):
                 </div>
             """, unsafe_allow_html=True)
 
-            # Mostrar logo debajo del consejo
-            URL_BASE = "https://raw.githubusercontent.com/glenyerbrasil-svg/app_academia/main/assets/"
+            # Mostrar logo debajo del consejo con rutas exactas
             logos = {
-                "Padawan": f"{URL_BASE}jove_padawan.png",
-                "Jedi": f"{URL_BASE}jedi.png",
-                "Maestro Jedi": f"{URL_BASE}maestro_jedi.png"
+                "Padawan": "https://raw.githubusercontent.com/glenyerbrasil-svg/app_academia/main/assets/joven_padawan.png",
+                "Jedi": "https://raw.githubusercontent.com/glenyerbrasil-svg/app_academia/main/assets/jedi.png",
+                "Maestro Jedi": "https://raw.githubusercontent.com/glenyerbrasil-svg/app_academia/main/assets/maestro_jedi.png"
             }
             logo_url = logos.get(nivel, logos["Padawan"])
 
