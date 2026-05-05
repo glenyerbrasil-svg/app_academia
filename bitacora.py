@@ -84,19 +84,10 @@ def bitacora_app(user):
     observaciones = st.text_area("Observaciones (análisis posterior)", key="obs")
 
     # --- Función para limpiar formulario ---
-                    hoja_b.append_row(nueva_fila)
-
-                    st.success("✅ Operación registrada en la Bitácora.")
-                    st.balloons()
-
-                    # Limpiar todo el formulario y refrescar
-                    st.session_state.clear()
-                    time.sleep(1)
-                    st.rerun()
-
-                except Exception as e:
-                    st.error(f"❌ Error crítico: {e}")
-
+    def limpiar_formulario():
+        for key in ["ins","acc","bala","rat","ent","sl","img_may","img_men","img_ent","img_res","emo","obs"]:
+            if key in st.session_state:
+                st.session_state[key] = None
 
 
 ##### a partir de aqui segunda parte
