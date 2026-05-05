@@ -12,6 +12,22 @@ def bienvenida_app(user):
     membresia = user.get("ROL", "DEMO")
     vencimiento = user.get("PROXIMO_VENCIMIENTO", "N/A")
 
+    # Mostrar logo según rango
+    URL_BASE = "https://raw.githubusercontent.com/glenyerbrasil-svg/app_academia/main/assets/"
+    logos = {
+        "Padawan": f"{URL_BASE}jove_padawan.png",
+        "Jedi": f"{URL_BASE}jedi.png",
+        "Maestro Jedi": f"{URL_BASE}maestro_jedi.png"
+    }
+    logo_url = logos.get(nivel, logos["Padawan"])
+
+    # Sidebar con logo y datos
+    with st.sidebar:
+        st.image(logo_url, use_container_width=True)
+        st.markdown(f"<h2 style='text-align: center;'>{nombre}</h2>", unsafe_allow_html=True)
+        st.markdown(f"<p style='text-align: center; font-weight: bold;'>{nivel}</p>", unsafe_allow_html=True)
+
+    # Datos principales
     st.write(f"Hola {nombre}")
     st.write(f"Nivel: {nivel}")
     st.write(f"Membresía: {membresia}")
