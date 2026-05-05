@@ -61,7 +61,20 @@ def bitacora_app(user):
     # --- ESTADO EMOCIONAL ---
     st.divider()
     opciones_emo = ["🙂 Normal", "😐 Nervioso", "😡 Venganza"]
-    estado_emocional = st.select_slider("Estado Emocional", options=opciones_emo, value="🙂 Normal")
+    estado_emocional = st.select_slider(
+        "Estado Emocional",
+        options=opciones_emo,
+        value="🙂 Normal"
+    )
+
+    # --- DRAWDOWN ---
+    drawdown = st.slider(
+        "Drawdown (%)",
+        min_value=1,
+        max_value=100,
+        value=0,
+        step=1
+    )
 
     # --- OBSERVACIONES ---
     observaciones = st.text_area("Observaciones (análisis posterior)")
@@ -122,7 +135,7 @@ def bitacora_app(user):
                     nueva_fila[20] = "PENDIENTE"                    # ESTADO_RESULTADO
                     nueva_fila[21] = 0                              # RESULTADO_DINERO
                     nueva_fila[22] = "NO"                           # LLEGO_11
-                    nueva_fila[23] = 0                              # DRAWDOWN
+                    nueva_fila[23] = drawdown                       # DRAWDOWN
                     nueva_fila[24] = url_res                        # IMAGEN_RESULTADO
                     nueva_fila[25] = observaciones                  # OBSERVACIONES
                     nueva_fila[26] = estado_emocional               # ESTADO_EMOCIONAL
