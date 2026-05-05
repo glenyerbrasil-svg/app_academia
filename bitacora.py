@@ -45,8 +45,8 @@ def bitacora_app(user):
     lotaje = bala / distancia if distancia > 0 else 0.0
     tp_sugerido = p_ent + (distancia * ratio) if acc == "COMPRA" else p_ent - (distancia * ratio)
 
-    if p_ent > 0 and p_sl > 0:
-        st.success(f"📊 Lotaje: **{lotaje:.2f}** | TP sugerido: **{tp_sugerido:.4f}**")
+    if p_ent > 0 and p_sl > 0 and bala > 0:
+        st.success(f"📊 Lotaje calculado: **{lotaje:.2f}** | TP sugerido: **{tp_sugerido:.4f}**")
 
     # --- EVIDENCIA VISUAL ---
     st.divider()
@@ -58,23 +58,24 @@ def bitacora_app(user):
     img_ent = g_c3.file_uploader("Gráfico Ejecución", type=['png','jpg','jpeg'])
     img_res = g_c4.file_uploader("Gráfico Resultado", type=['png','jpg','jpeg'])
 
-    # --- ESTADO EMOCIONAL ---
+    # --- ESTADO EMOCIONAL (tipo barra) ---
     st.divider()
-    opciones_emo = ["🙂 Normal", "😐 Nervioso", "😡 Venganza"]
-    estado_emocional = st.select_slider(
+    estado_emocional = st.slider(
         "Estado Emocional",
-        options=opciones_emo,
-        value="🙂 Normal"
-    )
-
-    # --- DRAWDOWN ---
-    drawdown = st.slider(
-        "Drawdown (%)",
         min_value=1,
-        max_value=100,
-        value=0,
-        step=1
+        max_value=3,
+        value=1,
+        format="%d"
     )
+    # Mapear valores a caritas y colores
+    if estado_emocional == 1:
+        estado_emocional_str = "🙂 Normal"
+    elif estado_emocional == 2:
+        estado_emocional_str = "😐 Nervioso"
+    else:
+        estado_emocional_str = "😡 Venganza"
+
+    st.write(f"Seleccionado: {estado_emocional_str}")
 
     # --- OBSERVACIONES ---
     observaciones = st.text_area("Observaciones (análisis posterior)")
@@ -135,10 +136,10 @@ def bitacora_app(user):
                     nueva_fila[20] = "PENDIENTE"                    # ESTADO_RESULTADO
                     nueva_fila[21] = 0                              # RESULTADO_DINERO
                     nueva_fila[22] = "NO"                           # LLEGO_11
-                    nueva_fila[23] = drawdown                       # DRAWDOWN
+                    nueva_fila[23] = 0                              # DRAWDOWN (solo se usa en cierre)
                     nueva_fila[24] = url_res                        # IMAGEN_RESULTADO
                     nueva_fila[25] = observaciones                  # OBSERVACIONES
-                    nueva_fila[26] = estado_emocional               # ESTADO_EMOCIONAL
+                    nueva_fila[26] = estado_emocional_str           # ESTADO_EMOCIONAL
 
                     hoja_b.append_row(nueva_fila)
 
