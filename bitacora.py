@@ -87,7 +87,8 @@ def bitacora_app(user):
     def limpiar_formulario():
         for key in ["ins","acc","bala","rat","ent","sl","img_may","img_men","img_ent","img_res","emo","obs"]:
             if key in st.session_state:
-                del st.session_state[key]
+                st.session_state[key] = None
+
 
 ##### a partir de aqui segunda parte
     # --- BOTÓN GUARDAR ---
@@ -155,7 +156,10 @@ def bitacora_app(user):
 
                     st.success("✅ Operación registrada en la Bitácora.")
                     st.balloons()
-                    time.sleep(2)
+
+                    # Limpiar formulario y refrescar
+                    limpiar_formulario()
+                    time.sleep(1)
                     st.rerun()
 
                 except Exception as e:
