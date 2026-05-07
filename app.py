@@ -1,89 +1,82 @@
 import streamlit as st
+import pandas as pd
+from utils import conectar_google
+from cerrar import cerrar_operacion   # Importamos la nueva función desde cerrar.py
 
-# Importar módulos
-from login import login_app
-from registro import registro_app
-from recuperar import recuperar_app
-from bienvenida import bienvenida_app
-from escuela import escuela_app
-from bitacora import bitacora_app
-from cerrar import cerrar_app
-from backtesting import backtesting_app
-from finanzas import finanzas_app
-from reportes import reportes_app
-from forum import forum_app
-from revision import revision_app
-from membresias import membresias_app
-from metas import metas_app
-from reporte_estudiantes import reporte_estudiantes_app
+def main_app():
+    user = st.session_state["USUARIO"]
+    cliente = conectar_google()
+    doc = cliente.open("Bitacora_Academia1")
 
-def main():
-    # Si no hay usuario en sesión, mostrar opciones de acceso
-    if "user" not in st.session_state:
-        st.sidebar.title("🔑 Acceso")
-        opcion_inicio = st.sidebar.radio(
-            "Selecciona una opción",
-            ["Login", "Registro", "Recuperar contraseña"]
+    URL_BASE = "https://raw.githubusercontent.com/glenyerbrasil-svg/app_academia/main/assets/"
+
+    rangos_config = {
+        "Padawan": {
+            "img": f"{URL_BASE}joven_padawan.png",
+            "color": "#A9A9A9",
+            "label": "Joven Padawan"
+        },
+        "Jedi": {
+            "img": f"{URL_BASE}jedi.png",
+            "color": "#2E8B57",
+            "label": "Caballero Jedi"
+        },
+        "Maestro Jedi": {
+            "img": f"{URL_BASE}maestro_jedi.png",
+            "color": "#FFD700",
+            "label": "Maestro Jedi"
+        }
+    }
+
+    nivel_user = str(user.get("NIVEL", "Padawan")).strip()
+    config = rangos_config.get(nivel_user, rangos_config["Padawan"])
+
+    # --- SIDEBAR ---
+    with st.sidebar:
+        st.image(config["img"], use_container_width=True)
+        st.markdown(f"<h2 style='text-align: center;'>{user['NOMBRE']}</h2>", unsafe_allow_html=True)
+        st.markdown(f"<p style='text-align: center; color: {config['color']}; font-weight: bold;'>{config['label']}</p>", unsafe_allow_html=True)
+        st.divider()
+
+        # Menú principal
+        menu = st.radio(
+            "Módulos del Sistema:",
+            ["🏠 Home", "🎓 Escuela", "📝 Bitácora", "✏️ Cerrar Operación", "📊 Backtesting", "💰 Finanzas", "📈 Reportes", "💬 Forum"]
         )
 
-        if opcion_inicio == "Login":
-            login_app()
-        elif opcion_inicio == "Registro":
-            registro_app()
-        else:
-            recuperar_app()
-        return
+        st.divider()
+        if st.button("Cerrar Sesión", use_container_width=True):
+            del st.session_state["USUARIO"]
+            st.rerun()
 
-    # Usuario autenticado
-    user = st.session_state["user"]
+    # --- Lógica de renderizado ---
+    if menu == "🏠 Home":
+        st.header("🌌 Centro de Mando")
+        # Aquí va tu contenido de Home
 
-    # Menú lateral
-    st.sidebar.title("📚 Menú Principal")
-    opcion = st.sidebar.radio("Selecciona una sección", [
-        "Bienvenida",
-        "Escuela",
-        "Bitácora",
-        "Cerrar Operaciones",
-        "Backtesting",
-        "Finanzas",
-        "Reportes",
-        "Foro",
-        "Revisión",
-        "Membresías",
-        "Metas",
-        "Reporte Estudiantes",
-        "Cerrar sesión"
-    ])
+    elif menu == "🎓 Escuela":
+        st.header("🎓 Holocrón de Entrenamiento")
+        # Aquí va tu contenido de Escuela
 
-    # Navegación entre secciones
-    if opcion == "Bienvenida":
-        bienvenida_app(user)
-    elif opcion == "Escuela":
-        escuela_app(user)
-    elif opcion == "Bitácora":
+    elif menu == "📝 Bitácora":
+        from bitacora import bitacora_app
         bitacora_app(user)
-    elif opcion == "Cerrar Operaciones":
-        cerrar_app(user)
-    elif opcion == "Backtesting":
-        backtesting_app(user)
-    elif opcion == "Finanzas":
-        finanzas_app(user)
-    elif opcion == "Reportes":
-        reportes_app(user)
-    elif opcion == "Foro":
-        forum_app(user)
-    elif opcion == "Revisión":
-        revision_app(user)
-    elif opcion == "Membresías":
-        membresias_app(user)
-    elif opcion == "Metas":
-        metas_app(user)
-    elif opcion == "Reporte Estudiantes":
-        reporte_estudiantes_app(user)
-    elif opcion == "Cerrar sesión":
-        st.session_state.clear()
-        st.success("Has cerrado sesión correctamente.")
-        st.rerun()
 
-if __name__ == "__main__":
-    main()
+    elif menu == "✏️ Cerrar Operación":
+        cerrar_operacion(user, doc)   # Llamamos la función desde cerrar.py
+
+    elif menu == "📊 Backtesting":
+        st.header("📊 Backtesting")
+        # Aquí va tu contenido de Backtesting
+
+    elif menu == "💰 Finanzas":
+        st.header("💰 Finanzas")
+        # Aquí va tu contenido de Finanzas
+
+    elif menu == "📈 Reportes":
+        st.header("📈 Reportes")
+        # Aquí va tu contenido de Reportes
+
+    elif menu == "💬 Forum":
+        st.header("💬 Forum")
+        # Aquí va tu contenido de Forum
