@@ -7,7 +7,7 @@ from recuperar import recuperar_app
 from bienvenida import bienvenida_app
 from escuela import escuela_app
 from bitacora import bitacora_app
-from editar import editar_app
+from cerrar import cerrar_app
 from backtesting import backtesting_app
 from finanzas import finanzas_app
 from reportes import reportes_app
@@ -43,7 +43,7 @@ def main():
         "Bienvenida",
         "Escuela",
         "Bitácora",
-        "Editar Operaciones",
+        "Cerrar Operaciones",
         "Backtesting",
         "Finanzas",
         "Reportes",
@@ -62,7 +62,7 @@ def main():
         escuela_app(user)
     elif opcion == "Bitácora":
         bitacora_app(user)
-    elif opcion == "Editar Operaciones":
+    elif opcion == "Cerrar Operaciones":
         editar_app(user)
     elif opcion == "Backtesting":
         backtesting_app(user)
