@@ -63,7 +63,7 @@ def main():
     elif opcion == "Bitácora":
         bitacora_app(user)
     elif opcion == "Cerrar Operaciones":
-        editar_app(user)
+        cerrar_app(user)
     elif opcion == "Backtesting":
         backtesting_app(user)
     elif opcion == "Finanzas":
