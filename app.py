@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 from utils import conectar_google
+from bitacora import bitacora_app
 from cerrar import cerrar_operacion   # Importamos la nueva función desde cerrar.py
 
 def main_app():
@@ -38,7 +39,7 @@ def main_app():
         st.markdown(f"<p style='text-align: center; color: {config['color']}; font-weight: bold;'>{config['label']}</p>", unsafe_allow_html=True)
         st.divider()
 
-        # Menú principal
+        # Menú principal (cambiamos Editar → Cerrar Operación)
         menu = st.radio(
             "Módulos del Sistema:",
             ["🏠 Home", "🎓 Escuela", "📝 Bitácora", "✏️ Cerrar Operación", "📊 Backtesting", "💰 Finanzas", "📈 Reportes", "💬 Forum"]
@@ -59,11 +60,10 @@ def main_app():
         # Aquí va tu contenido de Escuela
 
     elif menu == "📝 Bitácora":
-        from bitacora import bitacora_app
         bitacora_app(user)
 
     elif menu == "✏️ Cerrar Operación":
-        cerrar_operacion(user, doc)   # Llamamos la función desde cerrar.py
+        cerrar_operacion(user, doc)   # Ahora apunta al archivo cerrar.py
 
     elif menu == "📊 Backtesting":
         st.header("📊 Backtesting")
