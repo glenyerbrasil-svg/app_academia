@@ -5,6 +5,24 @@ st.set_page_config(
     page_icon="assets/logo_academia.png",   # tu logo como favicon
     layout="wide"
 )
+st.markdown(
+    """
+    <link rel="manifest" href="assets/manifest.json">
+    <script>
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('assets/service-worker.js')
+          .then(function(reg) {
+            console.log('Service Worker registrado:', reg);
+          })
+          .catch(function(err) {
+            console.log('Error al registrar Service Worker:', err);
+          });
+      }
+    </script>
+    """,
+    unsafe_allow_html=True
+)
+
 
 # Importar módulos
 from login import login_app
