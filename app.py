@@ -10,11 +10,10 @@ st.set_page_config(
 # Inyectar favicon y manifest
 st.markdown(
     """
-    <link rel="icon" href="assets/logo_academia.png" type="image/png">
-    <link rel="manifest" href="assets/manifest.json">
+    <link rel="manifest" href="manifest.json">
     <script>
       if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('assets/service-worker.js')
+        navigator.serviceWorker.register('service-worker.js')
           .then(function(reg) {
             console.log('Service Worker registrado:', reg);
           })
