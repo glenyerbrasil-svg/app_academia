@@ -1,9 +1,11 @@
-def cerrar_operacion(user, doc):
-    from datetime import datetime, date
-    import pandas as pd
-    import cloudinary
-    import cloudinary.uploader
+import streamlit as st
+import pandas as pd
+import cloudinary
+import cloudinary.uploader
+import time
+from datetime import datetime, date
 
+def cerrar_operacion(user, doc):
     st.header("🏁 Cerrar Operación")
 
     try:
@@ -14,7 +16,7 @@ def cerrar_operacion(user, doc):
         df_f = pd.DataFrame(hoja_f.get_all_records())
         saldo_actual = float(df_f.iloc[-1].get("SALDO_FINAL", 0)) if not df_f.empty else 0.0
     except Exception as e:
-        st.error(f"Error de conexión socio: {e}")
+        st.error(f"Error de conexión: {e}")
         st.stop()
 
     # --- Filtros ---
@@ -32,6 +34,7 @@ def cerrar_operacion(user, doc):
                     "FXVOL20","FXVOL40","FXVOL60","FXVOL80","FXVOL99",
                     "SFXVOL20","SFXVOL40","SFXVOL60","SFXVOL80","SFXVOL99"]
     filtro_ins = st.selectbox("Instrumento", instrumentos)
+
     # --- Filtrado de operaciones ---
     mask = (df_b["ID_USUARIO"].astype(str) == str(user["ID_USUARIO"])) & \
            (pd.to_datetime(df_b["FECHA"]) >= pd.to_datetime(fecha_ini)) & \
@@ -52,6 +55,7 @@ def cerrar_operacion(user, doc):
         opciones.append((label, i+2, r.to_dict()))
 
     sel = st.selectbox("🎯 Selecciona la operación a cerrar:", opciones, format_func=lambda x: x[0])
+
     if sel:
         f_idx, d = sel[1], sel[2]
         st.divider()
@@ -85,6 +89,7 @@ def cerrar_operacion(user, doc):
         # --- Barra de Drawdown ---
         st.divider()
         drawdown_reportado = st.slider("📉 Reporta el Drawdown alcanzado", min_value=1, max_value=99, value=1, format="%d%%")
+
         with st.form(key=f"form_cierre_{f_idx}"):
             st.write("🖼️ Evidencia Final")
             foto_camara = st.camera_input("📷 Tomar foto", key=f"cam_{f_idx}")
@@ -108,9 +113,9 @@ def cerrar_operacion(user, doc):
 
                         hoja_b.update_cell(f_idx, 21, nuevo_estado)          # ESTADO_RESULTADO
                         hoja_b.update_cell(f_idx, 22, monto_final_usuario)   # RESULTADO_DINERO
+                        hoja_b.update_cell(f_idx, 23, drawdown_reportado)    # DRAWDOWN (columna X)
                         hoja_b.update_cell(f_idx, 24, url_resultado)         # IMAGEN_RESULTADO
                         hoja_b.update_cell(f_idx, 25, obs)                   # OBSERVACIONES
-                        hoja_b.update_cell(f_idx, 23, drawdown_reportado)    # DRAWDOWN (columna X)
 
                         if nuevo_estado != "PENDIENTE":
                             ing = monto_final_usuario if monto_final_usuario > 0 else 0
