@@ -34,18 +34,18 @@ def cerrar_operacion(user, doc):
                     "FXVOL20","FXVOL40","FXVOL60","FXVOL80","FXVOL99",
                     "SFXVOL20","SFXVOL40","SFXVOL60","SFXVOL80","SFXVOL99"]
     filtro_ins = st.selectbox("Instrumento", instrumentos)
-
-    # --- Filtrado de operaciones ---
+    # --- Filtrado de operaciones (solo pendientes) ---
     mask = (df_b["ID_USUARIO"].astype(str) == str(user["ID_USUARIO"])) & \
            (pd.to_datetime(df_b["FECHA"]) >= pd.to_datetime(fecha_ini)) & \
-           (pd.to_datetime(df_b["FECHA"]) <= pd.to_datetime(fecha_fin))
+           (pd.to_datetime(df_b["FECHA"]) <= pd.to_datetime(fecha_fin)) & \
+           (df_b["ESTADO_RESULTADO"] == "PENDIENTE")
 
     if filtro_ins != "Todos":
         mask = mask & (df_b["INSTRUMENTO"] == filtro_ins)
 
     df_filtrado = df_b[mask].copy()
     if df_filtrado.empty:
-        st.info("No hay operaciones abiertas en el rango seleccionado.")
+        st.info("No hay operaciones pendientes en el rango seleccionado.")
         st.stop()
 
     # Selector de operación
@@ -55,7 +55,6 @@ def cerrar_operacion(user, doc):
         opciones.append((label, i+2, r.to_dict()))
 
     sel = st.selectbox("🎯 Selecciona la operación a cerrar:", opciones, format_func=lambda x: x[0])
-
     if sel:
         f_idx, d = sel[1], sel[2]
         st.divider()
@@ -89,7 +88,6 @@ def cerrar_operacion(user, doc):
         # --- Barra de Drawdown ---
         st.divider()
         drawdown_reportado = st.slider("📉 Reporta el Drawdown alcanzado", min_value=1, max_value=99, value=1, format="%d%%")
-
         with st.form(key=f"form_cierre_{f_idx}"):
             st.write("🖼️ Evidencia Final")
             foto_camara = st.camera_input("📷 Tomar foto", key=f"cam_{f_idx}")
@@ -113,7 +111,7 @@ def cerrar_operacion(user, doc):
 
                         hoja_b.update_cell(f_idx, 21, nuevo_estado)          # ESTADO_RESULTADO
                         hoja_b.update_cell(f_idx, 22, monto_final_usuario)   # RESULTADO_DINERO
-                        hoja_b.update_cell(f_idx, 23, drawdown_reportado)    # DRAWDOWN (columna X)
+                        hoja_b.update_cell(f_idx, 23, drawdown_reportado)    # DRAWDOWN
                         hoja_b.update_cell(f_idx, 24, url_resultado)         # IMAGEN_RESULTADO
                         hoja_b.update_cell(f_idx, 25, obs)                   # OBSERVACIONES
 
@@ -125,6 +123,11 @@ def cerrar_operacion(user, doc):
                                 f"CIERRE {d.get('INSTRUMENTO')}", float(saldo_actual),
                                 float(ing), float(egr), float(saldo_actual + monto_final_usuario), "APP"
                             ])
+
+                        # --- Limpieza del formulario ---
+                        for key in list(st.session_state.keys()):
+                            if key.startswith("form_cierre_") or key.startswith("cam_") or key.startswith("file_"):
+                                del st.session_state[key]
 
                         st.success("✅ Operación cerrada correctamente.")
                         st.balloons()
