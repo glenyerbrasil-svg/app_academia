@@ -4,7 +4,10 @@ self.addEventListener('install', (event) => {
       return cache.addAll([
         '/',
         '/assets/logo_academia.png',
-        '/assets/manifest.json'
+        '/assets/manifest.json',
+        '/bitacora',
+        '/finanzas',
+        '/backtesting'
       ]);
     })
   );
