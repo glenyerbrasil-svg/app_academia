@@ -16,6 +16,7 @@ from revision import revision_app
 from membresias import membresias_app
 from metas import metas_app
 from reporte_estudiantes import reporte_estudiantes_app
+from utils import conectar_google
 
 def main():
     # Si no hay usuario en sesión, mostrar opciones de acceso
@@ -36,6 +37,10 @@ def main():
 
     # Usuario autenticado
     user = st.session_state["user"]
+
+    # Conexión a Google Sheets
+    cliente = conectar_google()
+    doc = cliente.open("Bitacora_Academia1")
 
     # Menú lateral
     st.sidebar.title("📚 Menú Principal")
@@ -63,7 +68,7 @@ def main():
     elif opcion == "Bitácora":
         bitacora_app(user)
     elif opcion == "Cerrar Operación":   # Aquí cambiamos la llamada
-        cerrar_operacion(user)
+        cerrar_operacion(user, doc)
     elif opcion == "Backtesting":
         backtesting_app(user)
     elif opcion == "Finanzas":
