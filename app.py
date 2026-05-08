@@ -1,12 +1,16 @@
 import streamlit as st
 
+# Configuración inicial
 st.set_page_config(
     page_title="Academia Jedi Trading",
-    page_icon="assets/logo_academia.png",   # tu logo como favicon
+    page_icon="assets/logo_academia.png",
     layout="wide"
 )
+
+# Inyectar favicon y manifest
 st.markdown(
     """
+    <link rel="icon" href="assets/logo_academia.png" type="image/png">
     <link rel="manifest" href="assets/manifest.json">
     <script>
       if ('serviceWorker' in navigator) {
@@ -22,6 +26,12 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
+# --- Aquí ya sigue tu lógica normal de la app ---
+# Ejemplo:
+# import bienvenida
+# bienvenida.mostrar()
+
 
 
 # Importar módulos
