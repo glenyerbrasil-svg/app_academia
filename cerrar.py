@@ -111,9 +111,9 @@ def cerrar_operacion(user, doc):
 
                         hoja_b.update_cell(f_idx, 21, nuevo_estado)          # ESTADO_RESULTADO
                         hoja_b.update_cell(f_idx, 22, monto_final_usuario)   # RESULTADO_DINERO
-                        hoja_b.update_cell(f_idx, 23, drawdown_reportado)    # DRAWDOWN
-                        hoja_b.update_cell(f_idx, 24, url_resultado)         # IMAGEN_RESULTADO
-                        hoja_b.update_cell(f_idx, 25, obs)                   # OBSERVACIONES
+                        hoja_b.update_cell(f_idx, 24, drawdown_reportado)    # DRAWDOWN
+                        hoja_b.update_cell(f_idx, 25, url_resultado)         # IMAGEN_RESULTADO
+                        hoja_b.update_cell(f_idx, 26, obs)                   # OBSERVACIONES
 
                         if nuevo_estado != "PENDIENTE":
                             ing = monto_final_usuario if monto_final_usuario > 0 else 0
