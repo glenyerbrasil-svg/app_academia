@@ -1,15 +1,16 @@
 import streamlit as st
 
-# Configuración inicial
+# Configuración de la página
 st.set_page_config(
     page_title="Academia Jedi Trading",
-    page_icon="assets/logo_academia.png",
+    page_icon="logo_192.png",  # Usa tu logo en 192x192 px
     layout="wide"
 )
 
-# Inyectar favicon y manifest
+# Inyectar manifest y registrar service worker
 st.markdown(
     """
+    <link rel="icon" href="logo_192.png" type="image/png">
     <link rel="manifest" href="manifest.json">
     <script>
       if ('serviceWorker' in navigator) {
@@ -25,103 +26,49 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+# Sidebar con opciones de acceso
+st.sidebar.title("Acceso")
+opcion = st.sidebar.radio("Selecciona una opción:", ["Login", "Registro", "Recuperar contraseña"])
 
-# --- Aquí ya sigue tu lógica normal de la app ---
-# Ejemplo:
-# import bienvenida
-# bienvenida.mostrar()
+if opcion == "Login":
+    st.header("🔑 Iniciar sesión")
+    usuario = st.text_input("Usuario")
+    contrasena = st.text_input("Contraseña", type="password")
+    if st.button("Entrar"):
+        st.success(f"Bienvenido {usuario} a la Academia Jedi Trading")
 
+elif opcion == "Registro":
+    st.header("📝 Registro")
+    nuevo_usuario = st.text_input("Nuevo usuario")
+    nueva_contrasena = st.text_input("Nueva contraseña", type="password")
+    if st.button("Registrar"):
+        st.success(f"Usuario {nuevo_usuario} registrado correctamente")
 
+elif opcion == "Recuperar contraseña":
+    st.header("🔒 Recuperar contraseña")
+    email = st.text_input("Correo electrónico")
+    if st.button("Enviar enlace"):
+        st.info(f"Se envió un enlace de recuperación a {email}")
+# Menú principal
+st.sidebar.title("Menú")
+pagina = st.sidebar.selectbox("Ir a:", ["Bitácora", "Finanzas", "Backtesting"])
 
-# Importar módulos
-from login import login_app
-from registro import registro_app
-from recuperar import recuperar_app
-from bienvenida import bienvenida_app
-from escuela import escuela_app
-from bitacora import bitacora_app
-from cerrar import cerrar_operacion   # Cambiamos editar por cerrar
-from backtesting import backtesting_app
-from finanzas import finanzas_app
-from reportes import reportes_app
-from forum import forum_app
-from revision import revision_app
-from membresias import membresias_app
-from metas import metas_app
-from reporte_estudiantes import reporte_estudiantes_app
-from utils import conectar_google
+if pagina == "Bitácora":
+    st.header("📘 Bitácora")
+    st.write("Aquí puedes registrar tus operaciones y aprendizajes.")
 
-def main():
-    # Si no hay usuario en sesión, mostrar opciones de acceso
-    if "user" not in st.session_state:
-        st.sidebar.title("🔑 Acceso")
-        opcion_inicio = st.sidebar.radio(
-            "Selecciona una opción",
-            ["Login", "Registro", "Recuperar contraseña"]
-        )
+elif pagina == "Finanzas":
+    st.header("💰 Finanzas")
+    st.write("Visualiza tus resultados financieros y métricas clave.")
 
-        if opcion_inicio == "Login":
-            login_app()
-        elif opcion_inicio == "Registro":
-            registro_app()
-        else:
-            recuperar_app()
-        return
+elif pagina == "Backtesting":
+    st.header("📊 Backtesting")
+    st.write("Prueba tus estrategias con datos históricos.")
+# Footer
+st.markdown("---")
+st.markdown("© 2026 Academia Jedi Trading | Desarrollado con ❤️ en Streamlit")
 
-    # Usuario autenticado
-    user = st.session_state["user"]
-
-    # Conexión a Google Sheets
-    cliente = conectar_google()
-    doc = cliente.open("Bitacora_Academia1")
-
-    # Menú lateral
-    st.sidebar.title("📚 Menú Principal")
-    opcion = st.sidebar.radio("Selecciona una sección", [
-        "Bienvenida",
-        "Escuela",
-        "Bitácora",
-        "Cerrar Operación",   # Aquí cambiamos el nombre
-        "Backtesting",
-        "Finanzas",
-        "Reportes",
-        "Foro",
-        "Revisión",
-        "Membresías",
-        "Metas",
-        "Reporte Estudiantes",
-        "Cerrar sesión"
-    ])
-
-    # Navegación entre secciones
-    if opcion == "Bienvenida":
-        bienvenida_app(user)
-    elif opcion == "Escuela":
-        escuela_app(user)
-    elif opcion == "Bitácora":
-        bitacora_app(user)
-    elif opcion == "Cerrar Operación":   # Aquí cambiamos la llamada
-        cerrar_operacion(user, doc)
-    elif opcion == "Backtesting":
-        backtesting_app(user)
-    elif opcion == "Finanzas":
-        finanzas_app(user)
-    elif opcion == "Reportes":
-        reportes_app(user)
-    elif opcion == "Foro":
-        forum_app(user)
-    elif opcion == "Revisión":
-        revision_app(user)
-    elif opcion == "Membresías":
-        membresias_app(user)
-    elif opcion == "Metas":
-        metas_app(user)
-    elif opcion == "Reporte Estudiantes":
-        reporte_estudiantes_app(user)
-    elif opcion == "Cerrar sesión":
-        st.session_state.clear()
-        st.success("Has cerrado sesión correctamente.")
-        st.rerun()
-
-if __name__ == "__main__":
-    main()
+# Nota: asegúrate de tener en la raíz del proyecto:
+# - manifest.json con íconos 192x192 y 512x512
+# - service-worker.js
+# - logo_192.png y logo_512.png
