@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import time
-from datetime import date, datetime
+from datetime import date
 from utils import conectar_google
 
 def finanzas_app(user):
@@ -12,6 +12,7 @@ def finanzas_app(user):
     try:
         doc = cliente.open("Bitacora_Academia1")
         hoja_f = doc.worksheet("Finanzas")
+        hoja_u = doc.worksheet("Usuarios")  # Hoja de usuarios para registrar pagos
     except Exception as e:
         st.error(f"Error de conexión: {e}")
         return
@@ -78,5 +79,31 @@ def finanzas_app(user):
                     st.success(f"✅ Retiro registrado. Nuevo saldo: ${saldo_final:,.2f}")
                     time.sleep(2)
                     st.rerun()
+                except Exception as e:
+                    st.error(f"❌ Error crítico: {e}")
+
+    # --- FORMULARIO DE PAGO DE ACADEMIA ---
+    st.subheader("📑 Registrar Pago de la Academia")
+    fecha_pago = st.date_input("Fecha del pago", date.today())
+    monto_pago = st.number_input("Monto del pago ($)", min_value=0.0, step=0.5, format="%.2f")
+    comprobante = st.text_input("URL del comprobante de pago (imagen)")
+
+    if st.button("💾 Guardar Pago Academia", use_container_width=True):
+        if monto_pago <= 0 or not comprobante.strip():
+            st.warning("⚠️ Ingresa un monto válido y el comprobante.")
+        else:
+            with st.spinner("Registrando pago..."):
+                try:
+                    # Buscar fila del usuario en hoja Usuarios
+                    df_u = pd.DataFrame(hoja_u.get_all_records())
+                    idx = df_u.index[df_u["ID_USUARIO"] == user["ID_USUARIO"]].tolist()
+                    if idx:
+                        fila = idx[0] + 2  # +2 porque get_all_records no cuenta encabezado y Google Sheets es 1-based
+                        hoja_u.update_cell(fila, df_u.columns.get_loc("ULTIMO_PAGO")+1, str(fecha_pago))
+                        hoja_u.update_cell(fila, df_u.columns.get_loc("MONTO_ULTIMO_PAGO")+1, monto_pago)
+                        hoja_u.update_cell(fila, df_u.columns.get_loc("COMPROBANTE_PAGO")+1, comprobante)
+                        st.success("✅ Pago registrado correctamente en la hoja Usuarios.")
+                    else:
+                        st.error("No se encontró el usuario en la hoja Usuarios.")
                 except Exception as e:
                     st.error(f"❌ Error crítico: {e}")
