@@ -7,3 +7,4 @@ oauth2client
 bcrypt
 plotly
 matplotlib
+fpdf2
