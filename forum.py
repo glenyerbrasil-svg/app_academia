@@ -14,8 +14,9 @@ def forum_app(user):
         doc = cliente.open("Bitacora_Academia1")
         hoja_publico = doc.worksheet("Foro_Publico")
         hoja_privado = doc.worksheet("Mensajes_Privados")
+        hoja_usuarios = doc.worksheet("Usuarios")
     except:
-        st.error("No se encontraron las hojas de foro en Google Sheets.")
+        st.error("No se encontraron las hojas necesarias en Google Sheets.")
         return
 
     # -------------------------------
@@ -35,7 +36,7 @@ def forum_app(user):
             st.success("Mensaje enviado al chat público.")
 
     mensajes_publicos = hoja_publico.get_all_records()
-    for msg in mensajes_publicos[::-1]:  # Mostrar últimos primero
+    for msg in mensajes_publicos[::-1]:
         st.write(f"**{msg['NOMBRE']}** ({msg['FECHA']}): {msg['MENSAJE']}")
 
     # -------------------------------
@@ -43,14 +44,18 @@ def forum_app(user):
     # -------------------------------
     st.subheader("📩 Mensajes Internos")
 
-    destinatario = st.text_input("Enviar mensaje a (ID de usuario):")
+    usuarios = hoja_usuarios.get_all_records()
+    lista_ids = [u["ID_USUARIO"] for u in usuarios]
+    destinatario = st.selectbox("Selecciona destinatario (ID de usuario):", lista_ids)
+
     mensaje_privado = st.text_area("Escribe tu mensaje privado:")
 
     if st.button("Enviar mensaje privado"):
         if destinatario and mensaje_privado.strip():
             hoja_privado.append_row([
-                user["ID_USUARIO"],
-                destinatario,
+                user["ID_USUARIO"],   # ID remitente
+                user["NOMBRE"],       # Nombre remitente
+                destinatario,         # ID destinatario
                 mensaje_privado,
                 str(datetime.datetime.now())
             ])
@@ -63,6 +68,6 @@ def forum_app(user):
 
     if recibidos:
         for msg in recibidos[::-1]:
-            st.write(f"**De {msg['REMITENTE']}** ({msg['FECHA']}): {msg['MENSAJE']}")
+            st.write(f"**De {msg['REMITENTE']} (ID {msg['ID_USUARIO']})** ({msg['FECHA']}): {msg['MENSAJE']}")
     else:
         st.info("No tienes mensajes privados aún.")
