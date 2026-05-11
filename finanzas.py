@@ -3,6 +3,15 @@ import pandas as pd
 import time
 from datetime import date
 from utils import conectar_google
+import cloudinary
+import cloudinary.uploader
+
+# Configuración de Cloudinary con tus credenciales
+cloudinary.config(
+    cloud_name="dqur2fztq",
+    api_key="694985462176285",
+    api_secret="8iJE0G6CM6qE0zu9IKPsjzP6BNU"
+)
 
 def finanzas_app(user):
     st.header("💰 Finanzas")
@@ -83,14 +92,18 @@ def finanzas_app(user):
     st.subheader("📑 Registrar Pago de la Academia")
     fecha_pago = st.date_input("Fecha del pago", date.today())
     monto_pago = st.number_input("Monto del pago ($)", min_value=0.0, step=0.5, format="%.2f")
-    comprobante = st.text_input("URL del comprobante de pago (imagen)")
+    comprobante_file = st.file_uploader("Sube el comprobante de pago (imagen)", type=["png", "jpg", "jpeg"])
 
     if st.button("💾 Guardar Pago Academia", use_container_width=True):
-        if monto_pago <= 0 or not comprobante.strip():
-            st.warning("⚠️ Ingresa un monto válido y el comprobante.")
+        if monto_pago <= 0 or comprobante_file is None:
+            st.warning("⚠️ Ingresa un monto válido y sube el comprobante.")
         else:
             with st.spinner("Registrando pago..."):
                 try:
+                    # Subir imagen a Cloudinary
+                    upload_result = cloudinary.uploader.upload(comprobante_file, folder="comprobantes_pagos")
+                    comprobante_url = upload_result["secure_url"]
+
                     # Buscar fila del usuario en hoja Usuarios
                     df_u = pd.DataFrame(hoja_u.get_all_records())
                     idx = df_u.index[df_u["ID_USUARIO"] == user["ID_USUARIO"]].tolist()
@@ -98,8 +111,9 @@ def finanzas_app(user):
                         fila = idx[0] + 2  # +2 porque get_all_records no cuenta encabezado y Sheets es 1-based
                         hoja_u.update_cell(fila, df_u.columns.get_loc("ULTIMO_PAGO")+1, str(fecha_pago))
                         hoja_u.update_cell(fila, df_u.columns.get_loc("MONTO_ULTIMO_PAGO")+1, monto_pago)
-                        hoja_u.update_cell(fila, df_u.columns.get_loc("COMPROBANTE_PAGO")+1, comprobante)
+                        hoja_u.update_cell(fila, df_u.columns.get_loc("COMPROBANTE_PAGO")+1, comprobante_url)
                         st.success("✅ Pago registrado correctamente en la hoja Usuarios.")
+                        st.image(comprobante_url, caption="Comprobante registrado")
                     else:
                         st.error("No se encontró el usuario en la hoja Usuarios.")
                 except Exception as e:
