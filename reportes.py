@@ -2,7 +2,8 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 from utils import conectar_google
-from fpdf import FPDF  # Librería para exportar PDF
+from fpdf import FPDF
+import os
 
 def reportes_app(user):
     st.header("📈 Reportes de Rendimiento")
@@ -28,14 +29,12 @@ def reportes_app(user):
         return
 
     df = pd.DataFrame(ops)
+    df["FECHA"] = pd.to_datetime(df["FECHA"])
 
     # -------------------------------
     # Filtros
     # -------------------------------
     st.subheader("🔎 Filtros de búsqueda")
-
-    # Convertir fechas
-    df["FECHA"] = pd.to_datetime(df["FECHA"])
 
     fecha_inicio = st.date_input("Fecha inicio", df["FECHA"].min().date())
     fecha_fin = st.date_input("Fecha fin", df["FECHA"].max().date())
@@ -43,7 +42,6 @@ def reportes_app(user):
     instrumentos = df["INSTRUMENTO"].unique().tolist()
     instrumento_sel = st.selectbox("Instrumento", ["Todos"] + instrumentos)
 
-    # Aplicar filtros
     df_filtrado = df[(df["FECHA"].dt.date >= fecha_inicio) & (df["FECHA"].dt.date <= fecha_fin)]
     if instrumento_sel != "Todos":
         df_filtrado = df_filtrado[df_filtrado["INSTRUMENTO"] == instrumento_sel]
@@ -71,6 +69,7 @@ def reportes_app(user):
     ax.bar(["Ganadas", "Perdidas", "BE"], [ganadas, perdidas, be], color=["green", "red", "orange"])
     ax.set_title("Resultados de operaciones")
     st.pyplot(fig)
+    fig.savefig("grafico_resultados.png")
 
     # Análisis emocional
     st.subheader("🧠 Análisis emocional")
@@ -79,6 +78,7 @@ def reportes_app(user):
     emociones.plot(kind="bar", ax=ax2, color="skyblue")
     ax2.set_title("Estados emocionales más frecuentes")
     st.pyplot(fig2)
+    fig2.savefig("grafico_emociones.png")
 
     # Días más efectivos
     st.subheader("📅 Días más efectivos")
@@ -86,7 +86,7 @@ def reportes_app(user):
     st.line_chart(rendimiento_por_dia)
 
     # -------------------------------
-    # Exportación a PDF
+    # Exportación a PDF con gráficas
     # -------------------------------
     st.subheader("📤 Exportar reporte")
 
@@ -106,7 +106,13 @@ def reportes_app(user):
         pdf.cell(200, 10, txt=f"Break Even: {be}", ln=True)
         pdf.cell(200, 10, txt=f"Total: {total}", ln=True)
 
-        # Guardar archivo temporal
+        # Insertar las imágenes
+        if os.path.exists("grafico_resultados.png"):
+            pdf.image("grafico_resultados.png", x=10, y=100, w=180)
+        pdf.add_page()
+        if os.path.exists("grafico_emociones.png"):
+            pdf.image("grafico_emociones.png", x=10, y=30, w=180)
+
         pdf.output("reporte.pdf")
 
         with open("reporte.pdf", "rb") as f:
