@@ -1,57 +1,94 @@
 import streamlit as st
 
-# Configuración de la página
-st.set_page_config(
-    page_title="Academia GMC Trading",
-    page_icon="logo_192.png",  # favicon
-    layout="wide"
-)
-# Sidebar con opciones de acceso
-st.sidebar.title("Acceso")
-opcion = st.sidebar.radio("Selecciona una opción:", ["Login", "Registro", "Recuperar contraseña"])
+# Importar módulos
+from login import login_app
+from registro import registro_app
+from recuperar import recuperar_app
+from bienvenida import bienvenida_app
+from escuela import escuela_app
+from bitacora import bitacora_app
+from cerrar import cerrar_operacion   # Cambiamos editar por cerrar
+from backtesting import backtesting_app
+from finanzas import finanzas_app
+from reportes import reportes_app
+from forum import forum_app
+from revision import revision_app
+from membresias import membresias_app
+from metas import metas_app
+from reporte_estudiantes import reporte_estudiantes_app
+from utils import conectar_google
 
-if opcion == "Login":
-    st.header("🔑 Iniciar sesión")
-    usuario = st.text_input("Usuario")
-    contrasena = st.text_input("Contraseña", type="password")
-    if st.button("Entrar"):
-        st.success(f"Bienvenido {usuario} a la Academia GMC Trading")
+def main():
+    # Si no hay usuario en sesión, mostrar opciones de acceso
+    if "user" not in st.session_state:
+        st.sidebar.title("🔑 Acceso")
+        opcion_inicio = st.sidebar.radio(
+            "Selecciona una opción",
+            ["Login", "Registro", "Recuperar contraseña"]
+        )
 
-elif opcion == "Registro":
-    st.header("📝 Registro")
-    nuevo_usuario = st.text_input("Nuevo usuario")
-    nueva_contrasena = st.text_input("Nueva contraseña", type="password")
-    correo = st.text_input("Correo electrónico")
-    if st.button("Registrar"):
-        if nuevo_usuario and nueva_contrasena and correo:
-            st.success(f"Usuario {nuevo_usuario} registrado correctamente. Se envió un correo de confirmación a {correo}.")
+        if opcion_inicio == "Login":
+            login_app()
+        elif opcion_inicio == "Registro":
+            registro_app()
         else:
-            st.error("Por favor completa todos los campos.")
+            recuperar_app()
+        return
 
-elif opcion == "Recuperar contraseña":
-    st.header("🔒 Recuperar contraseña")
-    email = st.text_input("Correo electrónico")
-    if st.button("Enviar enlace"):
-        if email:
-            st.info(f"Se envió un enlace de recuperación a {email}")
-        else:
-            st.error("Por favor ingresa tu correo electrónico.")
-# Menú principal
-st.sidebar.title("Menú")
-pagina = st.sidebar.selectbox("Ir a:", ["Bitácora", "Finanzas", "Backtesting"])
+    # Usuario autenticado
+    user = st.session_state["user"]
 
-if pagina == "Bitácora":
-    st.header("📘 Bitácora")
-    st.write("Aquí puedes registrar tus operaciones y aprendizajes.")
+    # Conexión a Google Sheets
+    cliente = conectar_google()
+    doc = cliente.open("Bitacora_Academia1")
 
-elif pagina == "Finanzas":
-    st.header("💰 Finanzas")
-    st.write("Visualiza tus resultados financieros y métricas clave.")
+    # Menú lateral
+    st.sidebar.title("📚 Menú Principal")
+    opcion = st.sidebar.radio("Selecciona una sección", [
+        "Bienvenida",
+        "Escuela",
+        "Bitácora",
+        "Cerrar Operación",   # Aquí cambiamos el nombre
+        "Backtesting",
+        "Finanzas",
+        "Reportes",
+        "Foro",
+        "Revisión",
+        "Membresías",
+        "Metas",
+        "Reporte Estudiantes",
+        "Cerrar sesión"
+    ])
 
-elif pagina == "Backtesting":
-    st.header("📊 Backtesting")
-    st.write("Prueba tus estrategias con datos históricos.")
-# Footer
-st.markdown("---")
-st.markdown("© 2026 Academia GMC Trading")
-st.markdown("_Formando traders con visión y estrategia._")
+    # Navegación entre secciones
+    if opcion == "Bienvenida":
+        bienvenida_app(user)
+    elif opcion == "Escuela":
+        escuela_app(user)
+    elif opcion == "Bitácora":
+        bitacora_app(user)
+    elif opcion == "Cerrar Operación":   # Aquí cambiamos la llamada
+        cerrar_operacion(user, doc)
+    elif opcion == "Backtesting":
+        backtesting_app(user)
+    elif opcion == "Finanzas":
+        finanzas_app(user)
+    elif opcion == "Reportes":
+        reportes_app(user)
+    elif opcion == "Foro":
+        forum_app(user)
+    elif opcion == "Revisión":
+        revision_app(user)
+    elif opcion == "Membresías":
+        membresias_app(user)
+    elif opcion == "Metas":
+        metas_app(user)
+    elif opcion == "Reporte Estudiantes":
+        reporte_estudiantes_app(user)
+    elif opcion == "Cerrar sesión":
+        st.session_state.clear()
+        st.success("Has cerrado sesión correctamente.")
+        st.rerun()
+
+if __name__ == "__main__":
+    main()
