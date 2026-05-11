@@ -21,7 +21,6 @@ def finanzas_app(user):
     df_f = pd.DataFrame(hoja_f.get_all_records())
     saldo_actual = float(df_f.iloc[-1].get("SALDO_FINAL", 0)) if not df_f.empty else 0.0
     st.info(f"💵 **Saldo actual:** ${saldo_actual:,.2f}")
-
     # --- FORMULARIO DE DEPÓSITO ---
     st.subheader("➕ Registrar Depósito")
     monto_dep = st.number_input("Monto del depósito ($)", min_value=0.0, step=0.5, format="%.2f")
@@ -51,7 +50,6 @@ def finanzas_app(user):
                     st.rerun()
                 except Exception as e:
                     st.error(f"❌ Error crítico: {e}")
-
     # --- FORMULARIO DE RETIRO ---
     st.subheader("➖ Registrar Retiro")
     monto_ret = st.number_input("Monto del retiro ($)", min_value=0.0, step=0.5, format="%.2f")
@@ -81,7 +79,6 @@ def finanzas_app(user):
                     st.rerun()
                 except Exception as e:
                     st.error(f"❌ Error crítico: {e}")
-
     # --- FORMULARIO DE PAGO DE ACADEMIA ---
     st.subheader("📑 Registrar Pago de la Academia")
     fecha_pago = st.date_input("Fecha del pago", date.today())
@@ -98,7 +95,7 @@ def finanzas_app(user):
                     df_u = pd.DataFrame(hoja_u.get_all_records())
                     idx = df_u.index[df_u["ID_USUARIO"] == user["ID_USUARIO"]].tolist()
                     if idx:
-                        fila = idx[0] + 2  # +2 porque get_all_records no cuenta encabezado y Google Sheets es 1-based
+                        fila = idx[0] + 2  # +2 porque get_all_records no cuenta encabezado y Sheets es 1-based
                         hoja_u.update_cell(fila, df_u.columns.get_loc("ULTIMO_PAGO")+1, str(fecha_pago))
                         hoja_u.update_cell(fila, df_u.columns.get_loc("MONTO_ULTIMO_PAGO")+1, monto_pago)
                         hoja_u.update_cell(fila, df_u.columns.get_loc("COMPROBANTE_PAGO")+1, comprobante)
