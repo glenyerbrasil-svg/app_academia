@@ -18,6 +18,13 @@ from metas import metas_app
 from reporte_estudiantes import reporte_estudiantes_app
 from utils import conectar_google
 
+# Configuración de la página con favicon
+st.set_page_config(
+    page_title="Academia GMC Trading",
+    page_icon="logo_192.png",  # favicon personalizado
+    layout="wide"
+)
+
 def main():
     # Si no hay usuario en sesión, mostrar opciones de acceso
     if "user" not in st.session_state:
@@ -89,6 +96,11 @@ def main():
         st.session_state.clear()
         st.success("Has cerrado sesión correctamente.")
         st.rerun()
+
+    # Footer con identidad
+    st.markdown("---")
+    st.markdown("© 2026 Academia GMC Trading")
+    st.markdown("_Formando traders con visión y estrategia._")
 
 if __name__ == "__main__":
     main()
