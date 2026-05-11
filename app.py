@@ -26,16 +26,27 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
+# Inicializar estado de sesión
+if "logueado" not in st.session_state:
+    st.session_state.logueado = False
+    st.session_state.usuario = ""
 # Sidebar con opciones de acceso
 st.sidebar.title("Acceso")
 opcion = st.sidebar.radio("Selecciona una opción:", ["Login", "Registro", "Recuperar contraseña"])
 
 if opcion == "Login":
     st.header("🔑 Iniciar sesión")
-    usuario = st.text_input("Usuario")
+    usuario = st.text_input("Usuario (correo)")
     contrasena = st.text_input("Contraseña", type="password")
     if st.button("Entrar"):
-        st.success(f"Bienvenido {usuario} a la Academia GMC Trading")
+        # Validación simulada (puedes conectar a BD real)
+        if usuario and contrasena:
+            st.session_state.logueado = True
+            st.session_state.usuario = usuario
+            st.success(f"Bienvenido {usuario} a la Academia GMC Trading")
+        else:
+            st.error("Por favor ingresa usuario y contraseña.")
 
 elif opcion == "Registro":
     st.header("📝 Registro")
@@ -56,21 +67,24 @@ elif opcion == "Recuperar contraseña":
             st.info(f"Se envió un enlace de recuperación a {email}")
         else:
             st.error("Por favor ingresa tu correo electrónico.")
-# Menú principal
-st.sidebar.title("Menú")
-pagina = st.sidebar.selectbox("Ir a:", ["Bitácora", "Finanzas", "Backtesting"])
+if st.session_state.logueado:
+    # Menú principal
+    st.sidebar.title("Menú")
+    pagina = st.sidebar.selectbox("Ir a:", ["Bitácora", "Finanzas", "Backtesting"])
 
-if pagina == "Bitácora":
-    st.header("📘 Bitácora")
-    st.write("Aquí puedes registrar tus operaciones y aprendizajes.")
+    if pagina == "Bitácora":
+        st.header("📘 Bitácora")
+        st.write("Aquí puedes registrar tus operaciones y aprendizajes.")
 
-elif pagina == "Finanzas":
-    st.header("💰 Finanzas")
-    st.write("Visualiza tus resultados financieros y métricas clave.")
+    elif pagina == "Finanzas":
+        st.header("💰 Finanzas")
+        st.write("Visualiza tus resultados financieros y métricas clave.")
 
-elif pagina == "Backtesting":
-    st.header("📊 Backtesting")
-    st.write("Prueba tus estrategias con datos históricos.")
+    elif pagina == "Backtesting":
+        st.header("📊 Backtesting")
+        st.write("Prueba tus estrategias con datos históricos.")
+else:
+    st.info("Por favor inicia sesión para acceder al sistema completo.")
 # Footer
 st.markdown("---")
 st.markdown("© 2026 Academia GMC Trading")
