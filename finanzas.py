@@ -1,4 +1,4 @@
-import streamlit as st
+ import streamlit as st
 import pandas as pd
 import time
 from datetime import date
@@ -28,7 +28,9 @@ def finanzas_app(user):
 
     # Mostrar saldo actual filtrado por usuario
     df_f = pd.DataFrame(hoja_f.get_all_records())
-    df_user = df_f[df_f["ID_USUARIO"] == user["ID_USUARIO"]] 
+    df_f["ID_USUARIO"] = df_f["ID_USUARIO"].astype(str)
+    user_id = str(user["ID_USUARIO"])
+    df_user = df_f[df_f["ID_USUARIO"] == user_id]
 
     if df_user.empty:
         saldo_actual = 0.0
@@ -112,7 +114,8 @@ def finanzas_app(user):
 
                     # Buscar fila del usuario en hoja Usuarios
                     df_u = pd.DataFrame(hoja_u.get_all_records())
-                    idx = df_u.index[df_u["ID_USUARIO"] == user["ID_USUARIO"]].tolist()
+                    df_u["ID_USUARIO"] = df_u["ID_USUARIO"].astype(str)
+                    idx = df_u.index[df_u["ID_USUARIO"] == user_id].tolist()
                     if idx:
                         fila = idx[0] + 2  # +2 porque get_all_records no cuenta encabezado y Sheets es 1-based
                         hoja_u.update_cell(fila, df_u.columns.get_loc("ULTIMO_PAGO")+1, str(fecha_pago))
@@ -124,3 +127,4 @@ def finanzas_app(user):
                         st.error("No se encontró el usuario en la hoja Usuarios.")
                 except Exception as e:
                     st.error(f"❌ Error crítico: {e}")
+
