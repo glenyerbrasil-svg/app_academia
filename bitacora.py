@@ -19,15 +19,22 @@ def bitacora_app(user):
         st.error(f"Error de conexión: {e}")
         return
 
-    # Mostrar saldo actual
+    # Mostrar saldo actual filtrado por usuario
     df_f = pd.DataFrame(hoja_f.get_all_records())
-    saldo_actual = float(df_f.iloc[-1].get("SALDO_FINAL", 0)) if not df_f.empty else 0.0
-    st.info(f"💵 **Saldo actual:** ${saldo_actual:,.2f}")
+    df_f["ID_USUARIO"] = df_f["ID_USUARIO"].astype(str)
+    user_id = str(user["ID_USUARIO"])
+    df_user = df_f[df_f["ID_USUARIO"] == user_id]
+
+    if df_user.empty:
+        saldo_actual = 0.0
+        st.info("💵 No tienes movimientos registrados aún.")
+    else:
+        saldo_actual = float(df_user.iloc[-1].get("SALDO_FINAL", 0))
+        st.info(f"💵 **Saldo actual:** ${saldo_actual:,.2f}")
 
     if saldo_actual <= 0:
         st.warning("⚠️ Debes realizar tu primer depósito en Finanzas antes de abrir operaciones.")
         return
-
     # Motor de limpieza con contador
     if 'v_form' not in st.session_state:
         st.session_state.v_form = 0
