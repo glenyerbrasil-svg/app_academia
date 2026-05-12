@@ -1,4 +1,4 @@
- import streamlit as st
+import streamlit as st
 import pandas as pd
 import time
 from datetime import date
@@ -127,4 +127,3 @@ def finanzas_app(user):
                         st.error("No se encontró el usuario en la hoja Usuarios.")
                 except Exception as e:
                     st.error(f"❌ Error crítico: {e}")
-
