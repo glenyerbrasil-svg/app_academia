@@ -26,10 +26,16 @@ def finanzas_app(user):
         st.error(f"Error de conexión: {e}")
         return
 
-    # Mostrar saldo actual
+    # Mostrar saldo actual filtrado por usuario
     df_f = pd.DataFrame(hoja_f.get_all_records())
-    saldo_actual = float(df_f.iloc[-1].get("SALDO_FINAL", 0)) if not df_f.empty else 0.0
-    st.info(f"💵 **Saldo actual:** ${saldo_actual:,.2f}")
+    df_user = df_f[df_f["ID_USUARIO"] == user["ID_USUARIO"]] 
+
+    if df_user.empty:
+        saldo_actual = 0.0
+        st.info("💵 No tienes movimientos registrados aún.")
+    else:
+        saldo_actual = float(df_user.iloc[-1].get("SALDO_FINAL", 0))
+        st.info(f"💵 **Saldo actual:** ${saldo_actual:,.2f}")
     # --- FORMULARIO DE DEPÓSITO ---
     st.subheader("➕ Registrar Depósito")
     monto_dep = st.number_input("Monto del depósito ($)", min_value=0.0, step=0.5, format="%.2f")
