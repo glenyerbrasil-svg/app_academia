@@ -81,6 +81,8 @@ def membresias_app(user):
                     st.error(f"❌ Error crítico: {e}")
     st.subheader("⏳ Control automático de vencimientos")
     hoy = date.today()
+
+    # --- Control para cualquier usuario con PROXIMO_VENCIMIENTO vencido ---
     vencidos = df_u[(pd.to_datetime(df_u["PROXIMO_VENCIMIENTO"], errors="coerce") < pd.to_datetime(hoy)) & (df_u["ESTADO"]=="ACTIVO")]
 
     if not vencidos.empty:
@@ -90,3 +92,15 @@ def membresias_app(user):
             hoja_u.update_cell(fila, df_u.columns.get_loc("ESTADO")+1, "VENCIDO")
             hoja_u.update_cell(fila, df_u.columns.get_loc("ESTADO_PAGO")+1, "VENCIDO")
         st.success("✅ Usuarios vencidos actualizados correctamente.")
+
+    # --- Control especial para usuarios DEMO (7 días desde registro) ---
+    demos = df_u[df_u["ROL"]=="DEMO"]
+    if not demos.empty:
+        for idx in demos.index:
+            fecha_registro = pd.to_datetime(df_u.loc[idx,"FECHA_REGISTRO"], errors="coerce")
+            if pd.notnull(fecha_registro) and (hoy - fecha_registro.date()).days > 7:
+                fila = idx + 2
+                hoja_u.update_cell(fila, df_u.columns.get_loc("ESTADO")+1, "VENCIDO")
+                hoja_u.update_cell(fila, df_u.columns.get_loc("ESTADO_PAGO")+1, "VENCIDO")
+        st.success("✅ Usuarios DEMO vencidos (más de 7 días) actualizados correctamente.")
+
