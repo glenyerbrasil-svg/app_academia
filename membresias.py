@@ -6,11 +6,6 @@ from utils import conectar_google
 def membresias_app(user):
     st.header("👥 Gestión de Membresías")
 
-    # Acceso solo para administradores
-    if user.get("ROL") != "ADMINISTRADOR":
-        st.error("❌ Acceso denegado. Esta sección es exclusiva para administradores.")
-        return
-
     # Conexión a Google Sheets
     cliente = conectar_google()
     try:
@@ -22,6 +17,17 @@ def membresias_app(user):
 
     df_u = pd.DataFrame(hoja_u.get_all_records())
     df_u["ID_USUARIO"] = df_u["ID_USUARIO"].astype(str)
+    user_id = str(user["ID_USUARIO"])
+
+    # Validación directa contra la hoja
+    if user_id not in df_u["ID_USUARIO"].values:
+        st.error("❌ Usuario no encontrado en la hoja Usuarios.")
+        return
+
+    rol_actual = df_u.loc[df_u["ID_USUARIO"] == user_id, "ROL"].values[0]
+    if rol_actual != "ADMINISTRADOR":
+        st.error("❌ Acceso denegado. Esta sección es exclusiva para administradores.")
+        return
     # Filtros de visualización
     filtro = st.selectbox("Filtrar usuarios por estado:", 
                           ["Todos", "Estudiantes Activos", "Estudiantes Demo", "Estudiantes Vencidos", 
@@ -40,7 +46,7 @@ def membresias_app(user):
     else:
         df_filtrado = df_u
 
-    st.dataframe(df_filtrado[["ID_USUARIO","NOMBRE","ROL","ESTADO","FECHA_INGRESO","PROXIMO_VENCIMIENTO","PLAN"]])
+    st.dataframe(df_filtrado[["ID_USUARIO","NOMBRE","ROL","ESTADO","FECHA_INGRESO","PROXIMO_VENCIMIENTO","TIPO_PLAN"]])
     st.subheader("⚙️ Gestión de acceso")
     usuario_id = st.text_input("ID del usuario a gestionar:")
     if usuario_id:
@@ -66,7 +72,7 @@ def membresias_app(user):
                     hoja_u.update_cell(fila, df_u.columns.get_loc("ESTADO")+1, nuevo_estado)
                     hoja_u.update_cell(fila, df_u.columns.get_loc("FECHA_INGRESO")+1, fecha_ingreso)
                     hoja_u.update_cell(fila, df_u.columns.get_loc("PROXIMO_VENCIMIENTO")+1, fecha_vencimiento)
-                    hoja_u.update_cell(fila, df_u.columns.get_loc("PLAN")+1, plan)
+                    hoja_u.update_cell(fila, df_u.columns.get_loc("TIPO_PLAN")+1, plan)
 
                     st.success("✅ Membresía actualizada correctamente.")
                     st.rerun()
