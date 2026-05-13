@@ -46,7 +46,8 @@ def membresias_app(user):
     else:
         df_filtrado = df_u
 
-    st.dataframe(df_filtrado[["ID_USUARIO","NOMBRE","ROL","ESTADO","FECHA_INGRESO","PROXIMO_VENCIMIENTO","TIPO_PLAN"]])
+    # Mostrar columnas que sí existen en tu hoja
+    st.dataframe(df_filtrado[["ID_USUARIO","NOMBRE","ROL","ESTADO","FECHA_REGISTRO","PROXIMO_VENCIMIENTO","TIPO_PLAN"]])
     st.subheader("⚙️ Gestión de acceso")
     usuario_id = st.text_input("ID del usuario a gestionar:")
     if usuario_id:
@@ -66,11 +67,11 @@ def membresias_app(user):
             if st.button("💾 Actualizar Membresía"):
                 try:
                     fila = df_sel.index[0] + 2  # +2 por encabezado y base 1
-                    fecha_ingreso = str(date.today())
+                    fecha_registro = str(date.today())
                     fecha_vencimiento = str(date.today() + timedelta(days=30*meses))
 
                     hoja_u.update_cell(fila, df_u.columns.get_loc("ESTADO")+1, nuevo_estado)
-                    hoja_u.update_cell(fila, df_u.columns.get_loc("FECHA_INGRESO")+1, fecha_ingreso)
+                    hoja_u.update_cell(fila, df_u.columns.get_loc("FECHA_REGISTRO")+1, fecha_registro)
                     hoja_u.update_cell(fila, df_u.columns.get_loc("PROXIMO_VENCIMIENTO")+1, fecha_vencimiento)
                     hoja_u.update_cell(fila, df_u.columns.get_loc("TIPO_PLAN")+1, plan)
 
