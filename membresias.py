@@ -33,16 +33,33 @@ def membresias_app(user):
                           ["Todos", "Estudiantes Activos", "Estudiantes Demo", "Estudiantes Vencidos", 
                            "Maestros Activos", "Administradores Activos"])
 
+    hoy = date.today()
+
     if filtro == "Estudiantes Activos":
         df_filtrado = df_u[(df_u["ROL"]=="ESTUDIANTE") & (df_u["ESTADO"]=="ACTIVO")]
+
     elif filtro == "Estudiantes Demo":
-        df_filtrado = df_u[(df_u["ROL"]=="ESTUDIANTE") & (df_u["ESTADO"]=="DEMO")]
+        df_filtrado = df_u[(df_u["ROL"]=="DEMO") & (df_u["ESTADO"]=="DEMO")]
+
     elif filtro == "Estudiantes Vencidos":
-        df_filtrado = df_u[(df_u["ROL"]=="ESTUDIANTE") & (df_u["ESTADO"]=="VENCIDO")]
+        # 1. Usuarios con ESTADO = VENCIDO
+        vencidos_estado = df_u[(df_u["ROL"].isin(["ESTUDIANTE","DEMO"])) & (df_u["ESTADO"]=="VENCIDO")]
+
+        # 2. Usuarios DEMO con más de 7 días desde FECHA_REGISTRO
+        df_u["FECHA_REGISTRO"] = pd.to_datetime(df_u["FECHA_REGISTRO"], errors="coerce")
+        vencidos_demo = df_u[(df_u["ROL"]=="DEMO") & 
+                             (pd.notnull(df_u["FECHA_REGISTRO"])) & 
+                             ((hoy - df_u["FECHA_REGISTRO"].dt.date).dt.days > 7)]
+
+        # Unir ambos resultados
+        df_filtrado = pd.concat([vencidos_estado, vencidos_demo]).drop_duplicates()
+
     elif filtro == "Maestros Activos":
         df_filtrado = df_u[(df_u["ROL"]=="MAESTRO") & (df_u["ESTADO"]=="ACTIVO")]
+
     elif filtro == "Administradores Activos":
         df_filtrado = df_u[(df_u["ROL"]=="ADMINISTRADOR") & (df_u["ESTADO"]=="ACTIVO")]
+
     else:
         df_filtrado = df_u
 
@@ -68,7 +85,13 @@ def membresias_app(user):
                 try:
                     fila = df_sel.index[0] + 2  # +2 por encabezado y base 1
                     fecha_registro = str(date.today())
-                    fecha_vencimiento = str(date.today() + timedelta(days=30*meses))
+
+                    # Si es DEMO, siempre 7 días
+                    if nuevo_estado == "DEMO":
+                        fecha_vencimiento = str(date.today() + timedelta(days=7))
+                        plan = "DEMO"
+                    else:
+                        fecha_vencimiento = str(date.today() + timedelta(days=30*meses))
 
                     hoja_u.update_cell(fila, df_u.columns.get_loc("ESTADO")+1, nuevo_estado)
                     hoja_u.update_cell(fila, df_u.columns.get_loc("FECHA_REGISTRO")+1, fecha_registro)
@@ -103,4 +126,3 @@ def membresias_app(user):
                 hoja_u.update_cell(fila, df_u.columns.get_loc("ESTADO")+1, "VENCIDO")
                 hoja_u.update_cell(fila, df_u.columns.get_loc("ESTADO_PAGO")+1, "VENCIDO")
         st.success("✅ Usuarios DEMO vencidos (más de 7 días) actualizados correctamente.")
-
