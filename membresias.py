@@ -1,3 +1,4 @@
+# INICIO PARTE 1
 import streamlit as st
 import pandas as pd
 from datetime import date, timedelta
@@ -28,6 +29,7 @@ def membresias_app(user):
     if rol_actual != "ADMINISTRADOR":
         st.error("❌ Acceso denegado. Esta sección es exclusiva para administradores.")
         return
+# INICIO PARTE 2
     # Filtros de visualización
     filtro = st.selectbox("Filtrar usuarios por estado:", 
                           ["Todos", "Estudiantes Activos", "Estudiantes Demo", "Estudiantes Vencidos", 
@@ -49,7 +51,7 @@ def membresias_app(user):
         df_u["FECHA_REGISTRO"] = pd.to_datetime(df_u["FECHA_REGISTRO"], errors="coerce")
         vencidos_demo = df_u[(df_u["ROL"]=="DEMO") & 
                              (pd.notnull(df_u["FECHA_REGISTRO"])) & 
-                             ((hoy - df_u["FECHA_REGISTRO"].dt.date).dt.days > 7)]
+                             (df_u["FECHA_REGISTRO"].apply(lambda x: (hoy - x.date()).days if pd.notnull(x) else 0) > 7)]
 
         # Unir ambos resultados
         df_filtrado = pd.concat([vencidos_estado, vencidos_demo]).drop_duplicates()
@@ -65,6 +67,7 @@ def membresias_app(user):
 
     # Mostrar columnas que sí existen en tu hoja
     st.dataframe(df_filtrado[["ID_USUARIO","NOMBRE","ROL","ESTADO","FECHA_REGISTRO","PROXIMO_VENCIMIENTO","TIPO_PLAN"]])
+# INICIO PARTE 3
     st.subheader("⚙️ Gestión de acceso")
     usuario_id = st.text_input("ID del usuario a gestionar:")
     if usuario_id:
@@ -102,6 +105,7 @@ def membresias_app(user):
                     st.rerun()
                 except Exception as e:
                     st.error(f"❌ Error crítico: {e}")
+# INICIO PARTE 4
     st.subheader("⏳ Control automático de vencimientos")
     hoy = date.today()
 
