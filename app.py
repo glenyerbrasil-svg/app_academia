@@ -110,19 +110,19 @@ def login_v2():
                             if (hoy - fecha_registro.date()).days > 7:
                                 st.error("❌ Acceso denegado. Tu periodo DEMO ha vencido.")
                                 st.warning("📲 Comunícate con la Academia en WhatsApp: [Haz clic aquí](https://wa.me/message/TULINKAQUI)")
-                                st.stop()
+                                return
 
                         # Regla general de vencimiento
                         if pd.notnull(fecha_vencimiento) and fecha_vencimiento.date() < hoy:
                             st.error("❌ Acceso denegado. Tu membresía ha vencido.")
                             st.warning("📲 Comunícate con la Academia en WhatsApp: [Haz clic aquí](https://wa.me/message/TULINKAQUI)")
-                            st.stop()
+                            return
 
                         # Regla de estado
                         if user.get("ESTADO") != "ACTIVO":
                             st.error("❌ Acceso denegado. Estado no válido.")
                             st.warning("📲 Comunícate con la Academia en WhatsApp: [Haz clic aquí](https://wa.me/message/TULINKAQUI)")
-                            st.stop()
+                            return
 
                         # Si pasa todas las validaciones
                         st.session_state["USUARIO"] = user
@@ -193,6 +193,8 @@ def login_v2():
     elif menu_acceso == "Recuperar Clave":
         email_rec = st.text_input("Email registrado")
         if st.button("Enviar Clave Temporal"):
-            st.info("Buscando usuario... Función en desarrollo.")
+            # Aquí puedes implementar la lógica de recuperación
+            # Por ahora dejamos un aviso informativo
+            st.info("📩 Buscando usuario... Función en desarrollo.")
 
 # Aquí termina la función login_v2()
