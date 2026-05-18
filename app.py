@@ -120,7 +120,7 @@ def login_v2():
                         # Regla de estado
                         if user.get("ESTADO") != "ACTIVO":
                             st.error("❌ Acceso denegado. Estado no válido.")
-                            st.warning("📲 Comunícate con la Academia en WhatsApp: [Haz clic aquí](https://wa.me/message/TULINKAQUI)")
+                            st.warning("📲 Comunícate con la Academia en WhatsApp: [Haz clic aquí](https://wa.me/556284191427)")
                             return
 
                         # Si pasa todas las validaciones
