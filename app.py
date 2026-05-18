@@ -1,4 +1,3 @@
-# INICIO PARTE 1
 import streamlit as st
 import gspread
 import bcrypt
@@ -50,7 +49,7 @@ def subir_a_cloudinary(archivo):
             return upload_result["secure_url"]
         except: return ""
     return ""
-# INICIO PARTE 2
+
 def enviar_verificacion(email_destino, codigo):
     """Envía el código de seguridad al correo del nuevo padawan."""
     import smtplib 
@@ -126,13 +125,14 @@ def login_v2():
 
                         # Si pasa todas las validaciones
                         st.session_state["USUARIO"] = user
+                        st.success("¡Ingreso exitoso!")
                         st.rerun()
                     else:
                         st.error("Contraseña incorrecta.")
                 else:
                     st.error("El usuario no existe.")
-# INICIO PARTE 3
-    # --- SUBSECCIÓN: REGISTRARSE ---
+
+    # --- SUBSECCIÓN: REGISTRARSE (Corregida la indentación) ---
     elif menu_acceso == "Registrarse":
         if st.session_state["PASO_REGISTRO"] == 1:
             with st.form("registro_f"):
@@ -188,13 +188,17 @@ def login_v2():
                     st.rerun()
                 else:
                     st.error("Código incorrecto.")
-# INICIO PARTE 4
-    # --- SUBSECCIÓN: RECUPERAR CLAVE ---
+
+    # --- SUBSECCIÓN: RECUPERAR CLAVE (Corregida la indentación) ---
     elif menu_acceso == "Recuperar Clave":
         email_rec = st.text_input("Email registrado")
         if st.button("Enviar Clave Temporal"):
-            # Aquí puedes implementar la lógica real de recuperación
-            # Por ahora dejamos un aviso informativo
             st.info("📩 Buscando usuario... Función en desarrollo.")
 
-# Aquí termina la función login_v2()
+
+# ==========================================
+# DISPARADOR DE LA APLICACIÓN
+# ==========================================
+# Esto asegura que cuando ejecutes 'streamlit run app.py', la función se ejecute.
+if __name__ == "__main__":
+    login_v2()
