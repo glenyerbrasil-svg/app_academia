@@ -193,7 +193,7 @@ def login_v2():
     elif menu_acceso == "Recuperar Clave":
         email_rec = st.text_input("Email registrado")
         if st.button("Enviar Clave Temporal"):
-            # Aquí puedes implementar la lógica de recuperación
+            # Aquí puedes implementar la lógica real de recuperación
             # Por ahora dejamos un aviso informativo
             st.info("📩 Buscando usuario... Función en desarrollo.")
 
