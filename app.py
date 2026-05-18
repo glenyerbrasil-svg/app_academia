@@ -108,19 +108,19 @@ def login_v2():
                         if user.get("ROL") == "DEMO" and pd.notnull(fecha_registro):
                             if (hoy - fecha_registro.date()).days > 7:
                                 st.error("❌ Acceso denegado. Tu periodo DEMO ha vencido.")
-                                st.warning("📲 Comunícate con la Academia en WhatsApp: [Haz clic aquí](https://wa.me/message/TULINKAQUI)")
+                                st.warning("📲 Comunícate con la Academia en WhatsApp: [Haz clic aquí](https://wa.me/556284191427?text=Hola%20mi%20periodo%20DEMO%20ha%20vencido%20y%20quiero%20adquirir%20un%20plan)")
                                 return
 
                         # Regla general de vencimiento
                         if pd.notnull(fecha_vencimiento) and fecha_vencimiento.date() < hoy:
                             st.error("❌ Acceso denegado. Tu membresía ha vencido.")
-                            st.warning("📲 Comunícate con la Academia en WhatsApp: [Haz clic aquí](https://wa.me/message/TULINKAQUI)")
+                            st.warning("📲 Comunícate con la Academia en WhatsApp: [Haz clic aquí](https://wa.me/556284191427?text=Hola%20se%20vencio%20mi%20membresia%20y%20quiero%20renovar)")
                             return
 
                         # Regla de estado
                         if user.get("ESTADO") != "ACTIVO":
                             st.error("❌ Acceso denegado. Estado no válido.")
-                            st.warning("📲 Comunícate con la Academia en WhatsApp: [Haz clic aquí](https://wa.me/556284191427?text=Hola%20se%20vencio%20mi%20membresia%20y%20quiero%20renovar)")
+                            st.warning("📲 Comunícate con la Academia en WhatsApp: [Haz clic aquí](https://wa.me/556284191427?text=Hola%20mi%20usuario%20no%20esta%20activo%20puedes%20revisarlo)")
                             return
 
                         # Si pasa todas las validaciones
