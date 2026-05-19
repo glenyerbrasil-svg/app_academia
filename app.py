@@ -4,6 +4,7 @@
 
 import streamlit as st
 import pandas as pd
+import os
 import time  # ← CORREGIDO: faltaba este import
 from datetime import datetime, date, timedelta
 
