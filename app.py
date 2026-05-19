@@ -71,36 +71,79 @@ def evaluar_restricciones_acceso(user):
 
     return True
 # ==========================================
-# PARTE 3: GESTOR DE AUTENTICACIÓN Y FILTROS DE SEGURIDAD
+# PARTE 3: GESTOR DE AUTENTICACIÓN INTEGRADO Y FILTROS
 # ==========================================
 
 def portal_autenticacion():
-    """Maneja el flujo de acceso utilizando tus componentes externos de login y registro."""
+    """Maneja el flujo de acceso con el formulario de Login integrado para evitar errores de importación."""
     st.title("📈 Academia de Trading")
     
     # Selector horizontal para las pantallas de acceso
     menu_acceso = st.radio("Menú de Acceso", ["Ingresar", "Registrarse", "Recuperar Clave"], horizontal=True)
     
-    # Redirección de vistas según la selección del usuario
+    # 1. CONEXIÓN LOCAL PARA VALIDACIÓN DE CREDENCIALES
+    cliente = conectar_google()
+    if not cliente:
+        st.error("❌ No se pudo conectar con la base de datos de Google.")
+        return
+        
+    try:
+        doc = cliente.open("Bitacora_Academia1")
+        hoja_u = doc.worksheet("Usuarios")
+        datos = hoja_u.get_all_records()
+    except Exception as e:
+        st.error(f"❌ Error al acceder a la pestaña 'Usuarios': {e}")
+        return
+
+    # 2. ENRUTAMIENTO DE PANTALLAS
     if menu_acceso == "Ingresar":
-        login_app()
+        st.subheader("🔑 Iniciar Sesión")
+        
+        with st.form("login_form_interno"):
+            u = st.text_input("Usuario").strip().lower()
+            p = st.text_input("Contraseña", type="password")
+            submitted = st.form_submit_button("Entrar")
+
+            if submitted:
+                # Buscar el usuario de forma exacta (ignorando mayúsculas/minúsculas)
+                user = next((r for r in datos if str(r.get("USUARIO")).lower() == u), None)
+
+                if user:
+                    # Validación 1: Verificación de correo electrónico
+                    if str(user.get("CORREO_VERIFICADO")).upper() == "NO":
+                        st.warning("⚠️ Tu cuenta no ha sido verificada. Revisa tu email para ingresar el código.")
+                        st.session_state["EMAIL_TEMP"] = user.get("EMAIL")
+                        st.session_state["PASO_REGISTRO"] = 2
+                        st.rerun()
+                    
+                    # Validación 2: Verificación de contraseña usando la función hash de tu utils.py
+                    elif check_pass(p, str(user.get("PASSWORD"))):
+                        # Guardamos de forma exitosa el diccionario del usuario en el estado de sesión
+                        st.session_state["user"] = user
+                        st.success("🎉 ¡Inicio de sesión correcto!")
+                        time.sleep(1)
+                        st.rerun()
+                    else:
+                        st.error("❌ Contraseña incorrecta. Inténtalo de nuevo.")
+                else:
+                    st.error("❌ El usuario introducido no existe.")
         
     elif menu_acceso == "Registrarse":
+        # Llama de forma segura a tu archivo externo de registro
         registro_app()
         
     elif menu_acceso == "Recuperar Clave":
+        # Llama de forma segura a tu archivo externo de recuperación
         recuperar_app()
 
     # --- INTERCEPTOR DE SEGURIDAD POST-LOGIN ---
-    # Si tu script externo 'login.py' autenticó al usuario, lo guarda en st.session_state["user"]
     if st.session_state["user"] is not None:
         user_actual = st.session_state["user"]
         
-        # Ejecutamos las reglas de negocio críticas creadas en la Parte 2
+        # Evaluamos las restricciones de la Parte 2 (Demos, Vencidos, Activos)
         acceso_valido = evaluar_restricciones_acceso(user_actual)
         
         if not acceso_valido:
-            # Si las reglas fallan (vencido/inactivo), destruimos la sesión de inmediato para que no salte al sistema
             st.session_state["user"] = None
             st.stop()
 # ==========================================
