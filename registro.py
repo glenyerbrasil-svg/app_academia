@@ -1,47 +1,45 @@
 import streamlit as st
-from utils import conectar_google
+from utils import conectar_google, hash_pass, get_email_config
 import datetime
 import random
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import smtplib
-import bcrypt
 
-EMAIL_EMISOR = "glenyerbrasil@gmail.com"
-EMAIL_PASSWORD = "tpnk mizj ccul vfuv"  # Contraseña de aplicación de Gmail
+# =========================================================
+# ENVÍO DE CÓDIGO DE VERIFICACIÓN
+# =========================================================
+def enviar_verificacion(email_destino: str, codigo: str) -> bool:
+    cfg = get_email_config()  # ← CORREGIDO: credenciales desde st.secrets
+    if not cfg["emisor"]:
+        return False
 
-# --- Función para encriptar contraseñas ---
-def hash_pass(password):
-    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-
-def enviar_verificacion(email_destino, codigo):
     msg = MIMEMultipart()
-    msg['From'] = EMAIL_EMISOR
+    msg['From'] = cfg["emisor"]
     msg['To'] = email_destino
     msg['Subject'] = f"🛡️ Código de Verificación Academia: {codigo}"
-
-    cuerpo = f"""
-    <html>
-        <body>
-            <h2>¡Bienvenido a la Academia!</h2>
-            <p>Usa este código para activar tu cuenta:</p>
-            <h1>{codigo}</h1>
-        </body>
-    </html>
-    """
-    msg.attach(MIMEText(cuerpo, 'html'))
+    msg.attach(MIMEText(f"""
+    <html><body>
+        <h2>¡Bienvenido a la Academia!</h2>
+        <p>Usa este código para activar tu cuenta:</p>
+        <h1>{codigo}</h1>
+    </body></html>
+    """, 'html'))
 
     try:
         server = smtplib.SMTP('smtp.gmail.com', 587)
         server.starttls()
-        server.login(EMAIL_EMISOR, EMAIL_PASSWORD)
-        server.sendmail(EMAIL_EMISOR, email_destino, msg.as_string())
+        server.login(cfg["emisor"], cfg["password"])
+        server.sendmail(cfg["emisor"], email_destino, msg.as_string())
         server.quit()
         return True
     except Exception as e:
         st.error(f"Error al enviar correo: {e}")
         return False
 
+# =========================================================
+# FLUJO DE REGISTRO
+# =========================================================
 def registro_app():
     st.header("📝 Registro de nuevo usuario")
 
@@ -61,13 +59,14 @@ def registro_app():
         st.error("No se encontró la hoja 'Usuarios'.")
         return
 
-    # --- Paso 1: Registro inicial ---
+    # --- Paso 1: Formulario de datos ---
     if st.session_state["PASO_REGISTRO"] == 1:
         with st.form("registro_form"):
             nombre = st.text_input("Nombre completo")
             email = st.text_input("Correo electrónico")
             telefono = st.text_input("Teléfono")
             password = st.text_input("Contraseña", type="password")
+            confirmar = st.text_input("Confirmar contraseña", type="password")
             pais = st.text_input("País")
             fecha_cumple = st.date_input(
                 "Fecha de cumpleaños",
@@ -75,71 +74,72 @@ def registro_app():
                 min_value=datetime.date(1900, 1, 1),
                 max_value=datetime.date.today()
             )
-
             submitted = st.form_submit_button("Registrarme")
 
             if submitted:
                 if not nombre or not email or not password:
                     st.error("Por favor completa los campos obligatorios.")
                     return
+                if password != confirmar:
+                    st.error("Las contraseñas no coinciden.")
+                    return
+                # Verificar si el email ya existe
+                if any(str(u.get("EMAIL", "")).lower() == email.lower() for u in usuarios):
+                    st.error("Ya existe una cuenta con ese correo.")
+                    return
 
-                # Encriptar contraseña
-                hashed_password = hash_pass(password)
-
-                # Generar código de verificación
                 codigo_gen = str(random.randint(100000, 999999))
-
                 if enviar_verificacion(email, codigo_gen):
+                    hoy = datetime.date.today()
                     nuevo_usuario = [
-                        len(usuarios)+1,   # ID_USUARIO
-                        email,             # USUARIO = correo electrónico
+                        len(usuarios) + 1,
+                        email,
                         nombre,
                         email,
                         telefono,
-                        hashed_password,   # contraseña encriptada
+                        hash_pass(password),
                         pais,
-                        "DEMO",            # ROL
-                        "Padawan",         # NIVEL
-                        "ACTIVO",          # ESTADO
-                        str(datetime.date.today()),  # FECHA_REGISTRO
+                        "DEMO",
+                        "Padawan",
+                        "ACTIVO",
+                        str(hoy),
                         fecha_cumple.strftime("%Y-%m-%d"),
-                        "NO",              # REGALO_CUMPLE_RECLAMADO
-                        "N/A",             # ULTIMO_PAGO
-                        (datetime.date.today() + datetime.timedelta(days=7)).strftime("%Y-%m-%d"), # PROXIMO_VENCIMIENTO
-                        (datetime.date.today() + datetime.timedelta(days=9)).strftime("%Y-%m-%d"), # FECHA_GRACIA
-                        "N/A",             # COMPROBANTE_PAGO
-                        "PRUEBA",          # TIPO_PLAN
-                        1,                 # DISPOSITIVOS_ACTIVOS
-                        "NO",              # CORREO_VERIFICADO
-                        str(datetime.datetime.now()), # ULTIMA_CONEXION
-                        "PENDIENTE",       # ESTADO_PAGO
-                        0.0                # MONTO_ULTIMO_PAGO
+                        "NO",
+                        "N/A",
+                        str(hoy + datetime.timedelta(days=7)),
+                        str(hoy + datetime.timedelta(days=9)),
+                        "N/A",
+                        "PRUEBA",
+                        1,
+                        "NO",
+                        str(datetime.datetime.now()),
+                        "PENDIENTE",
+                        0.0
                     ]
-
                     hoja_u.append_row(nuevo_usuario)
                     st.session_state["EMAIL_TEMP"] = email
                     st.session_state["CODIGO_TEMP"] = codigo_gen
                     st.session_state["PASO_REGISTRO"] = 2
-                    st.success("✅ Registro exitoso. Revisa tu correo para confirmar tu cuenta.")
+                    st.success("✅ Revisa tu correo para confirmar tu cuenta.")
                     st.rerun()
                 else:
                     st.error("No se pudo enviar el correo de verificación.")
 
     # --- Paso 2: Validación del código ---
     elif st.session_state["PASO_REGISTRO"] == 2:
-        st.info(f"📩 Ingresa el código enviado a: **{st.session_state['EMAIL_TEMP']}**")
+        st.info(f"📩 Código enviado a: **{st.session_state.get('EMAIL_TEMP', '')}**")
         codigo_ingresado = st.text_input("Código de verificación (6 dígitos)")
 
         if st.button("Validar código"):
-            if str(codigo_ingresado).strip() == str(st.session_state["CODIGO_TEMP"]).strip():
+            if str(codigo_ingresado).strip() == str(st.session_state.get("CODIGO_TEMP", "")).strip():
                 datos = hoja_u.get_all_records()
-                user = next((u for u in datos if u["EMAIL"] == st.session_state["EMAIL_TEMP"]), None)
+                user = next((u for u in datos if u.get("EMAIL") == st.session_state["EMAIL_TEMP"]), None)
                 if user:
                     fila = datos.index(user) + 2
-                    hoja_u.update_cell(fila, 20, "SI")  # Columna CORREO_VERIFICADO
-                    st.success("🎉 Cuenta verificada con éxito. Ya puedes iniciar sesión.")
+                    hoja_u.update_cell(fila, 20, "SI")
+                    st.success("🎉 ¡Cuenta verificada! Ya puedes iniciar sesión.")
                     st.session_state["PASO_REGISTRO"] = 1
-                    del st.session_state["EMAIL_TEMP"]
-                    del st.session_state["CODIGO_TEMP"]
+                    st.session_state.pop("EMAIL_TEMP", None)
+                    st.session_state.pop("CODIGO_TEMP", None)
             else:
                 st.error("Código incorrecto.")
