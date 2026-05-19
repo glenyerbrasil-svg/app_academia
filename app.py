@@ -5,7 +5,7 @@
 import streamlit as st
 import pandas as pd
 import os
-import time  # ← CORREGIDO: faltaba este import
+import time
 from datetime import datetime, date, timedelta
 
 from utils import conectar_google, hash_pass, check_pass, hoy, ahora, rol_es
@@ -26,7 +26,6 @@ from registro import registro_app
 from recuperar import recuperar_app
 
 # Inicialización de Session State
-# CLAVE ÚNICA: "user" en todo el sistema (corregido de "USUARIO" en ui.py/auth.py)
 if "user" not in st.session_state:
     st.session_state["user"] = None
 
@@ -100,7 +99,7 @@ def portal_autenticacion():
                         st.session_state["PASO_REGISTRO"] = 2
                         st.rerun()
                     elif check_pass(p, str(user.get("PASSWORD", ""))):
-                        st.session_state["user"] = user  # ← CLAVE UNIFICADA
+                        st.session_state["user"] = user
                         st.success("🎉 ¡Inicio de sesión correcto!")
                         time.sleep(1)
                         st.rerun()
@@ -139,11 +138,12 @@ def app_interna():
         st.error(f"❌ Base de datos no encontrada: {e}")
         st.stop()
 
-    # Sidebar
+    # Sidebar — logo con fallback si no existe el archivo
     if os.path.exists("assets/logo.png"):
-    st.sidebar.image("assets/logo.png", use_container_width=True)
-else:
-    st.sidebar.markdown("## 📈 Academia GMC Trading")
+        st.sidebar.image("assets/logo.png", use_container_width=True)
+    else:
+        st.sidebar.markdown("## 📈 Academia GMC Trading")
+
     st.sidebar.markdown(f"<h2 style='text-align:center'>{user_actual.get('NOMBRE','Usuario')}</h2>", unsafe_allow_html=True)
     st.sidebar.markdown(f"<p style='text-align:center;font-weight:bold'>{user_actual.get('ROL','ESTUDIANTE')} — {user_actual.get('NIVEL','Padawan')}</p>", unsafe_allow_html=True)
     st.sidebar.divider()
@@ -160,7 +160,6 @@ else:
         "💬 Forum"
     ]
 
-    # CORREGIDO: comparación en mayúsculas consistente con rol_es()
     if rol_es(user_actual, "MAESTRO", "ADMINISTRADOR"):
         menu_opciones.append("🔎 Revisión de Operaciones")
     if rol_es(user_actual, "ADMINISTRADOR"):
@@ -170,7 +169,6 @@ else:
     seleccion_menu = st.sidebar.radio("Módulos del Sistema:", menu_opciones)
     st.sidebar.divider()
 
-    # CORREGIDO: borra "user" (clave unificada), no "USUARIO"
     if st.sidebar.button("❌ Cerrar Sesión"):
         st.session_state["user"] = None
         st.session_state["PASO_REGISTRO"] = 1
