@@ -139,7 +139,10 @@ def app_interna():
         st.stop()
 
     # Sidebar
+    if os.path.exists("assets/logo.png"):
     st.sidebar.image("assets/logo.png", use_container_width=True)
+else:
+    st.sidebar.markdown("## 📈 Academia GMC Trading")
     st.sidebar.markdown(f"<h2 style='text-align:center'>{user_actual.get('NOMBRE','Usuario')}</h2>", unsafe_allow_html=True)
     st.sidebar.markdown(f"<p style='text-align:center;font-weight:bold'>{user_actual.get('ROL','ESTUDIANTE')} — {user_actual.get('NIVEL','Padawan')}</p>", unsafe_allow_html=True)
     st.sidebar.divider()
