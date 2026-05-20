@@ -39,8 +39,8 @@ from utils import conectar_google
 
 # Estados emocionales alineados con los valores reales en la hoja
 OPCIONES_EMOCIONAL = [
-    "🟢 Calma",
     "🔵 Zen",
+    "🟢 Calma",
     "🙂 Normal",
     "😐 Nervioso",
     "😡 Venganza"
@@ -147,7 +147,7 @@ def bitacora_app(user):
     semaforo = st.select_slider(
         "¿Cómo te sientes antes de esta operación?",
         options=OPCIONES_EMOCIONAL,
-        value="🙂 Normal",
+        value="🔵 Zen",
         key=f"emo_{v}"
     )
 
