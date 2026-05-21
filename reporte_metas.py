@@ -128,18 +128,22 @@ def _vista_estudiante(user_id, mes_actual, hoja_m, hoja_pf, hoja_dg):
         if gastos_cats:
             colores_torta = ["#3498db","#2ecc71","#e74c3c","#f39c12","#9b59b6",
                              "#1abc9c","#e67e22","#95a5a6","#27ae60"]
-            fig1, ax1 = plt.subplots(figsize=(7, 5))
-            wedges, texts, autotexts = ax1.pie(
+            total_cats = sum(gastos_cats.values())
+            # Quitar emojis del label y agregar porcentaje directamente
+            labels_limpios = [
+                f"{' '.join(k.split()[1:])} {v/total_cats*100:.1f}%"
+                for k, v in gastos_cats.items()
+            ]
+            fig1, ax1 = plt.subplots(figsize=(8, 6))
+            ax1.pie(
                 gastos_cats.values(),
-                labels=gastos_cats.keys(),
-                autopct="%1.1f%%",
+                labels=labels_limpios,
                 colors=colores_torta[:len(gastos_cats)],
                 startangle=140,
-                pctdistance=0.82
+                labeldistance=1.13,
+                wedgeprops=dict(edgecolor="white", linewidth=2)
             )
-            for at in autotexts:
-                at.set_fontsize(9)
-            ax1.set_title(f"Distribución financiera — {mes_actual}", fontsize=13, fontweight="bold")
+            ax1.set_title(f"Distribucion financiera — {mes_actual}", fontsize=14, fontweight="bold", pad=20)
             fig1.tight_layout()
             st.pyplot(fig1)
             plt.close(fig1)
@@ -334,8 +338,12 @@ def _generar_pdf_estado_cuenta(user_id, mes, df_pf, df_dg, df_m) -> bytes:
         if cats:
             fig_t, ax_t = plt.subplots(figsize=(6, 4))
             colores = ["#3498db","#2ecc71","#e74c3c","#f39c12","#9b59b6","#1abc9c","#e67e22","#95a5a6"]
-            ax_t.pie(cats.values(), labels=cats.keys(), autopct="%1.1f%%",
-                     colors=colores[:len(cats)], startangle=140)
+            total_c = sum(cats.values())
+            labels_pdf = [f"{k} {v/total_c*100:.1f}%" for k, v in cats.items()]
+            ax_t.pie(cats.values(), labels=labels_pdf,
+                     colors=colores[:len(cats)], startangle=140,
+                     labeldistance=1.12,
+                     wedgeprops=dict(edgecolor="white", linewidth=2))
             ax_t.set_title("Distribucion de gastos fijos")
             fig_t.tight_layout()
             bytes_torta = fig_a_bytes(fig_t)
