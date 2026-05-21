@@ -129,20 +129,23 @@ def _vista_estudiante(user_id, mes_actual, hoja_m, hoja_pf, hoja_dg):
             colores_torta = ["#3498db","#2ecc71","#e74c3c","#f39c12","#9b59b6",
                              "#1abc9c","#e67e22","#95a5a6","#27ae60"]
             total_cats = sum(gastos_cats.values())
-            # Quitar emojis del label y agregar porcentaje directamente
+            # Label = nombre limpio (sin emoji) + porcentaje
             labels_limpios = [
-                f"{' '.join(k.split()[1:])} {v/total_cats*100:.1f}%"
+                f"{_limpiar_texto(k)} {v/total_cats*100:.1f}%"
                 for k, v in gastos_cats.items()
             ]
-            fig1, ax1 = plt.subplots(figsize=(8, 6))
-            ax1.pie(
+            fig1, ax1 = plt.subplots(figsize=(9, 7))
+            wedges, texts = ax1.pie(
                 gastos_cats.values(),
                 labels=labels_limpios,
                 colors=colores_torta[:len(gastos_cats)],
                 startangle=140,
-                labeldistance=1.13,
+                labeldistance=1.15,
                 wedgeprops=dict(edgecolor="white", linewidth=2)
             )
+            for t in texts:
+                t.set_fontsize(10)
+                t.set_fontweight("bold")
             ax1.set_title(f"Distribucion financiera — {mes_actual}", fontsize=14, fontweight="bold", pad=20)
             fig1.tight_layout()
             st.pyplot(fig1)
@@ -342,8 +345,10 @@ def _generar_pdf_estado_cuenta(user_id, mes, df_pf, df_dg, df_m) -> bytes:
             labels_pdf = [f"{k} {v/total_c*100:.1f}%" for k, v in cats.items()]
             ax_t.pie(cats.values(), labels=labels_pdf,
                      colors=colores[:len(cats)], startangle=140,
-                     labeldistance=1.12,
+                     labeldistance=1.18,
                      wedgeprops=dict(edgecolor="white", linewidth=2))
+            for t in ax_t.texts:
+                t.set_fontsize(8)
             ax_t.set_title("Distribucion de gastos fijos")
             fig_t.tight_layout()
             bytes_torta = fig_a_bytes(fig_t)
