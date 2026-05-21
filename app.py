@@ -24,6 +24,7 @@ from membresias import membresias_app
 from reporte_estudiantes import reporte_estudiantes_app
 from registro import registro_app
 from recuperar import recuperar_app
+from reporte_metas import reporte_metas_app
 
 # Inicialización de Session State
 if "user" not in st.session_state:
@@ -157,6 +158,7 @@ def app_interna():
         "💰 Finanzas",
         "📈 Reportes",
         "🎯 Metas",
+        "📊 Reporte de Metas",
         "💬 Forum"
     ]
 
@@ -192,6 +194,8 @@ def app_interna():
         reportes_app(user_actual)
     elif modulo_limpio == "Metas":
         metas_app(user_actual)
+    elif modulo_limpio == "Reporte de Metas":
+        reporte_metas_app(user_actual)
     elif modulo_limpio == "Forum":
         forum_app(user_actual)
     elif modulo_limpio == "Revisión de Operaciones":
