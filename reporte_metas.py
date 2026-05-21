@@ -253,6 +253,222 @@ def _vista_estudiante(user_id, mes_actual, hoja_m, hoja_pf, hoja_dg):
                 plt.close(fig4)
                 st.caption("🔴 La barra roja indica la categoría donde más gastaste este mes.")
 
+    # ── ESTADO DE CUENTA PDF ──
+    st.divider()
+    st.subheader("📄 Estado de Cuenta Mensual")
+    st.info("Descarga tu estado de cuenta del mes en PDF, igual que un extracto bancario.")
+
+    meses_disponibles = []
+    if not pf_u.empty and "MES" in pf_u.columns:
+        meses_disponibles = sorted(pf_u["MES"].dropna().unique().tolist(), reverse=True)
+
+    if not meses_disponibles:
+        st.warning("Aún no tienes perfiles financieros registrados para generar un estado de cuenta.")
+        return
+
+    mes_sel = st.selectbox("Selecciona el mes a descargar:", meses_disponibles)
+
+    if st.button("📥 Generar Estado de Cuenta PDF", use_container_width=True):
+        with st.spinner("Generando tu estado de cuenta..."):
+            try:
+                pdf_bytes = _generar_pdf_estado_cuenta(user_id, mes_sel, pf_u, dg_u, metas_u)
+                st.download_button(
+                    label="⬇️ Descargar Estado de Cuenta",
+                    data=pdf_bytes,
+                    file_name=f"estado_cuenta_{mes_sel}.pdf",
+                    mime="application/pdf",
+                    use_container_width=True
+                )
+                st.success("✅ Estado de cuenta generado correctamente.")
+            except Exception as e:
+                st.error(f"❌ Error al generar PDF: {e}")
+
+
+def _generar_pdf_estado_cuenta(user_id, mes, df_pf, df_dg, df_m) -> bytes:
+    from fpdf import FPDF
+    import io as _io
+
+    pf_mes = df_pf[df_pf["MES"] == mes].iloc[-1] if not df_pf.empty and "MES" in df_pf.columns and not df_pf[df_pf["MES"] == mes].empty else None
+    dg_mes = df_dg[df_dg["MES"] == mes].copy() if not df_dg.empty and "MES" in df_dg.columns else pd.DataFrame()
+    if not dg_mes.empty:
+        dg_mes["MONTO"] = pd.to_numeric(dg_mes["MONTO"], errors="coerce").fillna(0)
+
+    total_ing    = float(pf_mes.get("TOTAL_INGRESOS", 0) or 0)    if pf_mes is not None else 0
+    total_gas    = float(pf_mes.get("TOTAL_GASTOS", 0) or 0)      if pf_mes is not None else 0
+    capacidad    = float(pf_mes.get("CAPACIDAD_AHORRO", 0) or 0)  if pf_mes is not None else 0
+    pct_ahorro   = (capacidad / total_ing * 100) if total_ing > 0 else 0
+    gastos_extra   = dg_mes[dg_mes["TIPO"] == "GASTO"]["MONTO"].sum()   if not dg_mes.empty else 0
+    ingresos_extra = dg_mes[dg_mes["TIPO"] == "INGRESO"]["MONTO"].sum() if not dg_mes.empty else 0
+    total_real_ing = total_ing + ingresos_extra
+    total_real_gas = total_gas + gastos_extra
+    ahorro_real    = total_real_ing - total_real_gas
+
+    # Gráfica torta
+    bytes_torta = None
+    if pf_mes is not None:
+        cats = {
+            "Vivienda":        float(pf_mes.get("GASTO_VIVIENDA", 0) or 0),
+            "Servicios":       float(pf_mes.get("GASTO_SERVICIOS", 0) or 0),
+            "Alimentacion":    float(pf_mes.get("GASTO_ALIMENTACION", 0) or 0),
+            "Transporte":      float(pf_mes.get("GASTO_TRANSPORTE", 0) or 0),
+            "Salud":           float(pf_mes.get("GASTO_SALUD", 0) or 0),
+            "Educacion":       float(pf_mes.get("GASTO_EDUCACION", 0) or 0),
+            "Entretenimiento": float(pf_mes.get("GASTO_ENTRETENIMIENTO", 0) or 0),
+            "Otros fijos":     float(pf_mes.get("GASTO_OTROS_FIJOS", 0) or 0),
+        }
+        cats = {k: v for k, v in cats.items() if v > 0}
+        if cats:
+            fig_t, ax_t = plt.subplots(figsize=(6, 4))
+            colores = ["#3498db","#2ecc71","#e74c3c","#f39c12","#9b59b6","#1abc9c","#e67e22","#95a5a6"]
+            ax_t.pie(cats.values(), labels=cats.keys(), autopct="%1.1f%%",
+                     colors=colores[:len(cats)], startangle=140)
+            ax_t.set_title("Distribucion de gastos fijos")
+            fig_t.tight_layout()
+            bytes_torta = fig_a_bytes(fig_t)
+            plt.close(fig_t)
+
+    pdf = FPDF()
+    pdf.set_auto_page_break(auto=True, margin=15)
+    pdf.add_page()
+
+    # Encabezado
+    pdf.set_fill_color(26, 42, 74)
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_font("Arial", "B", 18)
+    pdf.cell(0, 14, "ACADEMIA GMC TRADING", ln=True, align="C", fill=True)
+    pdf.set_font("Arial", "", 11)
+    pdf.cell(0, 8, "Estado de Cuenta Financiero Personal", ln=True, align="C", fill=True)
+    pdf.set_fill_color(41, 128, 185)
+    pdf.set_font("Arial", "B", 12)
+    pdf.cell(0, 9, f"Periodo: {mes}   |   Usuario ID: {user_id}", ln=True, align="C", fill=True)
+    pdf.set_text_color(0, 0, 0)
+    pdf.ln(6)
+
+    def titulo_seccion(texto):
+        pdf.set_fill_color(236, 240, 241)
+        pdf.set_font("Arial", "B", 12)
+        pdf.cell(0, 9, f"  {texto}", ln=True, fill=True)
+        pdf.ln(2)
+
+    def fila_dato(label, valor, negrita_valor=False, color_valor=None):
+        pdf.set_font("Arial", "", 11)
+        pdf.cell(110, 7, f"  {label}", border=0)
+        if color_valor:
+            pdf.set_text_color(*color_valor)
+        pdf.set_font("Arial", "B" if negrita_valor else "", 11)
+        pdf.cell(0, 7, valor, ln=True, border=0)
+        pdf.set_text_color(0, 0, 0)
+
+    # Resumen
+    titulo_seccion("RESUMEN DEL MES")
+    fila_dato("Ingresos fijos del mes:",   f"${total_ing:,.2f}")
+    fila_dato("Ingresos extra del mes:",   f"${ingresos_extra:,.2f}")
+    fila_dato("Total ingresos reales:",    f"${total_real_ing:,.2f}", negrita_valor=True)
+    pdf.ln(2)
+    fila_dato("Gastos fijos del mes:",     f"${total_gas:,.2f}")
+    fila_dato("Gastos extra del mes:",     f"${gastos_extra:,.2f}")
+    fila_dato("Total gastos reales:",      f"${total_real_gas:,.2f}", negrita_valor=True)
+    pdf.ln(2)
+    color_ahorro = (39, 174, 96) if ahorro_real >= 0 else (192, 57, 43)
+    fila_dato("Ahorro neto del mes:",      f"${ahorro_real:,.2f}", negrita_valor=True, color_valor=color_ahorro)
+    fila_dato("Porcentaje de ahorro:",     f"{pct_ahorro:.1f}%")
+    if pct_ahorro >= 20:   salud = "SALUDABLE"
+    elif pct_ahorro >= 10: salud = "REGULAR"
+    elif pct_ahorro > 0:   salud = "AJUSTADO"
+    else:                  salud = "CRITICO"
+    fila_dato("Salud financiera:", salud, negrita_valor=True)
+    pdf.ln(4)
+
+    # Detalle gastos fijos
+    if pf_mes is not None:
+        titulo_seccion("DETALLE DE GASTOS FIJOS")
+        campos = [
+            ("Vivienda",       "GASTO_VIVIENDA"),
+            ("Servicios",      "GASTO_SERVICIOS"),
+            ("Alimentacion",   "GASTO_ALIMENTACION"),
+            ("Transporte",     "GASTO_TRANSPORTE"),
+            ("Salud",          "GASTO_SALUD"),
+            ("Educacion",      "GASTO_EDUCACION"),
+            ("Entretenimiento","GASTO_ENTRETENIMIENTO"),
+            ("Otros fijos",    "GASTO_OTROS_FIJOS"),
+        ]
+        for label, campo in campos:
+            val = float(pf_mes.get(campo, 0) or 0)
+            if val > 0:
+                fila_dato(f"  {label}:", f"${val:,.2f}")
+        pdf.ln(4)
+
+    # Gráfica torta
+    if bytes_torta:
+        titulo_seccion("DISTRIBUCION DE GASTOS")
+        img_buf = _io.BytesIO(bytes_torta)
+        pdf.image(img_buf, x=30, w=150)
+        pdf.ln(4)
+
+    # Movimientos diarios
+    if not dg_mes.empty:
+        pdf.add_page()
+        titulo_seccion(f"MOVIMIENTOS DIARIOS - {mes}")
+        pdf.set_fill_color(52, 73, 94)
+        pdf.set_text_color(255, 255, 255)
+        pdf.set_font("Arial", "B", 10)
+        pdf.cell(28, 8, "Fecha",       fill=True)
+        pdf.cell(22, 8, "Tipo",        fill=True)
+        pdf.cell(65, 8, "Categoria",   fill=True)
+        pdf.cell(50, 8, "Descripcion", fill=True)
+        pdf.cell(0,  8, "Monto",       fill=True, ln=True)
+        pdf.set_text_color(0, 0, 0)
+        fill = False
+        for _, row in dg_mes.sort_values("FECHA").iterrows():
+            pdf.set_fill_color(245, 245, 245) if fill else pdf.set_fill_color(255, 255, 255)
+            tipo  = str(row.get("TIPO", ""))
+            monto = float(row.get("MONTO", 0))
+            color = (39, 174, 96) if tipo == "INGRESO" else (192, 57, 43)
+            pdf.set_font("Arial", "", 9)
+            pdf.cell(28, 7, str(row.get("FECHA", ""))[:10], fill=fill)
+            pdf.set_text_color(*color)
+            pdf.cell(22, 7, tipo, fill=fill)
+            pdf.set_text_color(0, 0, 0)
+            pdf.cell(65, 7, str(row.get("CATEGORIA", ""))[:32], fill=fill)
+            pdf.cell(50, 7, str(row.get("DESCRIPCION", ""))[:26], fill=fill)
+            pdf.set_text_color(*color)
+            signo = "+" if tipo == "INGRESO" else "-"
+            pdf.cell(0, 7, f"{signo}${monto:,.2f}", fill=fill, ln=True)
+            pdf.set_text_color(0, 0, 0)
+            fill = not fill
+        pdf.ln(3)
+        pdf.set_fill_color(26, 42, 74)
+        pdf.set_text_color(255, 255, 255)
+        pdf.set_font("Arial", "B", 10)
+        pdf.cell(165, 8, "  TOTAL MOVIMIENTOS DIARIOS", fill=True)
+        saldo_mov = ingresos_extra - gastos_extra
+        signo_t = "+" if saldo_mov >= 0 else ""
+        pdf.cell(0, 8, f"  {signo_t}${saldo_mov:,.2f}", fill=True, ln=True)
+        pdf.set_text_color(0, 0, 0)
+        pdf.ln(4)
+
+    # Metas activas
+    if not df_m.empty:
+        activas = df_m[df_m["ESTADO"] == "Activa"]
+        if not activas.empty:
+            titulo_seccion("METAS DE AHORRO ACTIVAS")
+            for _, meta in activas.iterrows():
+                obj  = float(meta.get("CAPITAL_OBJETIVO", 0) or 0)
+                act  = float(meta.get("CAPITAL_ACTUAL", 0) or 0)
+                prog = min(act / obj * 100, 100) if obj > 0 else 0
+                fila_dato(f"  {meta.get('CATEGORIA')} - {meta.get('DESCRIPCION')}",
+                          f"${act:,.2f} de ${obj:,.2f} ({prog:.1f}%)")
+            pdf.ln(4)
+
+    # Pie de página
+    pdf.set_fill_color(26, 42, 74)
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_font("Arial", "I", 9)
+    pdf.cell(0, 8, f"  Generado el {date.today()} - Academia GMC Trading - Confidencial", fill=True, ln=True)
+
+    return pdf.output(dest="S").encode("latin-1")
+
+
 # ============================================================
 # VISTA ADMIN / MAESTRO
 # ============================================================
