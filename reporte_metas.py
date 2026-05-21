@@ -284,6 +284,20 @@ def _vista_estudiante(user_id, mes_actual, hoja_m, hoja_pf, hoja_dg):
                 st.error(f"❌ Error al generar PDF: {e}")
 
 
+def _limpiar_texto(texto: str) -> str:
+    """Elimina emojis y caracteres no compatibles con fuentes PDF estándar."""
+    import re
+    # Eliminar emojis y símbolos Unicode fuera del rango latin-1
+    resultado = []
+    for c in str(texto):
+        try:
+            c.encode('latin-1')
+            resultado.append(c)
+        except (UnicodeEncodeError, UnicodeDecodeError):
+            resultado.append('')
+    return ''.join(resultado).strip()
+
+
 def _generar_pdf_estado_cuenta(user_id, mes, df_pf, df_dg, df_m) -> bytes:
     from fpdf import FPDF
     import io as _io
@@ -309,7 +323,7 @@ def _generar_pdf_estado_cuenta(user_id, mes, df_pf, df_dg, df_m) -> bytes:
         cats = {
             "Vivienda":        float(pf_mes.get("GASTO_VIVIENDA", 0) or 0),
             "Servicios":       float(pf_mes.get("GASTO_SERVICIOS", 0) or 0),
-            "Alimentacion":    float(pf_mes.get("GASTO_ALIMENTACION", 0) or 0),
+            "Alimentacion": float(pf_mes.get("GASTO_ALIMENTACION", 0) or 0),
             "Transporte":      float(pf_mes.get("GASTO_TRANSPORTE", 0) or 0),
             "Salud":           float(pf_mes.get("GASTO_SALUD", 0) or 0),
             "Educacion":       float(pf_mes.get("GASTO_EDUCACION", 0) or 0),
@@ -429,8 +443,8 @@ def _generar_pdf_estado_cuenta(user_id, mes, df_pf, df_dg, df_m) -> bytes:
             pdf.set_text_color(*color)
             pdf.cell(22, 7, tipo, fill=fill)
             pdf.set_text_color(0, 0, 0)
-            pdf.cell(65, 7, str(row.get("CATEGORIA", ""))[:32], fill=fill)
-            pdf.cell(50, 7, str(row.get("DESCRIPCION", ""))[:26], fill=fill)
+            pdf.cell(65, 7, _limpiar_texto(str(row.get("CATEGORIA", "")))[:32], fill=fill)
+            pdf.cell(50, 7, _limpiar_texto(str(row.get("DESCRIPCION", "")))[:26], fill=fill)
             pdf.set_text_color(*color)
             signo = "+" if tipo == "INGRESO" else "-"
             pdf.cell(0, 7, f"{signo}${monto:,.2f}", fill=fill, ln=True)
@@ -456,7 +470,7 @@ def _generar_pdf_estado_cuenta(user_id, mes, df_pf, df_dg, df_m) -> bytes:
                 obj  = float(meta.get("CAPITAL_OBJETIVO", 0) or 0)
                 act  = float(meta.get("CAPITAL_ACTUAL", 0) or 0)
                 prog = min(act / obj * 100, 100) if obj > 0 else 0
-                fila_dato(f"  {meta.get('CATEGORIA')} - {meta.get('DESCRIPCION')}",
+                fila_dato(f"  {_limpiar_texto(str(meta.get('CATEGORIA','')))} - {_limpiar_texto(str(meta.get('DESCRIPCION','')))}",
                           f"${act:,.2f} de ${obj:,.2f} ({prog:.1f}%)")
             pdf.ln(4)
 
