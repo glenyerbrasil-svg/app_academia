@@ -154,6 +154,8 @@ def _vista_estudiante(user_id, mes_actual, hoja_m, hoja_pf, hoja_dg):
 
         # ── REGLA 50/30/20 ──
         st.subheader("📐 Regla del 50/30/20")
+        st.caption("Esta regla sugiere distribuir tus ingresos en: 50% necesidades básicas · 30% deseos · 20% ahorro e inversión.")
+
         necesidades = float(p.get("GASTO_VIVIENDA",0) or 0) + float(p.get("GASTO_SERVICIOS",0) or 0) + \
                       float(p.get("GASTO_ALIMENTACION",0) or 0) + float(p.get("GASTO_TRANSPORTE",0) or 0) + \
                       float(p.get("GASTO_SALUD",0) or 0)
@@ -161,24 +163,63 @@ def _vista_estudiante(user_id, mes_actual, hoja_m, hoja_pf, hoja_dg):
         ahorro_real = capacidad
 
         if total_ing > 0:
-            ideal_nec  = total_ing * 0.50
-            ideal_des  = total_ing * 0.30
-            ideal_aho  = total_ing * 0.20
+            ideal_nec = total_ing * 0.50
+            ideal_des = total_ing * 0.30
+            ideal_aho = total_ing * 0.20
+
+            pct_nec = necesidades / total_ing * 100
+            pct_des = deseos      / total_ing * 100
+            pct_aho = max(ahorro_real, 0) / total_ing * 100
+
+            def tarjeta_regla(col, emoji, titulo, ideal_pct, real, ideal, pct_real, invert=True):
+                exceso = real - ideal
+                if invert:
+                    # Para necesidades y deseos: exceso es malo
+                    if exceso > 0.5:
+                        color = "#e74c3c"; icono = "🔴"
+                        estado = f"Exceso de ${exceso:,.2f}"
+                        consejo = (f"Estás usando el **{pct_real:.1f}%** de tus ingresos aquí, "
+                                   f"pero el ideal es **{ideal_pct}%** (${ideal:,.2f}). "
+                                   f"Te sugerimos reducir **${exceso:,.2f}** en esta categoría para equilibrar tu presupuesto.")
+                    elif exceso < -0.5:
+                        color = "#2ecc71"; icono = "🟢"
+                        estado = f"${abs(exceso):,.2f} por debajo del límite"
+                        consejo = (f"Estás usando el **{pct_real:.1f}%** de tus ingresos aquí. "
+                                   f"Vas bien — tienes un margen de **${abs(exceso):,.2f}** antes de superar el límite del {ideal_pct}%.")
+                    else:
+                        color = "#2ecc71"; icono = "🟢"
+                        estado = "Exactamente en el ideal"
+                        consejo = f"¡Perfecto! Estás exactamente en el límite ideal del {ideal_pct}%."
+                else:
+                    # Para ahorro: exceso es bueno
+                    if exceso >= -0.5:
+                        color = "#2ecc71"; icono = "🟢"
+                        estado = f"${max(exceso,0):,.2f} por encima del mínimo"
+                        consejo = (f"Estás ahorrando el **{pct_real:.1f}%** de tus ingresos. "
+                                   f"¡Excelente! Superas el mínimo sugerido del {ideal_pct}% (${ideal:,.2f}).")
+                    else:
+                        color = "#e74c3c"; icono = "🔴"
+                        estado = f"Faltan ${abs(exceso):,.2f} para el mínimo"
+                        consejo = (f"Estás ahorrando el **{pct_real:.1f}%** de tus ingresos, "
+                                   f"pero el mínimo sugerido es **{ideal_pct}%** (${ideal:,.2f}). "
+                                   f"Necesitas ahorrar **${abs(exceso):,.2f} más** por mes — revisa dónde puedes recortar gastos.")
+
+                col.markdown(f"""
+                <div style='border:2px solid {color}; border-radius:12px; padding:16px; margin-bottom:6px;'>
+                    <div style='font-size:16px; font-weight:bold; margin-bottom:4px;'>{emoji} {titulo}</div>
+                    <div style='font-size:28px; font-weight:bold; color:{color};'>${real:,.2f}</div>
+                    <div style='font-size:12px; color:#888; margin-top:4px;'>
+                        Usas el <b>{pct_real:.1f}%</b> de tus ingresos &nbsp;·&nbsp; Ideal: {ideal_pct}% = ${ideal:,.2f}
+                    </div>
+                    <div style='font-size:13px; margin-top:8px;'>{icono} {estado}</div>
+                </div>
+                """, unsafe_allow_html=True)
+                col.info(f"💡 {consejo}")
 
             col_a, col_b, col_c = st.columns(3)
-            col_a.metric("🏠 Necesidades (ideal 50%)",
-                         f"${necesidades:,.2f}",
-                         delta=f"${necesidades - ideal_nec:,.2f} vs ideal",
-                         delta_color="inverse")
-            col_b.metric("🎬 Deseos (ideal 30%)",
-                         f"${deseos:,.2f}",
-                         delta=f"${deseos - ideal_des:,.2f} vs ideal",
-                         delta_color="inverse")
-            col_c.metric("💰 Ahorro (ideal 20%)",
-                         f"${ahorro_real:,.2f}",
-                         delta=f"${ahorro_real - ideal_aho:,.2f} vs ideal",
-                         delta_color="normal")
-            st.caption("La regla 50/30/20 sugiere: 50% para necesidades básicas, 30% para deseos, 20% para ahorro e inversión.")
+            tarjeta_regla(col_a, "🏠", "Necesidades", 50, necesidades, ideal_nec, pct_nec, invert=True)
+            tarjeta_regla(col_b, "🎬", "Deseos",       30, deseos,      ideal_des, pct_des, invert=True)
+            tarjeta_regla(col_c, "💰", "Ahorro",        20, ahorro_real, ideal_aho, pct_aho, invert=False)
             st.divider()
 
     # ── GRÁFICA 2: PROGRESO HACIA LA META ──
