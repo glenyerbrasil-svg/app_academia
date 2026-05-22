@@ -535,7 +535,11 @@ def _generar_pdf_estado_cuenta(user_id, mes, df_pf, df_dg, df_m) -> bytes:
     pdf.set_font("Arial", "I", 9)
     pdf.cell(0, 8, f"  Generado el {date.today()} - Academia GMC Trading - Confidencial", fill=True, ln=True)
 
-    return pdf.output(dest="S").encode("latin-1")
+    # FPDF2 retorna bytes directamente, sin necesitar encode
+    result = pdf.output()
+    if isinstance(result, (bytes, bytearray)):
+        return bytes(result)
+    return result.encode("latin-1")
 
 
 # ============================================================
