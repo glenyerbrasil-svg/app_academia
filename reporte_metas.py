@@ -1,3 +1,4 @@
+# v2.1 - regla 50/30/20 mejorada con porcentajes y sugerencias
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
