@@ -43,12 +43,12 @@ def reporte_metas_app(user):
         st.info("👁️ Estás viendo el panel de administrador. Aquí aparecen estadísticas generales y solicitudes de orientación.")
         _vista_admin(hoja_m, hoja_pf, hoja_dg)
     else:
-        _vista_estudiante(user_id, mes_actual, hoja_m, hoja_pf, hoja_dg)
+        _vista_estudiante(user_id, mes_actual, hoja_m, hoja_pf, hoja_dg, user.get("NOMBRE", user_id))
 
 # ============================================================
 # VISTA ESTUDIANTE
 # ============================================================
-def _vista_estudiante(user_id, mes_actual, hoja_m, hoja_pf, hoja_dg):
+def _vista_estudiante(user_id, mes_actual, hoja_m, hoja_pf, hoja_dg, nombre_usuario=""):
 
     # Cargar datos
     df_m  = pd.DataFrame(hoja_m.get_all_records())
@@ -320,7 +320,7 @@ def _vista_estudiante(user_id, mes_actual, hoja_m, hoja_pf, hoja_dg):
     if st.button("📥 Generar Estado de Cuenta PDF", use_container_width=True):
         with st.spinner("Generando tu estado de cuenta..."):
             try:
-                pdf_bytes = _generar_pdf_estado_cuenta(user_id, mes_sel, pf_u, dg_u, metas_u)
+                pdf_bytes = _generar_pdf_estado_cuenta(user_id, nombre_usuario, mes_sel, pf_u, dg_u, metas_u)
                 st.download_button(
                     label="⬇️ Descargar Estado de Cuenta",
                     data=pdf_bytes,
@@ -347,7 +347,7 @@ def _limpiar_texto(texto: str) -> str:
     return ''.join(resultado).strip()
 
 
-def _generar_pdf_estado_cuenta(user_id, mes, df_pf, df_dg, df_m) -> bytes:
+def _generar_pdf_estado_cuenta(user_id, nombre_usuario, mes, df_pf, df_dg, df_m) -> bytes:
     from fpdf import FPDF
     import io as _io
 
@@ -409,7 +409,7 @@ def _generar_pdf_estado_cuenta(user_id, mes, df_pf, df_dg, df_m) -> bytes:
     pdf.cell(0, 8, "Estado de Cuenta Financiero Personal", ln=True, align="C", fill=True)
     pdf.set_fill_color(41, 128, 185)
     pdf.set_font("Arial", "B", 12)
-    pdf.cell(0, 9, f"Periodo: {mes}   |   Usuario ID: {user_id}", ln=True, align="C", fill=True)
+    pdf.cell(0, 9, f"Periodo: {mes}   |   {nombre_usuario}  (ID: {user_id})", ln=True, align="C", fill=True)
     pdf.set_text_color(0, 0, 0)
     pdf.ln(6)
 
