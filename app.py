@@ -39,24 +39,52 @@ if "PASO_REGISTRO" not in st.session_state:
 
 def evaluar_restricciones_acceso(user):
     hoy_dt = date.today()
+    rol    = str(user.get("ROL", "")).upper().strip()
+    estado = str(user.get("ESTADO", "")).upper().strip()
 
-    if user.get("ROL") == "DEMO":
+    # ADMINISTRADORES y MAESTROS activos: acceso siempre garantizado
+    if rol in ["ADMINISTRADOR", "MAESTRO"] and estado == "ACTIVO":
+        return True
+
+    # DEMO: verificar que no hayan pasado mas de 7 dias desde el registro
+    if rol == "DEMO":
         fecha_registro = pd.to_datetime(user.get("FECHA_REGISTRO"), errors="coerce")
         if pd.notnull(fecha_registro):
-            if (hoy_dt - fecha_registro.date()).days > 7:
-                st.error("❌ Tu periodo DEMO de 7 días ha vencido.")
-                st.warning("📲 [Contacta a la Academia por WhatsApp](https://wa.me/556284191427?text=Hola%20mi%20periodo%20DEMO%20ha%20vencido%20y%20quiero%20adquirir%20un%20plan)")
+            dias = (hoy_dt - fecha_registro.date()).days
+            if dias > 7:
+                st.error("Tu periodo de prueba de 7 dias ha terminado.")
+                st.warning(
+                    "Para seguir disfrutando del servicio debes realizar tu pago. "
+                    "Contactanos por WhatsApp: https://wa.me/556284191427"
+                )
                 return False
 
-    fecha_vencimiento = pd.to_datetime(user.get("PROXIMO_VENCIMIENTO"), errors="coerce")
-    if pd.notnull(fecha_vencimiento) and fecha_vencimiento.date() < hoy_dt:
-        st.error("❌ Tu membresía ha vencido.")
-        st.warning("📲 [Contacta a la Academia por WhatsApp](https://wa.me/556284191427?text=Hola%20se%20vencio%20mi%20membresia%20y%20quiero%20renovar)")
+    # Cualquier usuario con ESTADO VENCIDO: bloquear
+    if estado == "VENCIDO":
+        st.error("Tu periodo de acceso ha vencido.")
+        st.warning(
+            "Para renovar tu membresia y seguir disfrutando del servicio realiza tu pago. "
+            "Contactanos por WhatsApp: https://wa.me/556284191427"
+        )
         return False
 
-    if str(user.get("ESTADO", "")).upper() != "ACTIVO":
-        st.error("❌ Tu cuenta está inactiva o suspendida.")
-        st.warning("📲 [Contacta a la Academia por WhatsApp](https://wa.me/556284191427?text=Hola%20mi%20usuario%20no%20esta%20activo%20puedes%20revisarlo)")
+    # Cualquier usuario con ESTADO INACTIVO o SUSPENDIDO: bloquear
+    if estado not in ["ACTIVO", "DEMO"]:
+        st.error("Tu cuenta esta inactiva o suspendida.")
+        st.warning(
+            "Comunicate con administracion para resolver tu situacion. "
+            "Contactanos por WhatsApp: https://wa.me/556284191427"
+        )
+        return False
+
+    # Verificar fecha de vencimiento
+    fecha_vencimiento = pd.to_datetime(user.get("PROXIMO_VENCIMIENTO"), errors="coerce")
+    if pd.notnull(fecha_vencimiento) and fecha_vencimiento.date() < hoy_dt:
+        st.error("Tu membresia ha vencido.")
+        st.warning(
+            "Para renovar tu acceso realiza tu pago. "
+            "Contactanos por WhatsApp: https://wa.me/556284191427"
+        )
         return False
 
     return True
