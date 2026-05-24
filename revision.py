@@ -42,6 +42,10 @@ def revision_app(user):
     # Agregar columna NOMBRE_ALUMNO
     df["NOMBRE_ALUMNO"] = df["ID_USUARIO"].map(mapa_nombres).fillna("Desconocido")
 
+    # ── DASHBOARD GENERAL DE LA ACADEMIA ──
+    _dashboard_general(df, usuarios)
+    st.divider()
+
     # ── FILTROS ──
     st.subheader("📌 Filtros de búsqueda")
     col1, col2, col3 = st.columns(3)
@@ -172,3 +176,129 @@ def revision_app(user):
             mostrar_img(fila1_c2, img_menor,      "📉 Temporalidad Menor")
             mostrar_img(fila2_c1, img_ejecucion,  "⚡ Ejecución")
             mostrar_img(fila2_c2, img_resultado,  "🏁 Resultado Final")
+
+
+
+# ============================================================
+# DASHBOARD GENERAL DE LA ACADEMIA
+# ============================================================
+def _dashboard_general(df, usuarios):
+    import matplotlib.pyplot as plt
+    import matplotlib.patches as mpatches
+    import io
+
+    st.subheader("📊 Salud General de la Academia")
+
+    df_cerradas = df[df["ESTADO_RESULTADO"].isin(["TP", "SL", "BE"])].copy()
+    df_cerradas["RESULTADO_DINERO"] = pd.to_numeric(df_cerradas["RESULTADO_DINERO"], errors="coerce").fillna(0)
+
+    total_alumnos   = df["ID_USUARIO"].nunique()
+    total_ops       = len(df)
+    total_cerradas  = len(df_cerradas)
+    total_pendientes= len(df[df["ESTADO_RESULTADO"] == "PENDIENTE"])
+    ganadas  = len(df_cerradas[df_cerradas["ESTADO_RESULTADO"] == "TP"])
+    perdidas = len(df_cerradas[df_cerradas["ESTADO_RESULTADO"] == "SL"])
+    be       = len(df_cerradas[df_cerradas["ESTADO_RESULTADO"] == "BE"])
+    pnl_total= df_cerradas["RESULTADO_DINERO"].sum()
+    win_rate = round(ganadas / total_cerradas * 100, 1) if total_cerradas > 0 else 0
+
+    # ── Métricas superiores ──
+    col1, col2, col3, col4, col5, col6 = st.columns(6)
+    col1.metric("👥 Alumnos activos",    total_alumnos)
+    col2.metric("📋 Total operaciones",  total_ops)
+    col3.metric("✅ Ganadas (TP)",        ganadas)
+    col4.metric("❌ Perdidas (SL)",       perdidas)
+    col5.metric("➖ Break Even",          be)
+    col6.metric("🎯 Win Rate global",     f"{win_rate}%")
+
+    pnl_color = "normal" if pnl_total >= 0 else "inverse"
+    st.metric("💰 PNL Total de la Academia", f"${pnl_total:,.2f}", delta=f"${pnl_total:,.2f}", delta_color=pnl_color)
+
+    if total_cerradas == 0:
+        st.info("Aún no hay operaciones cerradas para mostrar gráficas.")
+        return
+
+    st.markdown("---")
+
+    col_g1, col_g2, col_g3 = st.columns(3)
+
+    # ── GRÁFICA 1: Torta de resultados ──
+    with col_g1:
+        st.markdown("**📊 Distribución de resultados**")
+        fig1, ax1 = plt.subplots(figsize=(4, 4))
+        valores = [ganadas, perdidas, be]
+        labels  = [f"TP {ganadas}", f"SL {perdidas}", f"BE {be}"]
+        colores = ["#2ecc71", "#e74c3c", "#f39c12"]
+        no_cero = [(v, l, c) for v, l, c in zip(valores, labels, colores) if v > 0]
+        if no_cero:
+            vals, labs, cols = zip(*no_cero)
+            ax1.pie(vals, labels=labs, colors=cols, autopct="%1.1f%%",
+                    startangle=90, wedgeprops=dict(edgecolor="white", linewidth=2))
+        ax1.set_title(f"Win Rate: {win_rate}%", fontsize=12, fontweight="bold")
+        fig1.tight_layout()
+        st.pyplot(fig1)
+        plt.close(fig1)
+
+    # ── GRÁFICA 2: Barras por alumno ──
+    with col_g2:
+        st.markdown("**👥 Operaciones por alumno**")
+        resumen = df_cerradas.groupby("NOMBRE_ALUMNO")["ESTADO_RESULTADO"].value_counts().unstack(fill_value=0)
+        for col in ["TP", "SL", "BE"]:
+            if col not in resumen.columns:
+                resumen[col] = 0
+
+        fig2, ax2 = plt.subplots(figsize=(4, 4))
+        x = range(len(resumen))
+        ancho = 0.25
+        ax2.bar([i - ancho for i in x], resumen["TP"], width=ancho, color="#2ecc71", label="TP")
+        ax2.bar([i         for i in x], resumen["SL"], width=ancho, color="#e74c3c", label="SL")
+        ax2.bar([i + ancho for i in x], resumen["BE"], width=ancho, color="#f39c12", label="BE")
+        ax2.set_xticks(list(x))
+        nombres_cortos = [n.split()[0] for n in resumen.index]
+        ax2.set_xticklabels(nombres_cortos, rotation=30, ha="right", fontsize=8)
+        ax2.set_title("Resultados por alumno", fontsize=11, fontweight="bold")
+        ax2.legend(fontsize=8)
+        ax2.spines[["top", "right"]].set_visible(False)
+        fig2.tight_layout()
+        st.pyplot(fig2)
+        plt.close(fig2)
+
+    # ── GRÁFICA 3: PNL por alumno ──
+    with col_g3:
+        st.markdown("**💰 PNL por alumno**")
+        pnl_alumno = df_cerradas.groupby("NOMBRE_ALUMNO")["RESULTADO_DINERO"].sum().sort_values(ascending=True)
+        colores_pnl = ["#2ecc71" if v >= 0 else "#e74c3c" for v in pnl_alumno.values]
+
+        fig3, ax3 = plt.subplots(figsize=(4, 4))
+        bars = ax3.barh(
+            [n.split()[0] for n in pnl_alumno.index],
+            pnl_alumno.values,
+            color=colores_pnl,
+            edgecolor="white"
+        )
+        ax3.bar_label(bars, fmt="$%.2f", padding=3, fontsize=8)
+        ax3.axvline(0, color="gray", linestyle="--", linewidth=0.8)
+        ax3.set_title("PNL por alumno", fontsize=11, fontweight="bold")
+        ax3.spines[["top", "right"]].set_visible(False)
+        fig3.tight_layout()
+        st.pyplot(fig3)
+        plt.close(fig3)
+
+    # ── RANKING DE ALUMNOS ──
+    st.markdown("---")
+    st.markdown("**🏆 Ranking de alumnos**")
+    ranking = df_cerradas.groupby("NOMBRE_ALUMNO").agg(
+        Operaciones=("ESTADO_RESULTADO", "count"),
+        TP=("ESTADO_RESULTADO", lambda x: (x == "TP").sum()),
+        SL=("ESTADO_RESULTADO", lambda x: (x == "SL").sum()),
+        BE=("ESTADO_RESULTADO", lambda x: (x == "BE").sum()),
+        PNL=("RESULTADO_DINERO", "sum")
+    ).reset_index()
+    ranking["Win Rate"] = (ranking["TP"] / ranking["Operaciones"] * 100).round(1).astype(str) + "%"
+    ranking["PNL"] = ranking["PNL"].apply(lambda x: f"${x:,.2f}")
+    ranking = ranking.sort_values("TP", ascending=False).reset_index(drop=True)
+    ranking.index += 1
+    st.dataframe(
+        ranking.rename(columns={"NOMBRE_ALUMNO": "Alumno"}),
+        use_container_width=True
+    )
