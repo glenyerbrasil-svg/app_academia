@@ -40,8 +40,18 @@ def reporte_metas_app(user):
     es_admin = rol_es(user, "ADMINISTRADOR", "MAESTRO")
 
     if es_admin:
-        st.info("👁️ Estás viendo el panel de administrador. Aquí aparecen estadísticas generales y solicitudes de orientación.")
-        _vista_admin(hoja_m, hoja_pf, hoja_dg)
+        # Admin/Maestro puede elegir qué vista quiere ver
+        vista_sel = st.radio(
+            "¿Qué deseas ver?",
+            ["📊 Mi reporte personal", "🔑 Panel de administrador"],
+            horizontal=True
+        )
+        st.divider()
+        if vista_sel == "📊 Mi reporte personal":
+            _vista_estudiante(user_id, mes_actual, hoja_m, hoja_pf, hoja_dg, user.get("NOMBRE", user_id))
+        else:
+            st.info("👁️ Aquí aparecen estadísticas generales y solicitudes de orientación de los estudiantes.")
+            _vista_admin(hoja_m, hoja_pf, hoja_dg)
     else:
         _vista_estudiante(user_id, mes_actual, hoja_m, hoja_pf, hoja_dg, user.get("NOMBRE", user_id))
 
