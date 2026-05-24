@@ -128,12 +128,16 @@ def portal_autenticacion():
                         st.session_state["PASO_REGISTRO"] = 2
                         st.rerun()
                     elif check_pass(p, str(user.get("PASSWORD", ""))):
-                        st.session_state["user"] = user
-                        st.success("🎉 ¡Inicio de sesión correcto!")
-                        time.sleep(1)
-                        st.rerun()
+                        # Validar restricciones ANTES de guardar la sesión
+                        if evaluar_restricciones_acceso(user):
+                            st.session_state["user"] = user
+                            st.success("Inicio de sesion correcto!")
+                            time.sleep(1)
+                            st.rerun()
+                        # Si no pasa la validación, evaluar_restricciones_acceso
+                        # ya mostró el mensaje de error — no guardamos la sesión
                     else:
-                        st.error("❌ Contraseña incorrecta.")
+                        st.error("Contrasena incorrecta.")
                 else:
                     st.error("❌ El usuario no existe.")
 
@@ -143,11 +147,7 @@ def portal_autenticacion():
     elif menu_acceso == "Recuperar Clave":
         recuperar_app()
 
-    # Interceptor post-login
-    if st.session_state["user"] is not None:
-        if not evaluar_restricciones_acceso(st.session_state["user"]):
-            st.session_state["user"] = None
-            st.stop()
+    # Interceptor eliminado — validación ocurre antes del login
 
 # ==========================================
 # PARTE 4: APP INTERNA
