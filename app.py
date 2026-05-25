@@ -34,6 +34,9 @@ CSS = """
 @media(max-width:768px){
     section[data-testid="stSidebar"]{display:none!important;}
     .block-container{padding:0.5rem 0.5rem 90px!important;max-width:100%!important;}
+    /* Forzar columnas en móvil */
+    div[data-testid="stHorizontalBlock"]{flex-wrap:nowrap!important;}
+    div[data-testid="stHorizontalBlock"] > div{min-width:0!important;flex:1!important;}
 }
 .mob-header{
     background:linear-gradient(135deg,#0d1b3e,#1a2f5e);
@@ -64,6 +67,26 @@ CSS = """
 .stat-v{color:#f0e6c8;font-size:22px;font-weight:700;}
 .stat-s{color:#3dba6f;font-size:11px;margin-top:3px;}
 .sec-lbl{color:#6a7fa8;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;}
+
+/* Grid HTML móvil */
+.grid-wrap{padding:0 4px 12px;}
+.grow{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:8px;}
+.gc{
+    background:#111d3a;border:1px solid #1e2e52;border-radius:14px;
+    padding:14px 4px 10px;display:flex;flex-direction:column;
+    align-items:center;gap:6px;cursor:pointer;
+    transition:border-color 0.2s;
+}
+.gc:hover,.gc:active{border-color:#c8a84b;background:#1a2a4a;}
+.gc-em{font-size:26px;line-height:1;}
+.gc-lb{color:#a0b4d0;font-size:11px;text-align:center;line-height:1.3;font-weight:500;}
+
+/* Ocultar botones fantasma */
+div[data-testid="stHorizontalBlock"] div[data-testid="stButton"] button[title]{
+    opacity:0!important;height:1px!important;min-height:1px!important;
+    padding:0!important;margin:0!important;border:none!important;
+    pointer-events:all!important;
+}
 
 /* Botones del grid de módulos */
 div[data-testid="stButton"] > button{
@@ -241,23 +264,49 @@ def mostrar_dashboard(user, saldo, wr, ops):
     <div class="sec-lbl">Módulos</div>
     """, unsafe_allow_html=True)
 
-    # Grid de módulos
     modulos = [
+        ("🎯","Metas"),("📊","Rep. Metas"),("📝","Bitácora"),
+        ("🏁","Cerrar Op."),("💰","Finanzas"),("📈","Reportes"),
+        ("💬","Forum"),("🎓","Escuela"),("📊","Backtesting"),
+    ]
+    modulos_full = [
         ("🎯","Metas"),("📊","Reporte de Metas"),("📝","Bitácora"),
         ("🏁","Cerrar Operación"),("💰","Finanzas"),("📈","Reportes"),
         ("💬","Forum"),("🎓","Escuela"),("📊","Backtesting"),
     ]
     if rol_es(user,"MAESTRO","ADMINISTRADOR"):
-        modulos.append(("🔎","Revisión de Operaciones"))
+        modulos.append(("🔎","Revisión"))
+        modulos_full.append(("🔎","Revisión de Operaciones"))
     if rol_es(user,"ADMINISTRADOR"):
-        modulos += [("🔑","Membresías"),("📋","Reporte de Estudiantes")]
+        modulos += [("🔑","Membresías"),("📋","Rep. Alumnos")]
+        modulos_full += [("🔑","Membresías"),("📋","Reporte de Estudiantes")]
 
-    cols = st.columns(3)
+    # Grid HTML puro — siempre 3 columnas en cualquier pantalla
+    filas = ""
+    for i in range(0, len(modulos), 3):
+        grupo = modulos[i:i+3]
+        grupo_full = modulos_full[i:i+3]
+        celdas = ""
+        for j, (em, nm) in enumerate(grupo):
+            nm_full = grupo_full[j][1]
+            celdas += f"""
+            <div class="gc" onclick="document.getElementById('nav_hidden_{nm_full.replace(' ','_')}').click()">
+                <div class="gc-em">{em}</div>
+                <div class="gc-lb">{nm}</div>
+            </div>"""
+        filas += f'<div class="grow">{celdas}</div>'
+
+    st.markdown(f'<div class="grid-wrap">{filas}</div>', unsafe_allow_html=True)
+
+    # Botones ocultos de Streamlit para cada módulo
+    btn_cols = st.columns(len(modulos_full))
     clicked = None
-    for i,(emoji,nombre) in enumerate(modulos):
-        with cols[i%3]:
-            if st.button(f"{emoji}\n\n{nombre}", key=f"mod_{nombre}", use_container_width=True):
-                clicked = nombre
+    for i, (em, nm) in enumerate(modulos_full):
+        with btn_cols[i]:
+            btn = st.button("x", key=f"nav_hidden_{nm.replace(' ','_')}",
+                           help=nm, label_visibility="collapsed")
+            if btn:
+                clicked = nm
     if clicked:
         st.session_state["modulo_activo"] = clicked
         st.rerun()
