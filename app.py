@@ -34,9 +34,23 @@ CSS = """
 @media(max-width:768px){
     section[data-testid="stSidebar"]{display:none!important;}
     .block-container{padding:0.5rem 0.5rem 90px!important;max-width:100%!important;}
-    /* Forzar columnas en móvil */
-    div[data-testid="stHorizontalBlock"]{flex-wrap:nowrap!important;}
-    div[data-testid="stHorizontalBlock"] > div{min-width:0!important;flex:1!important;}
+    /* Forzar 3 columnas en móvil — nunca apilar */
+    div[data-testid="stHorizontalBlock"]{
+        flex-wrap:nowrap!important;
+        gap:6px!important;
+    }
+    div[data-testid="stHorizontalBlock"] > div[data-testid="column"]{
+        min-width:0!important;
+        width:33%!important;
+        flex:1 1 0!important;
+    }
+    /* Botones del grid más compactos en móvil */
+    div[data-testid="stHorizontalBlock"] div[data-testid="stButton"] > button{
+        font-size:11px!important;
+        padding:10px 2px!important;
+        min-height:72px!important;
+        line-height:1.3!important;
+    }
 }
 .mob-header{
     background:linear-gradient(135deg,#0d1b3e,#1a2f5e);
@@ -68,25 +82,7 @@ CSS = """
 .stat-s{color:#3dba6f;font-size:11px;margin-top:3px;}
 .sec-lbl{color:#6a7fa8;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;}
 
-/* Grid HTML móvil */
-.grid-wrap{padding:0 4px 12px;}
-.grow{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:8px;}
-.gc{
-    background:#111d3a;border:1px solid #1e2e52;border-radius:14px;
-    padding:14px 4px 10px;display:flex;flex-direction:column;
-    align-items:center;gap:6px;cursor:pointer;
-    transition:border-color 0.2s;
-}
-.gc:hover,.gc:active{border-color:#c8a84b;background:#1a2a4a;}
-.gc-em{font-size:26px;line-height:1;}
-.gc-lb{color:#a0b4d0;font-size:11px;text-align:center;line-height:1.3;font-weight:500;}
 
-/* Ocultar botones fantasma */
-div[data-testid="stHorizontalBlock"] div[data-testid="stButton"] button[title]{
-    opacity:0!important;height:1px!important;min-height:1px!important;
-    padding:0!important;margin:0!important;border:none!important;
-    pointer-events:all!important;
-}
 
 /* Botones del grid de módulos */
 div[data-testid="stButton"] > button{
@@ -265,55 +261,26 @@ def mostrar_dashboard(user, saldo, wr, ops):
     """, unsafe_allow_html=True)
 
     modulos = [
-        ("🎯","Metas"),("📊","Rep. Metas"),("📝","Bitácora"),
-        ("🏁","Cerrar Op."),("💰","Finanzas"),("📈","Reportes"),
-        ("💬","Forum"),("🎓","Escuela"),("📊","Backtesting"),
-    ]
-    modulos_full = [
-        ("🎯","Metas"),("📊","Reporte de Metas"),("📝","Bitácora"),
-        ("🏁","Cerrar Operación"),("💰","Finanzas"),("📈","Reportes"),
-        ("💬","Forum"),("🎓","Escuela"),("📊","Backtesting"),
+        ("🎯","Metas"),              ("📊","Reporte de Metas"),  ("📝","Bitácora"),
+        ("🏁","Cerrar Operación"),   ("💰","Finanzas"),           ("📈","Reportes"),
+        ("💬","Forum"),              ("🎓","Escuela"),            ("📊","Backtesting"),
     ]
     if rol_es(user,"MAESTRO","ADMINISTRADOR"):
-        modulos.append(("🔎","Revisión"))
-        modulos_full.append(("🔎","Revisión de Operaciones"))
+        modulos.append(("🔎","Revisión de Operaciones"))
     if rol_es(user,"ADMINISTRADOR"):
-        modulos += [("🔑","Membresías"),("📋","Rep. Alumnos")]
-        modulos_full += [("🔑","Membresías"),("📋","Reporte de Estudiantes")]
+        modulos += [("🔑","Membresías"),("📋","Reporte de Estudiantes")]
 
-    # Grid HTML puro — siempre 3 columnas en cualquier pantalla
-    filas = ""
+    # Botones en grupos de 3 — CSS fuerza ancho fijo
+    clicked = None
     for i in range(0, len(modulos), 3):
         grupo = modulos[i:i+3]
-        grupo_full = modulos_full[i:i+3]
-        celdas = ""
-        for j, (em, nm) in enumerate(grupo):
-            nm_full = grupo_full[j][1]
-            celdas += f"""
-            <div class="gc" onclick="window.location.href=window.location.pathname+'?mod={nm_full}'">
-                <div class="gc-em">{em}</div>
-                <div class="gc-lb">{nm}</div>
-            </div>"""
-        filas += f'<div class="grow">{celdas}</div>'
-
-    st.markdown(f'<div class="grid-wrap">{filas}</div>', unsafe_allow_html=True)
-
-    # Detectar clic via query params
-    params = st.query_params
-    if "mod" in params:
-        modulo_clicked = params["mod"]
-        st.query_params.clear()
-        st.session_state["modulo_activo"] = modulo_clicked
-        st.rerun()
-
-    # Botones ocultos — uno por módulo, tamaño mínimo
-    st.markdown('<div style="height:0;overflow:hidden;">', unsafe_allow_html=True)
-    clicked = None
-    for em, nm in modulos_full:
-        key = f"gc_{nm.replace(' ','_').replace('é','e').replace('ó','o').replace('á','a').replace('í','i')}"
-        if st.button(nm, key=key):
-            clicked = nm
-    st.markdown('</div>', unsafe_allow_html=True)
+        c1, c2, c3 = st.columns([1,1,1], gap="small")
+        cols_grp = [c1, c2, c3]
+        for j, (emoji, nombre) in enumerate(grupo):
+            label_corto = nombre.replace("Operación","Op.").replace("Reporte de Metas","Rep.Metas").replace("Reporte de Estudiantes","Rep.Alumnos").replace("Revisión de Operaciones","Revisión").replace("Backtesting","Backtest")
+            with cols_grp[j]:
+                if st.button(f"{emoji}\n{label_corto}", key=f"btn_{nombre}", use_container_width=True):
+                    clicked = nombre
     if clicked:
         st.session_state["modulo_activo"] = clicked
         st.rerun()
