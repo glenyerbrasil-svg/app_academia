@@ -243,9 +243,9 @@ def mostrar_dashboard(user, saldo, wr, ops):
 
     # Grid de módulos
     modulos = [
-        ("📝","Bitácora"),("🏁","Cerrar Operación"),("📈","Reportes"),
-        ("📊","Backtesting"),("💰","Finanzas"),("🎯","Metas"),
-        ("📊","Reporte de Metas"),("🎓","Escuela"),("💬","Forum"),
+        ("🎯","Metas"),("📊","Reporte de Metas"),("📝","Bitácora"),
+        ("🏁","Cerrar Operación"),("💰","Finanzas"),("📈","Reportes"),
+        ("💬","Forum"),("🎓","Escuela"),("📊","Backtesting"),
     ]
     if rol_es(user,"MAESTRO","ADMINISTRADOR"):
         modulos.append(("🔎","Revisión de Operaciones"))
@@ -253,11 +253,14 @@ def mostrar_dashboard(user, saldo, wr, ops):
         modulos += [("🔑","Membresías"),("📋","Reporte de Estudiantes")]
 
     cols = st.columns(3)
+    clicked = None
     for i,(emoji,nombre) in enumerate(modulos):
         with cols[i%3]:
             if st.button(f"{emoji}\n\n{nombre}", key=f"mod_{nombre}", use_container_width=True):
-                st.session_state["modulo_activo"] = nombre
-                st.rerun()
+                clicked = nombre
+    if clicked:
+        st.session_state["modulo_activo"] = clicked
+        st.rerun()
 
     st.divider()
     if st.button("❌ Cerrar Sesión", use_container_width=True):
@@ -269,17 +272,20 @@ def mostrar_dashboard(user, saldo, wr, ops):
 # NAVBAR INFERIOR
 # ============================================================
 def mostrar_navbar(modulo_activo):
-    items = [("🏠","Inicio","Bienvenida"),("📝","Bitácora","Bitácora"),
-             ("🏁","Cerrar","Cerrar Operación"),("🎯","Metas","Metas"),
-             ("📊","Rep.","Reporte de Metas")]
+    items = [("📝","Bitácora","Bitácora"),("🏁","Cerrar","Cerrar Operación"),
+             ("🎯","Metas","Metas"),("📊","Rep.Metas","Reporte de Metas"),
+             ("🏠","Inicio","Bienvenida")]
     st.markdown("---")
     cols = st.columns(len(items))
+    nav_clicked = None
     for i,(emoji,label,modulo) in enumerate(items):
         with cols[i]:
             activo = "🔸" if modulo_activo == modulo else ""
             if st.button(f"{emoji}\n{activo}{label}", key=f"nav_{modulo}", use_container_width=True):
-                st.session_state["modulo_activo"] = modulo
-                st.rerun()
+                nav_clicked = modulo
+    if nav_clicked:
+        st.session_state["modulo_activo"] = nav_clicked
+        st.rerun()
 
 # ============================================================
 # EJECUTAR MÓDULO
