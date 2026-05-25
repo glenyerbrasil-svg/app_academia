@@ -290,7 +290,7 @@ def mostrar_dashboard(user, saldo, wr, ops):
         for j, (em, nm) in enumerate(grupo):
             nm_full = grupo_full[j][1]
             celdas += f"""
-            <div class="gc" onclick="document.getElementById('nav_hidden_{nm_full.replace(' ','_')}').click()">
+            <div class="gc" onclick="window.location.href=window.location.pathname+'?mod={nm_full}'">
                 <div class="gc-em">{em}</div>
                 <div class="gc-lb">{nm}</div>
             </div>"""
@@ -298,15 +298,22 @@ def mostrar_dashboard(user, saldo, wr, ops):
 
     st.markdown(f'<div class="grid-wrap">{filas}</div>', unsafe_allow_html=True)
 
-    # Botones ocultos de Streamlit para cada módulo
-    btn_cols = st.columns(len(modulos_full))
+    # Detectar clic via query params
+    params = st.query_params
+    if "mod" in params:
+        modulo_clicked = params["mod"]
+        st.query_params.clear()
+        st.session_state["modulo_activo"] = modulo_clicked
+        st.rerun()
+
+    # Botones ocultos — uno por módulo, tamaño mínimo
+    st.markdown('<div style="height:0;overflow:hidden;">', unsafe_allow_html=True)
     clicked = None
-    for i, (em, nm) in enumerate(modulos_full):
-        with btn_cols[i]:
-            btn = st.button("x", key=f"nav_hidden_{nm.replace(' ','_')}",
-                           help=nm, label_visibility="collapsed")
-            if btn:
-                clicked = nm
+    for em, nm in modulos_full:
+        key = f"gc_{nm.replace(' ','_').replace('é','e').replace('ó','o').replace('á','a').replace('í','i')}"
+        if st.button(nm, key=key):
+            clicked = nm
+    st.markdown('</div>', unsafe_allow_html=True)
     if clicked:
         st.session_state["modulo_activo"] = clicked
         st.rerun()
