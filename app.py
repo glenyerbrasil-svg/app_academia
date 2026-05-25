@@ -1,244 +1,313 @@
-# ==========================================
-# PARTE 1: IMPORTACIONES Y CONFIGURACIÓN INICIAL
-# ==========================================
-
 import streamlit as st
 import pandas as pd
-import os
-import time
-from datetime import datetime, date, timedelta
+import os, time, random
+from datetime import datetime, date
+from utils import conectar_google, check_pass, hoy, ahora, rol_es
+from ui import (CSS_GLOBAL, render_header_movil, render_stats_movil,
+                render_grid_movil, render_sidebar_desktop, render_navbar)
 
-from utils import conectar_google, hash_pass, check_pass, hoy, ahora, rol_es
-
-from bienvenida import bienvenida_app
-from escuela import escuela_app
-from bitacora import bitacora_app
-from cerrar import cerrar_operacion
-from backtesting import backtesting_app
-from finanzas import finanzas_app
-from reportes import reportes_app
-from metas import metas_app
-from forum import forum_app
-from revision import revision_app
-from membresias import membresias_app
+from bienvenida        import bienvenida_app
+from escuela           import escuela_app
+from bitacora          import bitacora_app
+from cerrar            import cerrar_operacion
+from backtesting       import backtesting_app
+from finanzas          import finanzas_app
+from reportes          import reportes_app
+from metas             import metas_app
+from reporte_metas     import reporte_metas_app
+from forum             import forum_app
+from revision          import revision_app
+from membresias        import membresias_app
 from reporte_estudiantes import reporte_estudiantes_app
-from registro import registro_app
-from recuperar import recuperar_app
-from reporte_metas import reporte_metas_app
+from registro          import registro_app
+from recuperar         import recuperar_app
 
-# Inicialización de Session State
-if "user" not in st.session_state:
-    st.session_state["user"] = None
+# ── Session State ──
+for key, default in [
+    ("user", None),
+    ("PASO_REGISTRO", 1),
+    ("modulo_activo", "Bienvenida"),
+]:
+    if key not in st.session_state:
+        st.session_state[key] = default
 
-if "PASO_REGISTRO" not in st.session_state:
-    st.session_state["PASO_REGISTRO"] = 1
+# ============================================================
+# JAVASCRIPT: captura clics de iconos y botones de navegación
+# ============================================================
+JS_NAV = """
+<script>
+window.addEventListener('message', function(e) {
+    if (e.data && e.data.type === 'nav') {
+        const inputs = window.parent.document.querySelectorAll('input[type=text]');
+        for (let inp of inputs) {
+            if (inp.getAttribute('aria-label') === '__nav_mod__') {
+                inp.value = e.data.mod;
+                inp.dispatchEvent(new Event('input', {bubbles: true}));
+                break;
+            }
+        }
+    }
+});
+</script>
+"""
 
-# ==========================================
-# PARTE 2: CONTROL DE ACCESO
-# ==========================================
-
+# ============================================================
+# CONTROL DE ACCESO
+# ============================================================
 def evaluar_restricciones_acceso(user):
     hoy_dt = date.today()
     rol    = str(user.get("ROL", "")).upper().strip()
     estado = str(user.get("ESTADO", "")).upper().strip()
 
-    # ADMINISTRADORES y MAESTROS activos: acceso siempre garantizado
     if rol in ["ADMINISTRADOR", "MAESTRO"] and estado == "ACTIVO":
         return True
 
-    # DEMO: verificar que no hayan pasado mas de 7 dias desde el registro
     if rol == "DEMO":
         fecha_registro = pd.to_datetime(user.get("FECHA_REGISTRO"), errors="coerce")
         if pd.notnull(fecha_registro):
-            dias = (hoy_dt - fecha_registro.date()).days
-            if dias > 7:
-                st.error("Tu periodo de prueba de 7 dias ha terminado.")
-                st.warning(
-                    "Para seguir disfrutando del servicio debes realizar tu pago. "
-                    "Contactanos por WhatsApp: https://wa.me/556284191427"
-                )
+            if (hoy_dt - fecha_registro.date()).days > 7:
+                st.error("Tu periodo de prueba de 7 días ha terminado.")
+                st.warning("Para seguir disfrutando del servicio realiza tu pago. "
+                           "📲 [Contáctanos por WhatsApp](https://wa.me/556284191427"
+                           "?text=Hola%20mi%20periodo%20DEMO%20ha%20vencido)")
                 return False
 
-    # Cualquier usuario con ESTADO VENCIDO: bloquear
     if estado == "VENCIDO":
         st.error("Tu periodo de acceso ha vencido.")
-        st.warning(
-            "Para renovar tu membresia y seguir disfrutando del servicio realiza tu pago. "
-            "Contactanos por WhatsApp: https://wa.me/556284191427"
-        )
+        st.warning("Para renovar tu membresía realiza tu pago. "
+                   "📲 [Contáctanos por WhatsApp](https://wa.me/556284191427"
+                   "?text=Hola%20se%20vencio%20mi%20membresia%20y%20quiero%20renovar)")
         return False
 
-    # Cualquier usuario con ESTADO INACTIVO o SUSPENDIDO: bloquear
     if estado not in ["ACTIVO", "DEMO"]:
-        st.error("Tu cuenta esta inactiva o suspendida.")
-        st.warning(
-            "Comunicate con administracion para resolver tu situacion. "
-            "Contactanos por WhatsApp: https://wa.me/556284191427"
-        )
+        st.error("Tu cuenta está inactiva o suspendida.")
+        st.warning("📲 [Contáctanos por WhatsApp](https://wa.me/556284191427"
+                   "?text=Hola%20mi%20usuario%20no%20esta%20activo)")
         return False
 
-    # Verificar fecha de vencimiento
-    fecha_vencimiento = pd.to_datetime(user.get("PROXIMO_VENCIMIENTO"), errors="coerce")
-    if pd.notnull(fecha_vencimiento) and fecha_vencimiento.date() < hoy_dt:
-        st.error("Tu membresia ha vencido.")
-        st.warning(
-            "Para renovar tu acceso realiza tu pago. "
-            "Contactanos por WhatsApp: https://wa.me/556284191427"
-        )
+    fecha_venc = pd.to_datetime(user.get("PROXIMO_VENCIMIENTO"), errors="coerce")
+    if pd.notnull(fecha_venc) and fecha_venc.date() < hoy_dt:
+        st.error("Tu membresía ha vencido.")
+        st.warning("📲 [Contáctanos por WhatsApp](https://wa.me/556284191427"
+                   "?text=Hola%20se%20vencio%20mi%20membresia%20y%20quiero%20renovar)")
         return False
 
     return True
 
-# ==========================================
-# PARTE 3: PORTAL DE AUTENTICACIÓN
-# ==========================================
-
+# ============================================================
+# PORTAL DE AUTENTICACIÓN
+# ============================================================
 def portal_autenticacion():
+    st.markdown(CSS_GLOBAL, unsafe_allow_html=True)
     st.title("📈 Academia de Trading")
 
-    menu_acceso = st.radio("Menú de Acceso", ["Ingresar", "Registrarse", "Recuperar Clave"], horizontal=True)
+    menu_acceso = st.radio("", ["Ingresar", "Registrarse", "Recuperar Clave"], horizontal=True)
 
     cliente = conectar_google()
     if not cliente:
-        st.error("❌ No se pudo conectar con la base de datos.")
+        st.error("No se pudo conectar con la base de datos.")
         return
 
     try:
-        doc = cliente.open("Bitacora_Academia1")
+        doc    = cliente.open("Bitacora_Academia1")
         hoja_u = doc.worksheet("Usuarios")
-        datos = hoja_u.get_all_records()
+        datos  = hoja_u.get_all_records()
     except Exception as e:
-        st.error(f"❌ Error al acceder a Usuarios: {e}")
+        st.error(f"Error al acceder a Usuarios: {e}")
         return
 
     if menu_acceso == "Ingresar":
-        st.subheader("🔑 Iniciar Sesión")
-        with st.form("login_form_interno"):
+        with st.form("login_form"):
             u = st.text_input("Usuario").strip().lower()
             p = st.text_input("Contraseña", type="password")
-            submitted = st.form_submit_button("Entrar")
-
-            if submitted:
-                user = next((r for r in datos if str(r.get("USUARIO", "")).lower() == u), None)
-
+            if st.form_submit_button("Entrar", use_container_width=True):
+                user = next((r for r in datos if str(r.get("USUARIO","")).lower() == u), None)
                 if user:
-                    if str(user.get("CORREO_VERIFICADO", "")).upper() == "NO":
-                        st.warning("⚠️ Cuenta no verificada. Revisa tu email.")
-                        st.session_state["EMAIL_TEMP"] = user.get("EMAIL")
-                        st.session_state["PASO_REGISTRO"] = 2
-                        st.rerun()
-                    elif check_pass(p, str(user.get("PASSWORD", ""))):
-                        # Validar restricciones ANTES de guardar la sesión
+                    if str(user.get("CORREO_VERIFICADO","")).upper() == "NO":
+                        st.warning("Cuenta no verificada. Revisa tu email.")
+                    elif check_pass(p, str(user.get("PASSWORD",""))):
                         if evaluar_restricciones_acceso(user):
                             st.session_state["user"] = user
-                            st.success("Inicio de sesion correcto!")
-                            time.sleep(1)
+                            st.session_state["modulo_activo"] = "Bienvenida"
+                            st.success("¡Bienvenido!")
+                            time.sleep(0.8)
                             st.rerun()
-                        # Si no pasa la validación, evaluar_restricciones_acceso
-                        # ya mostró el mensaje de error — no guardamos la sesión
                     else:
-                        st.error("Contrasena incorrecta.")
+                        st.error("Contraseña incorrecta.")
                 else:
-                    st.error("❌ El usuario no existe.")
+                    st.error("El usuario no existe.")
 
     elif menu_acceso == "Registrarse":
         registro_app()
-
     elif menu_acceso == "Recuperar Clave":
         recuperar_app()
 
-    # Interceptor eliminado — validación ocurre antes del login
+# ============================================================
+# OBTENER CONSEJO DEL DÍA
+# ============================================================
+def obtener_consejo(doc):
+    try:
+        hoja_m   = doc.worksheet("Mensajes")
+        mensajes = hoja_m.col_values(1)[1:62]
+        mensajes = [m for m in mensajes if m.strip()]
+        if mensajes:
+            random.seed(date.today().timetuple().tm_yday)
+            return random.choice(mensajes)
+    except:
+        pass
+    return "Cada operación es una oportunidad de aprender."
 
-# ==========================================
-# PARTE 4: APP INTERNA
-# ==========================================
+# ============================================================
+# OBTENER STATS RÁPIDAS
+# ============================================================
+def obtener_stats(doc, user_id):
+    saldo, win_rate, ops_total = 0.0, 0.0, 0
+    try:
+        df_f = pd.DataFrame(doc.worksheet("Finanzas").get_all_records())
+        df_f["ID_USUARIO"] = df_f["ID_USUARIO"].astype(str)
+        df_u = df_f[df_f["ID_USUARIO"] == str(user_id)]
+        if not df_u.empty:
+            saldo = float(df_u.iloc[-1].get("SALDO_FINAL", 0) or 0)
+    except: pass
+    try:
+        df_b = pd.DataFrame(doc.worksheet("Bitacora").get_all_records())
+        df_b["ID_USUARIO"] = df_b["ID_USUARIO"].astype(str)
+        df_ub = df_b[df_b["ID_USUARIO"] == str(user_id)]
+        cerradas = df_ub[df_ub["ESTADO_RESULTADO"].isin(["TP","SL","BE"])]
+        ops_total = len(cerradas)
+        if ops_total > 0:
+            win_rate = len(cerradas[cerradas["ESTADO_RESULTADO"] == "TP"]) / ops_total * 100
+    except: pass
+    return saldo, win_rate, ops_total
 
+# ============================================================
+# ENRUTADOR DE MÓDULOS
+# ============================================================
+def ejecutar_modulo(modulo, user, doc):
+    if modulo == "Bienvenida":         bienvenida_app(user)
+    elif modulo == "Escuela":          escuela_app(user)
+    elif modulo == "Bitácora":         bitacora_app(user)
+    elif modulo == "Cerrar Operación": cerrar_operacion(user, doc)
+    elif modulo == "Backtesting":      backtesting_app(user)
+    elif modulo == "Finanzas":         finanzas_app(user)
+    elif modulo == "Reportes":         reportes_app(user)
+    elif modulo == "Metas":            metas_app(user)
+    elif modulo == "Reporte de Metas": reporte_metas_app(user)
+    elif modulo == "Forum":            forum_app(user)
+    elif modulo == "Revisión de Operaciones": revision_app(user)
+    elif modulo == "Membresías":       membresias_app(user)
+    elif modulo == "Reporte de Estudiantes":  reporte_estudiantes_app(user)
+
+# ============================================================
+# APP INTERNA
+# ============================================================
 def app_interna():
-    user_actual = st.session_state["user"]
+    user   = st.session_state["user"]
+    modulo = st.session_state.get("modulo_activo", "Bienvenida")
+
+    st.markdown(CSS_GLOBAL, unsafe_allow_html=True)
 
     cliente = conectar_google()
     if not cliente:
-        st.error("❌ Error de infraestructura. Intenta más tarde.")
+        st.error("Error de infraestructura.")
         st.stop()
-
     try:
         doc = cliente.open("Bitacora_Academia1")
     except Exception as e:
-        st.error(f"❌ Base de datos no encontrada: {e}")
+        st.error(f"Base de datos no encontrada: {e}")
         st.stop()
 
-    # Sidebar — logo con fallback si no existe el archivo
-    if os.path.exists("assets/logo.png"):
-        st.sidebar.image("assets/logo.png", use_container_width=True)
-    else:
-        st.sidebar.markdown("## 📈 Academia GMC Trading")
-
-    st.sidebar.markdown(f"<h2 style='text-align:center'>{user_actual.get('NOMBRE','Usuario')}</h2>", unsafe_allow_html=True)
-    st.sidebar.markdown(f"<p style='text-align:center;font-weight:bold'>{user_actual.get('ROL','ESTUDIANTE')} — {user_actual.get('NIVEL','Padawan')}</p>", unsafe_allow_html=True)
-    st.sidebar.divider()
-
+    # ── MENÚ DESKTOP ──
     menu_opciones = [
-        "🏠 Bienvenida",
-        "🎓 Escuela",
-        "📝 Bitácora",
-        "🏁 Cerrar Operación",
-        "📊 Backtesting",
-        "💰 Finanzas",
-        "📈 Reportes",
-        "🎯 Metas",
-        "📊 Reporte de Metas",
-        "💬 Forum"
+        "🏠 Bienvenida","🎓 Escuela","📝 Bitácora","🏁 Cerrar Operación",
+        "📊 Backtesting","💰 Finanzas","📈 Reportes","🎯 Metas",
+        "📊 Reporte de Metas","💬 Forum"
     ]
-
-    if rol_es(user_actual, "MAESTRO", "ADMINISTRADOR"):
+    if rol_es(user, "MAESTRO", "ADMINISTRADOR"):
         menu_opciones.append("🔎 Revisión de Operaciones")
-    if rol_es(user_actual, "ADMINISTRADOR"):
-        menu_opciones.append("🔑 Membresías")
-        menu_opciones.append("📋 Reporte de Estudiantes")
+    if rol_es(user, "ADMINISTRADOR"):
+        menu_opciones.extend(["🔑 Membresías","📋 Reporte de Estudiantes"])
 
-    seleccion_menu = st.sidebar.radio("Módulos del Sistema:", menu_opciones)
-    st.sidebar.divider()
+    # ── VISTA MÓVIL ──
+    consejo = obtener_consejo(doc)
+    saldo, win_rate, ops_total = obtener_stats(doc, user["ID_USUARIO"])
 
-    if st.sidebar.button("❌ Cerrar Sesión"):
-        st.session_state["user"] = None
-        st.session_state["PASO_REGISTRO"] = 1
+    render_header_movil(user, consejo)
+
+    # Input oculto para capturar navegación por JS
+    nav_input = st.text_input("", key="__nav_input__", label_visibility="collapsed")
+    if nav_input and nav_input != modulo:
+        st.session_state["modulo_activo"] = nav_input
         st.rerun()
 
-    modulo_limpio = seleccion_menu.split(" ", 1)[-1].strip()
+    # ── Si estamos en Bienvenida → mostrar dashboard de iconos ──
+    if modulo == "Bienvenida":
+        render_stats_movil(saldo, win_rate, ops_total)
+        render_grid_movil(user)
 
-    if modulo_limpio == "Bienvenida":
-        bienvenida_app(user_actual)
-    elif modulo_limpio == "Escuela":
-        escuela_app(user_actual)
-    elif modulo_limpio == "Bitácora":
-        bitacora_app(user_actual)
-    elif modulo_limpio == "Cerrar Operación":
-        cerrar_operacion(user_actual, doc)
-    elif modulo_limpio == "Backtesting":
-        backtesting_app(user_actual)
-    elif modulo_limpio == "Finanzas":
-        finanzas_app(user_actual)
-    elif modulo_limpio == "Reportes":
-        reportes_app(user_actual)
-    elif modulo_limpio == "Metas":
-        metas_app(user_actual)
-    elif modulo_limpio == "Reporte de Metas":
-        reporte_metas_app(user_actual)
-    elif modulo_limpio == "Forum":
-        forum_app(user_actual)
-    elif modulo_limpio == "Revisión de Operaciones":
-        revision_app(user_actual)
-    elif modulo_limpio == "Membresías":
-        membresias_app(user_actual)
-    elif modulo_limpio == "Reporte de Estudiantes":
-        reporte_estudiantes_app(user_actual)
+        # Botones reales de Streamlit para cada módulo (ocultos visualmente, funcionales)
+        modulos_lista = [
+            "Bitácora","Cerrar Operación","Reportes","Backtesting",
+            "Finanzas","Metas","Reporte de Metas","Escuela","Forum"
+        ]
+        if rol_es(user, "MAESTRO","ADMINISTRADOR"):
+            modulos_lista.append("Revisión de Operaciones")
+        if rol_es(user, "ADMINISTRADOR"):
+            modulos_lista.extend(["Membresías","Reporte de Estudiantes"])
 
-# ==========================================
+        # Selectbox invisible como fallback de navegación en móvil
+        st.markdown("<div style='padding:0 16px;'>", unsafe_allow_html=True)
+        sel = st.selectbox(
+            "Ir a módulo:",
+            ["-- Selecciona --"] + modulos_lista,
+            key="sel_modulo_movil"
+        )
+        if sel != "-- Selecciona --":
+            st.session_state["modulo_activo"] = sel
+            st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    else:
+        # ── VISTA DESKTOP: sidebar ──
+        with st.sidebar:
+            sel_desktop = render_sidebar_desktop(user, menu_opciones)
+            modulo_desktop = sel_desktop.split(" ", 1)[-1].strip()
+
+        # Botón volver en móvil
+        st.markdown("<div style='padding:8px 16px 0;'>", unsafe_allow_html=True)
+        if st.button("← Volver al inicio"):
+            st.session_state["modulo_activo"] = "Bienvenida"
+            st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        # Ejecutar módulo seleccionado
+        ejecutar_modulo(modulo, user, doc)
+
+        # Desktop también puede navegar desde sidebar
+        if modulo_desktop != modulo and modulo_desktop:
+            st.session_state["modulo_activo"] = modulo_desktop
+            st.rerun()
+
+    render_navbar(modulo)
+
+    # Cerrar sesión accesible desde móvil
+    st.markdown("<div style='padding:0 16px 100px;'>", unsafe_allow_html=True)
+    if st.button("❌ Cerrar Sesión", use_container_width=True):
+        st.session_state["user"] = None
+        st.session_state["modulo_activo"] = "Bienvenida"
+        st.rerun()
+    st.markdown("</div>", unsafe_allow_html=True)
+
+# ============================================================
 # MAIN
-# ==========================================
+# ============================================================
 if __name__ == "__main__":
-    st.set_page_config(page_title="Academia GMC Trading", page_icon="📈", layout="wide")
-
+    st.set_page_config(
+        page_title="Academia GMC Trading",
+        page_icon="📈",
+        layout="wide",
+        initial_sidebar_state="collapsed"
+    )
     if st.session_state["user"] is None:
         portal_autenticacion()
     else:
