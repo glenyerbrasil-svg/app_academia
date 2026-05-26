@@ -400,14 +400,19 @@ def app_interna():
     st.sidebar.markdown(f"### {user.get('NOMBRE','')}")
     st.sidebar.markdown(f"*{user.get('ROL','')} — {user.get('NIVEL','')}*")
     st.sidebar.divider()
-    sel = st.sidebar.radio("Módulos:", menu_opc)
+
+    # Sincronizar sidebar con el módulo activo actual
+    # Buscar el índice del módulo activo en el menú
+    emojis_limpios = [m.split(" ",1)[-1].strip() for m in menu_opc]
+    idx_activo = emojis_limpios.index(modulo) if modulo in emojis_limpios else 0
+    sel = st.sidebar.radio("Módulos:", menu_opc, index=idx_activo)
     st.sidebar.divider()
     if st.sidebar.button("❌ Cerrar Sesión"):
         st.session_state["user"] = None
         st.session_state["modulo_activo"] = "Bienvenida"
         st.rerun()
 
-    # Sincronizar sidebar con session_state
+    # Actualizar módulo solo si el usuario cambió en la sidebar
     modulo_desktop = sel.split(" ",1)[-1].strip()
     if modulo_desktop != modulo:
         st.session_state["modulo_activo"] = modulo_desktop
