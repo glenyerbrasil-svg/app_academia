@@ -310,36 +310,15 @@ def mostrar_dashboard(user, saldo, wr, ops):
     st.markdown('</div>', unsafe_allow_html=True)
 
 # ============================================================
-# NAVBAR INFERIOR
+# NAVBAR INFERIOR — solo botón Inicio
 # ============================================================
 def mostrar_navbar(modulo_activo):
-    items = [
-        ("📝","Bitácora",        "Bitácora"),
-        ("🏁","Cerrar",          "Cerrar Operación"),
-        ("🎯","Metas",           "Metas"),
-        ("📊","Rep.Metas",       "Reporte de Metas"),
-        ("🏠","Inicio",          "Bienvenida"),
-    ]
-    st.markdown("---")
-    cols = st.columns(len(items))
-    nav_clicked = None
-    for i,(emoji,label,modulo) in enumerate(items):
-        with cols[i]:
-            activo = modulo_activo == modulo
-            estilo = "color:#c8a84b;font-weight:700;" if activo else "color:#6a7fa8;"
-            st.markdown(f"""
-            <div style="text-align:center;{estilo}font-size:11px;line-height:1.4;">
-                <div style="font-size:20px;">{emoji}</div>
-                {label}
-            </div>
-            """, unsafe_allow_html=True)
-            if st.button("​", key=f"nav_{modulo}",
-                        use_container_width=True,
-                        help=label):
-                nav_clicked = modulo
-    if nav_clicked:
-        st.session_state["modulo_activo"] = nav_clicked
-        st.rerun()
+    # Solo mostrar si estamos dentro de un módulo
+    if modulo_activo != "Bienvenida":
+        st.markdown("---")
+        if st.button("🏠  Inicio", use_container_width=True, key="nav_home"):
+            st.session_state["modulo_activo"] = "Bienvenida"
+            st.rerun()
 
 # ============================================================
 # EJECUTAR MÓDULO
