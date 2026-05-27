@@ -435,7 +435,7 @@ def app_interna():
 if __name__ == "__main__":
     st.set_page_config(
         page_title="Academia GMC Trading",
-        page_icon="📈",
+        page_icon="assets/favicon.png",
         layout="wide",
         initial_sidebar_state="collapsed"
     )
