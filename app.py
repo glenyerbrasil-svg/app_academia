@@ -28,6 +28,18 @@ for k, v in [("user", None), ("PASO_REGISTRO", 1), ("modulo_activo", "Bienvenida
 # ============================================================
 # CSS
 # ============================================================
+# PWA meta tags — registra la app como instalable en celular
+PWA_META = """
+<link rel="manifest" href="manifest.json">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="GMC Trading">
+<meta name="theme-color" content="#c8a84b">
+<link rel="apple-touch-icon" href="logo_192.png">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon.png">
+"""
+
 CSS = """
 <style>
 #MainMenu, footer, header[data-testid="stHeader"]{display:none!important;}
@@ -153,6 +165,7 @@ def evaluar_acceso(user):
 # ============================================================
 def portal_login():
     st.markdown(CSS, unsafe_allow_html=True)
+    st.markdown(PWA_META, unsafe_allow_html=True)
     st.markdown("## 📈 Academia GMC Trading")
     tab = st.radio("", ["Ingresar","Registrarse","Recuperar Clave"], horizontal=True)
     cliente = conectar_google()
@@ -350,6 +363,7 @@ def app_interna():
     modulo = st.session_state.get("modulo_activo","Bienvenida")
 
     st.markdown(CSS, unsafe_allow_html=True)
+    st.markdown(PWA_META, unsafe_allow_html=True)
 
     cliente = conectar_google()
     if not cliente: st.error("Error de conexión."); st.stop()
