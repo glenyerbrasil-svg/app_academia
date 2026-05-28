@@ -1,11 +1,12 @@
 import streamlit as st
+from idiomas import t
 import pandas as pd
 import time
 from datetime import date
 from utils import conectar_google, subir_a_cloudinary  # ← Cloudinary centralizado
 
 def finanzas_app(user):
-    st.header("💰 Finanzas")
+    st.header(t("finanzas_titulo"))
 
     cliente = conectar_google()
     try:
@@ -32,16 +33,16 @@ def finanzas_app(user):
 
     st.divider()
 
-    tab1, tab2, tab3, tab4 = st.tabs(["➕ Depósito", "➖ Retiro", "📑 Pago Academia", "📋 Historial"])
+    tab1, tab2, tab3, tab4 = st.tabs([t("deposito"), t("retiro"), t("pago_academia"), t("historial")])
 
     # --- TAB 1: DEPÓSITO ---
     with tab1:
         st.subheader("Registrar Depósito")
         monto_dep = st.number_input("Monto ($)", min_value=0.0, step=0.5, format="%.2f", key="dep_monto")
         notas_dep = st.text_area("Notas (opcional)", key="dep_notas")
-        if st.button("💾 Guardar Depósito", use_container_width=True):
+        if st.button(t("guardar_deposito"), use_container_width=True):
             if monto_dep <= 0:
-                st.warning("⚠️ Ingresa un monto válido.")
+                st.warning(t("monto_invalido"))
             else:
                 with st.spinner("Procesando..."):
                     try:
@@ -62,7 +63,7 @@ def finanzas_app(user):
         st.subheader("Registrar Retiro")
         monto_ret = st.number_input("Monto ($)", min_value=0.0, step=0.5, format="%.2f", key="ret_monto")
         notas_ret = st.text_area("Notas (opcional)", key="ret_notas")
-        if st.button("💾 Guardar Retiro", use_container_width=True):
+        if st.button(t("guardar_retiro"), use_container_width=True):
             if monto_ret <= 0 or monto_ret > saldo_actual:
                 st.warning("⚠️ Monto inválido o mayor al saldo disponible.")
             else:
@@ -87,7 +88,7 @@ def finanzas_app(user):
         monto_pago = st.number_input("Monto ($)", min_value=0.0, step=0.5, format="%.2f", key="pago_monto")
         comprobante_file = st.file_uploader("Comprobante de pago", type=["png", "jpg", "jpeg"])
 
-        if st.button("💾 Enviar para revisión", use_container_width=True):
+        if st.button(t("enviar_revision"), use_container_width=True):
             if monto_pago <= 0 or comprobante_file is None:
                 st.warning("⚠️ Ingresa monto y sube el comprobante.")
             else:
@@ -103,7 +104,7 @@ def finanzas_app(user):
                             hoja_u.update_cell(fila, df_u.columns.get_loc("MONTO_ULTIMO_PAGO") + 1, monto_pago)
                             hoja_u.update_cell(fila, df_u.columns.get_loc("COMPROBANTE_PAGO") + 1, comprobante_url)
                             hoja_u.update_cell(fila, df_u.columns.get_loc("ESTADO_PAGO") + 1, "PENDIENTE")
-                            st.success("✅ Pago enviado para revisión del administrador.")
+                            st.success(t("pago_enviado"))
                             st.image(comprobante_url, caption="Comprobante registrado", width=300)
                         else:
                             st.error("No se encontró el usuario.")

@@ -1,8 +1,9 @@
 import streamlit as st
+from idiomas import t
 from utils import conectar_google, subir_a_cloudinary, hoy, ahora
 
 def backtesting_app(user):
-    st.header("📊 Backtesting de Estrategias")
+    st.header(t("bt_titulo"))
 
     cliente = conectar_google()
     if not cliente:
@@ -18,23 +19,23 @@ def backtesting_app(user):
 
     # Formulario para nuevo registro de backtesting
     with st.form("backtesting_form"):
-        estrategia = st.text_input("Nombre de la estrategia")
+        estrategia = st.text_input(t("nombre_estrategia"))
         instrumento = st.text_input("Instrumento")
         hora_inicial = st.text_input("Hora inicial (HH:MM:SS)")
         hora_final = st.text_input("Hora final (HH:MM:SS)")
-        confluencias = st.text_area("Confluencias observadas")
+        confluencias = st.text_area(t("confluencias"))
 
         # Subida de imágenes
         img_mayor = st.file_uploader("Gráfico temporalidad mayor", type=["png", "jpg"])
         img_menor = st.file_uploader("Gráfico temporalidad menor", type=["png", "jpg"])
         img_ejecucion = st.file_uploader("Gráfico ejecución", type=["png", "jpg"])
 
-        resultado = st.selectbox("Resultado", ["TP", "SL", "BE"])
-        ratio_rr = st.selectbox("Ratio esperado", ["1:1", "1:2", "1:3", "Otro"])
-        pnl_unidades = st.number_input("PNL en unidades", step=0.1)
+        resultado = st.selectbox(t("resultado"), ["TP", "SL", "BE"])
+        ratio_rr = st.selectbox(t("ratio_esperado"), ["1:1", "1:2", "1:3", "Otro"])
+        pnl_unidades = st.number_input(t("pnl_unidades"), step=0.1)
         obs = st.text_area("Observaciones")
 
-        submitted = st.form_submit_button("Guardar estudio")
+        submitted = st.form_submit_button(t("guardar_estudio"))
 
         if submitted:
             # Subir imágenes a Cloudinary
@@ -50,4 +51,4 @@ def backtesting_app(user):
             ]
 
             hoja_bt.append_row(nueva_fila)
-            st.success("✅ Estudio de backtesting registrado correctamente.")
+            st.success(t("bt_guardado"))

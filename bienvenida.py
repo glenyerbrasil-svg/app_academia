@@ -1,10 +1,11 @@
 import streamlit as st
+from idiomas import t
 import random
 import datetime
 from utils import conectar_google
 
 def bienvenida_app(user):
-    st.header("🌟 Bienvenida")
+    st.header("🌟 " + t("bienvenido"))
 
     # Datos del usuario
     nombre = user.get("NOMBRE", "Usuario")
@@ -12,10 +13,10 @@ def bienvenida_app(user):
     membresia = user.get("ROL", "DEMO")
     vencimiento = user.get("PROXIMO_VENCIMIENTO", "N/A")
 
-    st.write(f"Hola {nombre}")
-    st.write(f"Nivel: {nivel}")
-    st.write(f"Membresía: {membresia}")
-    st.write(f"Próximo vencimiento: {vencimiento}")
+    st.write(f'{t("hola")} {nombre}')
+    st.write(f'{t("nivel")}: {nivel}')
+    st.write(f'{t("membresia")}: {membresia}')
+    st.write(f'{t("proximo_vencimiento")}: {vencimiento}')
 
     # Conectar a Google Sheets
     cliente = conectar_google()

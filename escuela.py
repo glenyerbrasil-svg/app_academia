@@ -1,8 +1,9 @@
 import streamlit as st
+from idiomas import t
 from utils import conectar_google
 
 def escuela_app(user):
-    st.header("🎓 Escuela")
+    st.header(t("escuela_titulo"))
 
     cliente = conectar_google()
     if not cliente:
@@ -39,14 +40,14 @@ def escuela_app(user):
                 st.markdown(f"[📘 Ver material]({m['LINK']})")
             st.divider()
     else:
-        st.info("No hay material disponible para tu nivel.")
+        st.info(t("sin_material"))
 
     # Opciones para maestros: asignar jerarquías
     if user["ROL"] in ["Maestro", "Administrador"]:
-        st.subheader("⚙️ Asignar jerarquía a estudiantes")
-        estudiante = st.text_input("Usuario del estudiante")
-        nuevo_nivel = st.selectbox("Nuevo nivel", ["Padawan", "Jedi", "Maestro Jedi"])
-        if st.button("Actualizar nivel"):
+        st.subheader(t("asignar_jerarquia"))
+        estudiante = st.text_input(t("usuario_estudiante"))
+        nuevo_nivel = st.selectbox(t("nuevo_nivel"), ["Padawan", "Jedi", "Maestro Jedi"])
+        if st.button(t("actualizar_nivel")):
             try:
                 hoja_u = doc.worksheet("Usuarios")
                 usuarios = hoja_u.get_all_records()

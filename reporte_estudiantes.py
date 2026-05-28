@@ -1,9 +1,10 @@
 import streamlit as st
+from idiomas import t
 import pandas as pd
 from utils import conectar_google, rol_es
 
 def reporte_estudiantes_app(user):
-    st.header("📊 Reporte Global de Estudiantes")
+    st.header(t("rep_est_titulo"))
 
     # CORREGIDO: rol_es() insensible a mayúsculas
     if not rol_es(user, "ADMINISTRADOR"):
@@ -41,7 +42,7 @@ def reporte_estudiantes_app(user):
     df["RESULTADO_DINERO"] = pd.to_numeric(df.get("RESULTADO_DINERO", 0), errors="coerce").fillna(0)
 
     # --- Métricas globales ---
-    st.subheader("📈 Estadísticas globales")
+    st.subheader(t("estadisticas"))
     total_ops = len(df)
     ganadas = len(df[df.get("ESTADO_RESULTADO", "") == "TP"]) if "ESTADO_RESULTADO" in df.columns else 0
     perdidas = len(df[df["ESTADO_RESULTADO"] == "SL"]) if "ESTADO_RESULTADO" in df.columns else 0
@@ -58,7 +59,7 @@ def reporte_estudiantes_app(user):
     st.divider()
 
     # --- Rendimiento por estudiante ---
-    st.subheader("📌 Rendimiento por estudiante")
+    st.subheader(t("rendimiento_est"))
     resumen = df.groupby("ID_USUARIO").agg(
         Operaciones=("RESULTADO_DINERO", "count"),
         PNL=("RESULTADO_DINERO", "sum")
@@ -73,7 +74,7 @@ def reporte_estudiantes_app(user):
     st.dataframe(resumen.sort_values("PNL", ascending=False), use_container_width=True)
 
     # --- Ranking ---
-    st.subheader("🏆 Ranking de rendimiento")
+    st.subheader(t("ranking"))
     ranking = resumen.sort_values("PNL", ascending=False).reset_index(drop=True)
     ranking.index += 1
     st.table(ranking[["NOMBRE", "Operaciones", "PNL"]].head(10) if "NOMBRE" in ranking.columns else ranking.head(10))

@@ -1,9 +1,10 @@
 import streamlit as st
+from idiomas import t
 import pandas as pd
 from utils import conectar_google, rol_es
 
 def revision_app(user):
-    st.header("🔎 Revisión de Operaciones")
+    st.header(t("revision_titulo"))
 
     if not rol_es(user, "MAESTRO", "ADMINISTRADOR"):
         st.warning("⚠️ No tienes permisos para acceder a esta sección.")
@@ -80,7 +81,7 @@ def revision_app(user):
     st.subheader(f"📊 Operaciones encontradas: {len(filtrado)}")
 
     if filtrado.empty:
-        st.info("No se encontraron operaciones con esos filtros.")
+        st.info(t("sin_ops"))
         return
 
     # ── ESTADÍSTICAS RÁPIDAS ──

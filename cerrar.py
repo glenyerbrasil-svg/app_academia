@@ -1,4 +1,5 @@
 import streamlit as st
+from idiomas import t
 import pandas as pd
 import cloudinary
 import cloudinary.uploader
@@ -47,7 +48,7 @@ COL_OBSERVACIONES_2  = 25
 COL_OBSERVACIONES_1  = 26
 
 def cerrar_operacion(user, doc):
-    st.header("🏁 Cerrar Operación")
+    st.header(t("cerrar_titulo"))
 
     try:
         hoja_b = doc.worksheet("Bitacora")
@@ -99,7 +100,7 @@ def cerrar_operacion(user, doc):
                  f"{r.get('ACCION')} | 🕒 {r.get('HORA_ENTRADA')} | 💰 ${r.get('VALOR_BALA')}")
         opciones.append((label, i + 2, r.to_dict()))  # i+2 = fila real en Sheets
 
-    sel = st.selectbox("🎯 Selecciona la operación a cerrar:", opciones, format_func=lambda x: x[0])
+    sel = st.selectbox(t("selecciona_op"), opciones, format_func=lambda x: x[0])
 
     if sel:
         f_idx = sel[1]   # fila real en Google Sheets
@@ -139,7 +140,7 @@ def cerrar_operacion(user, doc):
         # --- Estado final ---
         col_c1, col_c2 = st.columns(2)
         nuevo_estado = col_c1.selectbox(
-            "Estado Final",
+            t("estado_final"),
             ["PENDIENTE", "TP", "SL", "BE"],
             index=["PENDIENTE", "TP", "SL", "BE"].index(
                 d.get('ESTADO_RESULTADO', 'PENDIENTE')
@@ -159,7 +160,7 @@ def cerrar_operacion(user, doc):
             monto_calc = 0.0
 
         monto_final = col_c2.number_input(
-            "Monto Final ($)",
+            t("monto_final"),
             value=float(round(monto_calc, 2)),
             format="%.2f"
         )
@@ -180,11 +181,11 @@ def cerrar_operacion(user, doc):
             imagen_final = foto_camara if foto_camara else foto_archivo
 
             obs = st.text_area(
-                "Observaciones finales",
+                t("obs_finales"),
                 value=str(d.get('OBSERVACIONES 1', '') or d.get('OBSERVACIONES1', ''))
             )
 
-            if st.form_submit_button("💾 Cerrar Operación", use_container_width=True):
+            if st.form_submit_button(t("cerrar_btn"), use_container_width=True):
                 if nuevo_estado == "PENDIENTE":
                     st.warning("⚠️ Selecciona un estado final (TP, SL o BE) para cerrar.")
                     st.stop()

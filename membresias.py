@@ -1,4 +1,5 @@
 import streamlit as st
+from idiomas import t
 import pandas as pd
 import time
 from datetime import date, timedelta
@@ -14,7 +15,7 @@ PLANES = {
 }
 
 def membresias_app(user):
-    st.header("👥 Gestión de Membresías")
+    st.header(t("mem_titulo"))
 
     cliente = conectar_google()
     try:
@@ -42,7 +43,7 @@ def membresias_app(user):
     df_u = pd.DataFrame(hoja_u.get_all_records())
     df_u["ID_USUARIO"] = df_u["ID_USUARIO"].astype(str)
 
-    tab1, tab2, tab3 = st.tabs(["📋 Lista de usuarios", "⚙️ Gestionar membresía", "📊 Resumen"])
+    tab1, tab2, tab3 = st.tabs([t("lista_usuarios"), t("gestionar"), t("resumen")])
 
     # ============================================================
     # TAB 1 — LISTA
@@ -170,7 +171,7 @@ def membresias_app(user):
                 # Notas opcionales
                 notas = st.text_input("Notas (opcional)")
 
-                if st.button("💾 Actualizar Membresía", use_container_width=True):
+                if st.button(t("actualizar_mem"), use_container_width=True):
                     with st.spinner("Actualizando..."):
                         try:
                             registros = hoja_u.get_all_records()

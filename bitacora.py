@@ -1,4 +1,5 @@
 import streamlit as st
+from idiomas import t
 import pandas as pd
 import time
 from datetime import datetime, date
@@ -47,7 +48,7 @@ OPCIONES_EMOCIONAL = [
 ]
 
 def bitacora_app(user):
-    st.header("📝 Bitácora de Operaciones")
+    st.header(t("bitacora_titulo"))
 
     # Conexión a Google Sheets
     cliente = conectar_google()
@@ -94,7 +95,7 @@ def bitacora_app(user):
     v = st.session_state.v_form
 
     # ─── SECCIÓN 1: DATOS TÉCNICOS ───
-    st.subheader("🚀 Nueva Operación")
+    st.subheader(t("nueva_operacion"))
 
     instrumentos = [
         "FLIPX1", "FLIPX2", "FLIPX3", "FLIPX4", "FLIPX5",
@@ -103,8 +104,8 @@ def bitacora_app(user):
     ]
 
     c1, c2, c3 = st.columns(3)
-    ins  = c1.selectbox("Instrumento", instrumentos, key=f"ins_{v}")
-    acc  = c2.selectbox("Acción", ["COMPRA", "VENTA"], key=f"acc_{v}")
+    ins  = c1.selectbox(t("instrumento"), instrumentos, key=f"ins_{v}")
+    acc  = c2.selectbox(t("accion"), ["COMPRA", "VENTA"], key=f"acc_{v}")
     bala = c3.number_input("Valor de la Bala ($)", min_value=0.0, step=0.5, format="%.2f", key=f"bala_{v}")
 
     c_rat, c_ent, c_sl = st.columns(3)
@@ -131,19 +132,19 @@ def bitacora_app(user):
     st.divider()
 
     # ─── SECCIÓN 2: EVIDENCIA VISUAL ───
-    st.subheader("🖼️ Evidencia Visual")
+    st.subheader(t("evidencia_visual"))
     g_c1, g_c2 = st.columns(2)
-    img_may = g_c1.file_uploader("📈 Gráfico Mayor", type=['png', 'jpg', 'jpeg'], key=f"img_may_{v}")
-    img_men = g_c2.file_uploader("📉 Gráfico Menor", type=['png', 'jpg', 'jpeg'], key=f"img_men_{v}")
+    img_may = g_c1.file_uploader(t("grafico_mayor"), type=['png', 'jpg', 'jpeg'], key=f"img_may_{v}")
+    img_men = g_c2.file_uploader(t("grafico_menor"), type=['png', 'jpg', 'jpeg'], key=f"img_men_{v}")
     g_c3, g_c4 = st.columns(2)
-    img_ent = g_c3.file_uploader("⚡ Gráfico Ejecución", type=['png', 'jpg', 'jpeg'], key=f"img_ent_{v}")
-    img_res = g_c4.file_uploader("🏁 Gráfico Resultado (opcional)", type=['png', 'jpg', 'jpeg'], key=f"img_res_{v}")
+    img_ent = g_c3.file_uploader(t("grafico_ejecucion"), type=['png', 'jpg', 'jpeg'], key=f"img_ent_{v}")
+    img_res = g_c4.file_uploader(t("grafico_resultado"), type=['png', 'jpg', 'jpeg'], key=f"img_res_{v}")
 
     st.divider()
 
     # ─── SECCIÓN 3: SEMÁFORO EMOCIONAL ───
     # CORREGIDO: opciones alineadas con los valores reales en la BD
-    st.subheader("🧠 Estado Emocional")
+    st.subheader(t("estado_emocional"))
     semaforo = st.select_slider(
         "¿Cómo te sientes antes de esta operación?",
         options=OPCIONES_EMOCIONAL,
@@ -163,9 +164,9 @@ def bitacora_app(user):
     observaciones = st.text_area("📝 Observaciones (análisis, confluencias, notas)", key=f"obs_{v}")
 
     # ─── BOTÓN GUARDAR ───
-    if st.button("💾 Guardar Operación", use_container_width=True, key=f"btn_save_{v}"):
+    if st.button(t("guardar_operacion"), use_container_width=True, key=f"btn_save_{v}"):
         if p_ent == 0 or p_sl == 0 or bala == 0:
-            st.warning("⚠️ Completa los datos técnicos: Entrada, SL y Bala son obligatorios.")
+            st.warning(t("faltan_datos"))
         else:
             with st.spinner("🚀 Guardando operación..."):
                 try:
@@ -229,7 +230,7 @@ def bitacora_app(user):
 
                     hoja_b.append_row(nueva_fila)
 
-                    st.success("✅ Operación registrada correctamente en la Bitácora.")
+                    st.success(t("operacion_guardada"))
                     st.balloons()
                     time.sleep(2)
                     limpiar_formulario()

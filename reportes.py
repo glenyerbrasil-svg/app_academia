@@ -1,4 +1,5 @@
 import streamlit as st
+from idiomas import t
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
@@ -16,7 +17,7 @@ def fig_a_bytes(fig) -> bytes:
     return buf.read()
 
 def reportes_app(user):
-    st.header("📈 Reportes de Rendimiento")
+    st.header(t("reportes_titulo"))
 
     cliente = conectar_google()
     if not cliente:
@@ -34,7 +35,7 @@ def reportes_app(user):
     ops = [r for r in registros if str(r.get("ID_USUARIO", "")) == str(user["ID_USUARIO"])]
 
     if not ops:
-        st.info("No tienes operaciones registradas aún.")
+        st.info(t("no_operaciones"))
         return
 
     df = pd.DataFrame(ops)
@@ -45,7 +46,7 @@ def reportes_app(user):
     df_cerradas = df[df["ESTADO_RESULTADO"].isin(["TP", "SL", "BE"])].copy()
 
     # ─── FILTROS ───
-    st.subheader("🔎 Filtros")
+    st.subheader(t("filtros"))
     col_f1, col_f2, col_f3 = st.columns(3)
 
     fecha_min = df["FECHA"].min().date() if not df["FECHA"].isna().all() else pd.Timestamp.today().date()
@@ -72,7 +73,7 @@ def reportes_app(user):
     st.divider()
 
     # ─── MÉTRICAS GENERALES ───
-    st.subheader("📊 Métricas generales")
+    st.subheader(t("metricas"))
 
     total    = len(df_cerr)
     ganadas  = len(df_cerr[df_cerr["ESTADO_RESULTADO"] == "TP"])
@@ -219,7 +220,7 @@ def reportes_app(user):
     # ─── EXPORTAR PDF ───
     st.subheader("📤 Exportar Reporte")
 
-    if st.button("📄 Generar PDF", use_container_width=True):
+    if st.button(t("generar_pdf"), use_container_width=True):
         with st.spinner("Generando PDF..."):
             try:
                 pdf = FPDF()
@@ -270,7 +271,7 @@ def reportes_app(user):
                 pdf_buf = io.BytesIO(pdf_bytes)
 
                 st.download_button(
-                    label="📥 Descargar Reporte PDF",
+                    label=t("descargar_pdf"),
                     data=pdf_buf,
                     file_name=f"reporte_{user['ID_USUARIO']}_{fecha_inicio}_{fecha_fin}.pdf",
                     mime="application/pdf",

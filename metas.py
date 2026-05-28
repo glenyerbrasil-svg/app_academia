@@ -1,4 +1,5 @@
 import streamlit as st
+from idiomas import t
 import pandas as pd
 import time
 from datetime import date, datetime
@@ -46,7 +47,7 @@ CAPITAL_MINIMO = 100   # referencia mínima sugerida
 CAPITAL_SUGERIDO = 300  # referencia ideal sugerida
 
 def metas_app(user):
-    st.header("🎯 Metas Financieras")
+    st.header(t("metas_titulo"))
 
     cliente = conectar_google()
     if not cliente:
@@ -67,8 +68,8 @@ def metas_app(user):
 
     # ── TABS PRINCIPALES ──
     tab1, tab2, tab3 = st.tabs([
-        "🎯 Mi Meta de Ahorro",
-        "📋 Perfil Financiero Mensual",
+        t("mi_meta"),
+        t("perfil_financiero"),
         "📒 Diario de Gastos"
     ])
 
@@ -131,7 +132,7 @@ def metas_app(user):
                                         col_estado = list(registros[0].keys()).index("ESTADO") + 1
                                         hoja_m.update_cell(fila, col_estado, "Cumplida")
                                         st.balloons()
-                                        st.success("🎉 ¡Felicitaciones! ¡Meta cumplida!")
+                                        st.success(t("meta_cumplida"))
                                     else:
                                         st.success("✅ Progreso actualizado.")
                                     time.sleep(1)
@@ -142,7 +143,7 @@ def metas_app(user):
                         # Botón solicitar orientación
                         orientacion_actual = str(meta.get("SOLICITAR_ORIENTACION", "NO")).upper()
                         if orientacion_actual == "NO":
-                            if col_btn2.button("🤝 Solicitar orientación", key=f"ori_{meta['ID_META']}"):
+                            if col_btn2.button(t("solicitar_orient"), key=f"ori_{meta['ID_META']}"):
                                 try:
                                     registros = hoja_m.get_all_records()
                                     fila = next(
@@ -153,7 +154,7 @@ def metas_app(user):
                                     if fila:
                                         col_ori = list(registros[0].keys()).index("SOLICITAR_ORIENTACION") + 1
                                         hoja_m.update_cell(fila, col_ori, "SI")
-                                        st.success("✅ Solicitud enviada. Un maestro te contactará pronto.")
+                                        st.success(t("orient_enviada"))
                                         time.sleep(1)
                                         st.rerun()
                                 except Exception as e:
@@ -180,7 +181,7 @@ def metas_app(user):
             capital_obj = col_c.number_input("Capital objetivo ($)", min_value=1.0, value=float(CAPITAL_SUGERIDO), step=10.0, format="%.2f")
             fecha_limite = col_d.date_input("Fecha límite", value=date.today().replace(month=12, day=31))
 
-            if st.form_submit_button("💾 Guardar Meta", use_container_width=True):
+            if st.form_submit_button(t("guardar_meta"), use_container_width=True):
                 if not descripcion.strip():
                     st.warning("⚠️ Escribe una descripción para tu meta.")
                 else:
@@ -200,7 +201,7 @@ def metas_app(user):
                             "N/A"                           # COMENTARIO_MAESTRO
                         ]
                         hoja_m.append_row(nueva_meta)
-                        st.success("✅ ¡Meta registrada! Ahora ve construyendo el camino hacia ella.")
+                        st.success(t("meta_guardada"))
                         time.sleep(1)
                         st.rerun()
                     except Exception as e:
@@ -250,7 +251,7 @@ def metas_app(user):
             g_entrete       = col_g7.number_input("🎬 Entretenimiento", min_value=0.0, step=5.0, format="%.2f")
             g_otros         = col_g8.number_input("📦 Otros fijos",     min_value=0.0, step=5.0, format="%.2f")
 
-            if st.form_submit_button("💾 Guardar Perfil del Mes", use_container_width=True):
+            if st.form_submit_button(t("guardar_perfil"), use_container_width=True):
                 total_ing  = ing_principal + ing_extra
                 total_gas  = g_vivienda + g_servicios + g_alimentacion + g_transporte + g_salud + g_educacion + g_entrete + g_otros
                 capacidad  = total_ing - total_gas
@@ -293,7 +294,7 @@ def metas_app(user):
     # TAB 3 — DIARIO DE GASTOS
     # ============================================================
     with tab3:
-        st.subheader("📒 Diario de Gastos e Ingresos Extra")
+        st.subheader(t("diario_gastos"))
 
         # Resumen rápido del mes
         df_dg = pd.DataFrame(hoja_dg.get_all_records())
@@ -324,7 +325,7 @@ def metas_app(user):
             monto      = col_c2.number_input("Monto ($)", min_value=0.01, step=0.5, format="%.2f")
             descripcion = st.text_input("Descripción libre (opcional)")
 
-            if st.form_submit_button("💾 Registrar", use_container_width=True):
+            if st.form_submit_button(t("registrar_mov"), use_container_width=True):
                 if monto <= 0:
                     st.warning("⚠️ Ingresa un monto válido.")
                 else:

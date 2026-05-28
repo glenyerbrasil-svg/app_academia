@@ -21,7 +21,7 @@ from registro            import registro_app
 from recuperar           import recuperar_app
 
 # ── Session State ──
-for k, v in [("user", None), ("PASO_REGISTRO", 1), ("modulo_activo", "Bienvenida")]:
+for k, v in [("user", None), ("PASO_REGISTRO", 1), ("modulo_activo", "Bienvenida"), ("idioma", "ES")]:
     if k not in st.session_state:
         st.session_state[k] = v
 
@@ -146,8 +146,8 @@ def evaluar_acceso(user):
             st.warning("📲 [Contáctanos por WhatsApp](https://wa.me/556284191427?text=Hola%20quiero%20activar%20mi%20cuenta)")
             return False
     if estado == "VENCIDO":
-        st.error("Tu membresía ha vencido.")
-        st.warning("📲 [Contáctanos por WhatsApp](https://wa.me/556284191427?text=Hola%20quiero%20renovar%20mi%20membresia)")
+        st.error(t("membresia_vencida"))
+        st.warning("📲 [WhatsApp](https://wa.me/556284191427?text=Hola%20quiero%20renovar%20mi%20membresia)")
         return False
     if estado not in ["ACTIVO","DEMO"]:
         st.error("Tu cuenta está inactiva o suspendida.")
@@ -167,7 +167,15 @@ def portal_login():
     st.markdown(CSS, unsafe_allow_html=True)
     st.markdown(PWA_META, unsafe_allow_html=True)
     st.markdown("## 📈 Academia GMC Trading")
-    tab = st.radio("", ["Ingresar","Registrarse","Recuperar Clave"], horizontal=True)
+
+    # Selector de idioma
+    col_flag, col_esp = st.columns([1, 3])
+    with col_flag:
+        idioma_sel = st.selectbox("🌐", ["🇻🇪 Español", "🇧🇷 Português"],
+                                  label_visibility="collapsed")
+        st.session_state["idioma"] = "ES" if "Español" in idioma_sel else "PT"
+
+    tab = st.radio("", [t("ingresar"), t("registrarse"), t("recuperar_clave")], horizontal=True)
     cliente = conectar_google()
     if not cliente:
         st.error("No se pudo conectar."); return
@@ -179,22 +187,22 @@ def portal_login():
 
     if tab == "Ingresar":
         with st.form("login"):
-            u = st.text_input("Usuario").strip().lower()
-            p = st.text_input("Contraseña", type="password")
-            if st.form_submit_button("Entrar", use_container_width=True):
+            u = st.text_input(t("usuario")).strip().lower()
+            p = st.text_input(t("contrasena"), type="password")
+            if st.form_submit_button(t("entrar"), use_container_width=True):
                 user = next((r for r in datos if str(r.get("USUARIO","")).lower()==u), None)
                 if user:
                     if str(user.get("CORREO_VERIFICADO","")).upper()=="NO":
-                        st.warning("Cuenta no verificada. Revisa tu email.")
+                        st.warning(t("cuenta_no_verificada"))
                     elif check_pass(p, str(user.get("PASSWORD",""))):
                         if evaluar_acceso(user):
                             st.session_state["user"] = user
                             st.session_state["modulo_activo"] = "Bienvenida"
                             st.rerun()
                     else:
-                        st.error("Contraseña incorrecta.")
+                        st.error(t("contrasena_incorrecta"))
                 else:
-                    st.error("Usuario no encontrado.")
+                    st.error(t("usuario_no_encontrado"))
     elif tab == "Registrarse":
         registro_app()
     else:
@@ -256,7 +264,7 @@ def mostrar_header(user, consejo):
             <span class="mob-badge" style="background:{c}22;border:1px solid {c}55;color:{c};">{rol}</span>
         </div>
         <div class="consejo">
-            <div class="consejo-t">💡 Consejo del día</div>
+            <div class="consejo-t">{t("consejo_dia")}</div>
             <p class="consejo-m">{consejo}</p>
         </div>
     </div>
@@ -270,36 +278,36 @@ def mostrar_dashboard(user, saldo, wr, ops):
     st.markdown(f"""
     <div class="stats-row">
         <div class="stat-c">
-            <div class="stat-l">Saldo actual</div>
+            <div class="stat-l">{t("saldo_actual")}</div>
             <div class="stat-v">${saldo:,.0f}</div>
-            <div class="stat-s">Tu capital</div>
+            <div class="stat-s">{t("tu_capital")}</div>
         </div>
         <div class="stat-c">
-            <div class="stat-l">Win Rate</div>
+            <div class="stat-l">{t("win_rate")}</div>
             <div class="stat-v">{wr:.0f}%</div>
-            <div class="stat-s">{ops} ops cerradas</div>
+            <div class="stat-s">{ops} {t("ops_cerradas")}</div>
         </div>
     </div>
-    <div class="sec-lbl">Módulos</div>
+    <div class="sec-lbl">{t("modulos")}</div>
     """, unsafe_allow_html=True)
 
     # Lista de módulos con emoji, nombre y descripción
     modulos = [
-        ("🎯", "Metas",                    "Gestiona tus metas de ahorro"),
-        ("📊", "Reporte de Metas",         "Visualiza tu progreso financiero"),
-        ("📝", "Bitácora",                 "Registra nuevas operaciones"),
-        ("🏁", "Cerrar Operación",         "Cierra operaciones pendientes"),
-        ("💰", "Finanzas",                 "Depósitos, retiros y pagos"),
-        ("📈", "Reportes",                 "Análisis de tu rendimiento"),
-        ("💬", "Forum",                    "Comunidad de la academia"),
-        ("🎓", "Escuela",                  "Material de formación"),
-        ("📊", "Backtesting",              "Estudia tus estrategias"),
+        ("🎯", "Metas",                    t("desc_metas")),
+        ("📊", "Reporte de Metas",         t("desc_reporte_metas")),
+        ("📝", "Bitácora",                 t("desc_bitacora")),
+        ("🏁", "Cerrar Operación",         t("desc_cerrar")),
+        ("💰", "Finanzas",                 t("desc_finanzas")),
+        ("📈", "Reportes",                 t("desc_reportes")),
+        ("💬", "Forum",                    t("desc_forum")),
+        ("🎓", "Escuela",                  t("desc_escuela")),
+        ("📊", "Backtesting",              t("desc_backtesting")),
     ]
     if rol_es(user,"MAESTRO","ADMINISTRADOR"):
-        modulos.append(("🔎","Revisión de Operaciones","Revisa las ops de los alumnos"))
+        modulos.append(("🔎","Revisión de Operaciones", t("desc_revision")))
     if rol_es(user,"ADMINISTRADOR"):
-        modulos.append(("🔑","Membresías",             "Gestiona accesos y planes"))
-        modulos.append(("📋","Reporte de Estudiantes", "Actividad global de alumnos"))
+        modulos.append(("🔑","Membresías",              t("desc_membresias")))
+        modulos.append(("📋","Reporte de Estudiantes",  t("desc_reporte_est")))
 
     # Botones lista vertical — uno por uno
     clicked = None
@@ -316,7 +324,7 @@ def mostrar_dashboard(user, saldo, wr, ops):
 
     # Cerrar sesión
     st.markdown('<div class="btn-logout">', unsafe_allow_html=True)
-    if st.button("❌  Cerrar Sesión", use_container_width=True, key="logout"):
+    if st.button(t("cerrar_sesion"), use_container_width=True, key="logout"):
         st.session_state["user"] = None
         st.session_state["modulo_activo"] = "Bienvenida"
         st.rerun()
@@ -329,7 +337,7 @@ def mostrar_navbar(modulo_activo):
     # Solo mostrar si estamos dentro de un módulo
     if modulo_activo != "Bienvenida":
         st.markdown("---")
-        if st.button("🏠  Inicio", use_container_width=True, key="nav_home"):
+        if st.button(t("inicio"), use_container_width=True, key="nav_home"):
             st.session_state["modulo_activo"] = "Bienvenida"
             st.rerun()
 
@@ -400,7 +408,7 @@ def app_interna():
     idx_activo = emojis_limpios.index(modulo) if modulo in emojis_limpios else 0
     sel = st.sidebar.radio("Módulos:", menu_opc, index=idx_activo)
     st.sidebar.divider()
-    if st.sidebar.button("❌ Cerrar Sesión"):
+    if st.sidebar.button(t("cerrar_sesion")):
         st.session_state["user"] = None
         st.session_state["modulo_activo"] = "Bienvenida"
         st.rerun()
@@ -419,7 +427,7 @@ def app_interna():
         mostrar_dashboard(user, saldo, wr, ops)
     else:
         st.markdown('<div class="btn-back">', unsafe_allow_html=True)
-        if st.button("← Volver al inicio", key="btn_volver"):
+        if st.button(t("volver_inicio"), key="btn_volver"):
             st.session_state["modulo_activo"] = "Bienvenida"
             st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)

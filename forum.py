@@ -1,9 +1,10 @@
 import streamlit as st
+from idiomas import t
 import datetime
 from utils import conectar_google
 
 def forum_app(user):
-    st.header("💬 Foro de la Academia")
+    st.header(t("forum_titulo"))
 
     cliente = conectar_google()
     if not cliente:
@@ -22,10 +23,10 @@ def forum_app(user):
     # -------------------------------
     # Chat público
     # -------------------------------
-    st.subheader("🌍 Chat Público")
+    st.subheader(t("chat_publico"))
 
-    mensaje_publico = st.text_input("Escribe un mensaje para todos:")
-    if st.button("Enviar al chat público"):
+    mensaje_publico = st.text_input(t("escribe_mensaje"))
+    if st.button(t("enviar_publico")):
         if mensaje_publico.strip():
             hoja_publico.append_row([
                 user["ID_USUARIO"],
@@ -33,7 +34,7 @@ def forum_app(user):
                 mensaje_publico,
                 str(datetime.datetime.now())
             ])
-            st.success("Mensaje enviado al chat público.")
+            st.success(t("msg_enviado"))
 
     mensajes_publicos = hoja_publico.get_all_records()
     for msg in mensajes_publicos[::-1]:
@@ -42,15 +43,15 @@ def forum_app(user):
     # -------------------------------
     # Mensajes internos
     # -------------------------------
-    st.subheader("📩 Mensajes Internos")
+    st.subheader(t("mensajes_internos"))
 
     usuarios = hoja_usuarios.get_all_records()
     lista_ids = [u["ID_USUARIO"] for u in usuarios]
     destinatario = st.selectbox("Selecciona destinatario (ID de usuario):", lista_ids)
 
-    mensaje_privado = st.text_area("Escribe tu mensaje privado:")
+    mensaje_privado = st.text_area(t("msg_privado"))
 
-    if st.button("Enviar mensaje privado"):
+    if st.button(t("enviar_privado")):
         if destinatario and mensaje_privado.strip():
             hoja_privado.append_row([
                 user["ID_USUARIO"],   # ID remitente
@@ -59,10 +60,10 @@ def forum_app(user):
                 mensaje_privado,
                 str(datetime.datetime.now())
             ])
-            st.success("Mensaje privado enviado.")
+            st.success(t("msg_privado_ok"))
 
     # Bandeja de entrada
-    st.subheader("📥 Tus mensajes recibidos")
+    st.subheader(t("bandeja_entrada"))
     mensajes_privados = hoja_privado.get_all_records()
     recibidos = [m for m in mensajes_privados if m["DESTINATARIO"] == user["ID_USUARIO"]]
 
@@ -70,4 +71,4 @@ def forum_app(user):
         for msg in recibidos[::-1]:
             st.write(f"**De {msg['REMITENTE']} (ID {msg['ID_USUARIO']})** ({msg['FECHA']}): {msg['MENSAJE']}")
     else:
-        st.info("No tienes mensajes privados aún.")
+        st.info(t("sin_mensajes"))
