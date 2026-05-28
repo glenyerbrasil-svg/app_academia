@@ -19,6 +19,7 @@ from membresias          import membresias_app
 from reporte_estudiantes import reporte_estudiantes_app
 from registro            import registro_app
 from recuperar           import recuperar_app
+from idiomas             import t
 
 # ── Session State ──
 for k, v in [("user", None), ("PASO_REGISTRO", 1), ("modulo_activo", "Bienvenida"), ("idioma", "ES")]:
