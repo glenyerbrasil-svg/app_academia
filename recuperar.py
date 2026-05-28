@@ -1,4 +1,5 @@
 import streamlit as st
+from idiomas import t
 import random
 import smtplib
 from email.mime.text import MIMEText
@@ -35,7 +36,7 @@ def enviar_codigo_recuperacion(email_destino: str, codigo: str) -> bool:
         return False
 
 def recuperar_app():
-    st.header("🔑 Recuperar contraseña")
+    st.header(t("recuperar_titulo"))
 
     if "PASO_RECUPERAR" not in st.session_state:
         st.session_state["PASO_RECUPERAR"] = 1
@@ -54,9 +55,9 @@ def recuperar_app():
 
     # --- Paso 1: Ingresar correo ---
     if st.session_state["PASO_RECUPERAR"] == 1:
-        email = st.text_input("Correo electrónico registrado")
+        email = st.text_input(t("correo_registrado"))
 
-        if st.button("Enviar código de recuperación"):
+        if st.button(t("enviar_codigo")):
             usuarios = hoja_u.get_all_records()
             user = next((u for u in usuarios if str(u.get("EMAIL", "")).lower() == email.lower()), None)
 
@@ -66,24 +67,24 @@ def recuperar_app():
                     st.session_state["RECUPERAR_EMAIL"] = email
                     st.session_state["RECUPERAR_CODIGO"] = codigo
                     st.session_state["PASO_RECUPERAR"] = 2
-                    st.success("✅ Código enviado a tu correo.")
+                    st.success(t("codigo_enviado"))
                     st.rerun()
             else:
-                st.error("No existe un usuario con ese correo.")
+                st.error(t("correo_no_existe"))
 
     # --- Paso 2: Validar código y nueva contraseña ---
     elif st.session_state["PASO_RECUPERAR"] == 2:
         st.info(f"📩 Código enviado a: **{st.session_state.get('RECUPERAR_EMAIL', '')}**")
-        codigo_ingresado = st.text_input("Código de 6 dígitos")
-        nueva_pass = st.text_input("Nueva contraseña", type="password")
-        confirmar_pass = st.text_input("Confirmar nueva contraseña", type="password")
+        codigo_ingresado = st.text_input(t("codigo_verificacion"))
+        nueva_pass = st.text_input(t("nueva_contrasena"), type="password")
+        confirmar_pass = st.text_input(t("confirmar_nueva"), type="password")
 
-        if st.button("Restablecer contraseña"):
+        if st.button(t("restablecer")):
             if codigo_ingresado.strip() != str(st.session_state.get("RECUPERAR_CODIGO", "")):
-                st.error("Código incorrecto.")
+                st.error(t("codigo_incorrecto"))
                 return
             if nueva_pass != confirmar_pass:
-                st.error("Las contraseñas no coinciden.")
+                st.error(t("pass_no_coinciden"))
                 return
             if len(nueva_pass) < 6:
                 st.error("La contraseña debe tener al menos 6 caracteres.")
@@ -96,7 +97,7 @@ def recuperar_app():
                 if user:
                     fila = usuarios.index(user) + 2
                     hoja_u.update_cell(fila, list(user.keys()).index("PASSWORD") + 1, hash_pass(nueva_pass))
-                    st.success("✅ Contraseña actualizada. Ya puedes iniciar sesión.")
+                    st.success(t("pass_actualizada"))
                     st.session_state["PASO_RECUPERAR"] = 1
                     st.session_state.pop("RECUPERAR_EMAIL", None)
                     st.session_state.pop("RECUPERAR_CODIGO", None)

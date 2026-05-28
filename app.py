@@ -176,7 +176,9 @@ def portal_login():
                                   label_visibility="collapsed")
         st.session_state["idioma"] = "ES" if "Español" in idioma_sel else "PT"
 
-    tab = st.radio("", [t("ingresar"), t("registrarse"), t("recuperar_clave")], horizontal=True)
+    opciones_tab = [t("ingresar"), t("registrarse"), t("recuperar_clave")]
+    tab_idx = st.radio("", range(len(opciones_tab)), horizontal=True,
+                       format_func=lambda i: opciones_tab[i])
     cliente = conectar_google()
     if not cliente:
         st.error("No se pudo conectar."); return
@@ -186,7 +188,7 @@ def portal_login():
     except Exception as e:
         st.error(f"Error: {e}"); return
 
-    if tab == "Ingresar":
+    if tab_idx == 0:
         with st.form("login"):
             u = st.text_input(t("usuario")).strip().lower()
             p = st.text_input(t("contrasena"), type="password")
@@ -204,7 +206,7 @@ def portal_login():
                         st.error(t("contrasena_incorrecta"))
                 else:
                     st.error(t("usuario_no_encontrado"))
-    elif tab == "Registrarse":
+    elif tab_idx == 1:
         registro_app()
     else:
         recuperar_app()

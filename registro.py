@@ -1,4 +1,5 @@
 import streamlit as st
+from idiomas import t
 from utils import conectar_google, hash_pass, get_email_config
 import datetime
 import random
@@ -41,7 +42,7 @@ def enviar_verificacion(email_destino: str, codigo: str) -> bool:
 # FLUJO DE REGISTRO
 # =========================================================
 def registro_app():
-    st.header("📝 Registro de nuevo usuario")
+    st.header(t("registrarse"))
 
     if "PASO_REGISTRO" not in st.session_state:
         st.session_state["PASO_REGISTRO"] = 1
@@ -62,30 +63,30 @@ def registro_app():
     # --- Paso 1: Formulario de datos ---
     if st.session_state["PASO_REGISTRO"] == 1:
         with st.form("registro_form"):
-            nombre = st.text_input("Nombre completo")
-            email = st.text_input("Correo electrónico")
-            telefono = st.text_input("Teléfono")
-            password = st.text_input("Contraseña", type="password")
-            confirmar = st.text_input("Confirmar contraseña", type="password")
-            pais = st.text_input("País")
+            nombre = st.text_input(t("nombre_completo"))
+            email = st.text_input(t("correo"))
+            telefono = st.text_input(t("telefono"))
+            password = st.text_input(t("contrasena"), type="password")
+            confirmar = st.text_input(t("confirmar_pass"), type="password")
+            pais = st.text_input(t("pais"))
             fecha_cumple = st.date_input(
-                "Fecha de cumpleaños",
+                t("fecha_cumple"),
                 value=datetime.date(2000, 1, 1),
                 min_value=datetime.date(1900, 1, 1),
                 max_value=datetime.date.today()
             )
-            submitted = st.form_submit_button("Registrarme")
+            submitted = st.form_submit_button(t("registrarme"))
 
             if submitted:
                 if not nombre or not email or not password:
                     st.error("Por favor completa los campos obligatorios.")
                     return
                 if password != confirmar:
-                    st.error("Las contraseñas no coinciden.")
+                    st.error(t("pass_no_coinciden"))
                     return
                 # Verificar si el email ya existe
                 if any(str(u.get("EMAIL", "")).lower() == email.lower() for u in usuarios):
-                    st.error("Ya existe una cuenta con ese correo.")
+                    st.error(t("email_ya_existe"))
                     return
 
                 codigo_gen = str(random.randint(100000, 999999))
@@ -120,26 +121,26 @@ def registro_app():
                     st.session_state["EMAIL_TEMP"] = email
                     st.session_state["CODIGO_TEMP"] = codigo_gen
                     st.session_state["PASO_REGISTRO"] = 2
-                    st.success("✅ Revisa tu correo para confirmar tu cuenta.")
+                    st.success(t("revisa_correo"))
                     st.rerun()
                 else:
-                    st.error("No se pudo enviar el correo de verificación.")
+                    st.error(t("error_envio_correo"))
 
     # --- Paso 2: Validación del código ---
     elif st.session_state["PASO_REGISTRO"] == 2:
         st.info(f"📩 Código enviado a: **{st.session_state.get('EMAIL_TEMP', '')}**")
-        codigo_ingresado = st.text_input("Código de verificación (6 dígitos)")
+        codigo_ingresado = st.text_input(t("codigo_verificacion"))
 
-        if st.button("Validar código"):
+        if st.button(t("validar_codigo")):
             if str(codigo_ingresado).strip() == str(st.session_state.get("CODIGO_TEMP", "")).strip():
                 datos = hoja_u.get_all_records()
                 user = next((u for u in datos if u.get("EMAIL") == st.session_state["EMAIL_TEMP"]), None)
                 if user:
                     fila = datos.index(user) + 2
                     hoja_u.update_cell(fila, 20, "SI")
-                    st.success("🎉 ¡Cuenta verificada! Ya puedes iniciar sesión.")
+                    st.success(t("cuenta_verificada"))
                     st.session_state["PASO_REGISTRO"] = 1
                     st.session_state.pop("EMAIL_TEMP", None)
                     st.session_state.pop("CODIGO_TEMP", None)
             else:
-                st.error("Código incorrecto.")
+                st.error(t("codigo_incorrecto"))
