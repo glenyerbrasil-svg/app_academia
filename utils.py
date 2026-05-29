@@ -1,9 +1,9 @@
-import streamlit as st
 import gspread
 import bcrypt
 import cloudinary
 import cloudinary.uploader
 from datetime import datetime
+from functools import lru_cache
 
 # =========================================================
 # CONFIGURACIÓN DE CLOUDINARY
@@ -21,11 +21,11 @@ def format_key(key: str) -> str:
     """Formatea la clave privada para Google Sheets."""
     return key.replace("\\n", "\n")
 
-@st.cache_resource
+@lru_cache(maxsize=1)
 def conectar_google():
     """Conecta con Google Sheets — cacheada para toda la sesión."""
     try:
-        import streamlit as st
+        import streamlit as st  # noqa
         if "google_sheets" in st.secrets:
             creds = dict(st.secrets["google_sheets"])
             creds["private_key"] = format_key(creds["private_key"])
