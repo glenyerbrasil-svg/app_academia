@@ -214,26 +214,28 @@ def portal_login():
 # ============================================================
 # HELPERS
 # ============================================================
-def obtener_consejo(doc):
+@st.cache_data(ttl=3600)  # Cachear 1 hora — el consejo no cambia tan seguido
+def obtener_consejo(_doc):
     try:
-        msgs = [m for m in doc.worksheet("Mensajes").col_values(1)[1:62] if m.strip()]
+        msgs = [m for m in _doc.worksheet("Mensajes").col_values(1)[1:62] if m.strip()]
         if msgs:
             random.seed(date.today().timetuple().tm_yday)
             return random.choice(msgs)
     except: pass
     return "Cada operación es una oportunidad de aprender."
 
-def obtener_stats(doc, uid):
+@st.cache_data(ttl=60)  # Cachear 60 segundos — stats del dashboard
+def obtener_stats(_doc, uid):
     saldo, wr, ops = 0.0, 0.0, 0
     try:
-        df = pd.DataFrame(doc.worksheet("Finanzas").get_all_records())
+        df = pd.DataFrame(_doc.worksheet("Finanzas").get_all_records())
         df["ID_USUARIO"] = df["ID_USUARIO"].astype(str)
         du = df[df["ID_USUARIO"]==str(uid)]
         if not du.empty:
             saldo = float(du.iloc[-1].get("SALDO_FINAL",0) or 0)
     except: pass
     try:
-        df = pd.DataFrame(doc.worksheet("Bitacora").get_all_records())
+        df = pd.DataFrame(_doc.worksheet("Bitacora").get_all_records())
         df["ID_USUARIO"] = df["ID_USUARIO"].astype(str)
         du = df[df["ID_USUARIO"]==str(uid)]
         c  = du[du["ESTADO_RESULTADO"].isin(["TP","SL","BE"])]
@@ -377,11 +379,11 @@ def app_interna():
     st.markdown(PWA_META, unsafe_allow_html=True)
 
     cliente = conectar_google()
-    if not cliente: st.error("Error de conexión."); st.stop()
+    if not cliente: st.error(t("error_conexion")); st.stop()
     try:
         doc = cliente.open("Bitacora_Academia1")
     except Exception as e:
-        st.error(f"BD no encontrada: {e}"); st.stop()
+        st.error(f'{t("error_bd")}: {e}'); st.stop()
 
     consejo        = obtener_consejo(doc)
     saldo, wr, ops = obtener_stats(doc, user["ID_USUARIO"])
