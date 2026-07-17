@@ -8,30 +8,15 @@ from datetime import datetime
 # CONFIGURACIÓN DE CLOUDINARY — desde st.secrets
 # =========================================================
 def _configurar_cloudinary():
-    import streamlit as st
-
-    if "cloudinary" not in st.secrets:
-        st.error(
-            "⚠️ Falta la sección [cloudinary] en st.secrets. "
-            "Configúrala en .streamlit/secrets.toml (local) o en "
-            "Settings → Secrets (Streamlit Cloud) con: "
-            "cloud_name, api_key, api_secret."
+    try:
+        import streamlit as st
+        cloudinary.config(
+            cloud_name=st.secrets["cloudinary"]["cloud_name"],
+            api_key=st.secrets["cloudinary"]["api_key"],
+            api_secret=st.secrets["cloudinary"]["api_secret"]
         )
-        st.stop()
-
-    faltantes = [
-        k for k in ("cloud_name", "api_key", "api_secret")
-        if k not in st.secrets["cloudinary"]
-    ]
-    if faltantes:
-        st.error(f"⚠️ Faltan claves en [cloudinary] de st.secrets: {faltantes}")
-        st.stop()
-
-    cloudinary.config(
-        cloud_name=st.secrets["cloudinary"]["cloud_name"],
-        api_key=st.secrets["cloudinary"]["api_key"],
-        api_secret=st.secrets["cloudinary"]["api_secret"]
-    )
+    except Exception as e:
+        print(f"Cloudinary config error: {e}")
 
 _configurar_cloudinary()
 

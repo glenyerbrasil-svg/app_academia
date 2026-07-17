@@ -193,7 +193,17 @@ def cerrar_operacion(user, doc):
                 with st.spinner("🚀 Actualizando Bitácora y Finanzas..."):
                     try:
                         # Subir imagen resultado a Cloudinary
-                        # (la configuración ya se hizo una sola vez al importar utils.py)
+                        import streamlit as st_inner
+                        try:
+                            cloud_cfg = st.secrets["cloudinary"]
+                            cloudinary.config(
+                                cloud_name=cloud_cfg["cloud_name"],
+                                api_key=cloud_cfg["api_key"],
+                                api_secret=cloud_cfg["api_secret"]
+                            )
+                        except Exception:
+                            pass  # Ya configurado en utils.py al importar
+
                         url_resultado = str(d.get('IMAGEN_RESULTADO', 'N/A'))
                         if imagen_final:
                             res = cloudinary.uploader.upload(
