@@ -39,7 +39,8 @@ def comprimir_imagen(archivo, max_kb=400):
         buf.seek(0)
         return buf
     except Exception as e:
-        # Si falla la compresión, retornar el archivo original
+        # Si falla la compresión, avisar y retornar el archivo original
+        st.warning(f"⚠️ No se pudo comprimir la imagen (se subirá sin comprimir): {e}")
         if hasattr(archivo, 'seek'):
             archivo.seek(0)
         return archivo
@@ -173,7 +174,7 @@ def bitacora_app(user):
         else:
             with st.spinner("🚀 Guardando operación..."):
                 try:
-                    # Configurar Cloudinary
+                    # Configurar Cloudinary (con error visible si falla)
                     try:
                         cfg = st.secrets["cloudinary"]
                         cloudinary.config(
@@ -181,8 +182,9 @@ def bitacora_app(user):
                             api_key=cfg["api_key"],
                             api_secret=cfg["api_secret"]
                         )
-                    except:
-                        pass
+                    except Exception as e:
+                        st.error(f"❌ Error leyendo credenciales de Cloudinary en secrets: {e}")
+                        st.stop()
 
                     # Subir imágenes de forma individual con compresión
                     url_may = subir_imagen_segura(img_may, "MAYOR",    ins)
