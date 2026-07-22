@@ -18,9 +18,15 @@ def finanzas_app(user):
         return
 
     df_f = pd.DataFrame(hoja_f.get_all_records())
-    df_f["ID_USUARIO"] = df_f["ID_USUARIO"].astype(str)
     user_id = str(user["ID_USUARIO"])
-    df_user = df_f[df_f["ID_USUARIO"] == user_id]
+
+    if df_f.empty or "ID_USUARIO" not in df_f.columns:
+        # Hoja vacía (o sin la columna esperada todavía): no hay movimientos registrados
+        df_f = pd.DataFrame(columns=["ID_USUARIO"])
+        df_user = df_f
+    else:
+        df_f["ID_USUARIO"] = df_f["ID_USUARIO"].astype(str)
+        df_user = df_f[df_f["ID_USUARIO"] == user_id]
 
     saldo_actual = float(df_user.iloc[-1].get("SALDO_FINAL", 0)) if not df_user.empty else 0.0
 
