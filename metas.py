@@ -434,15 +434,17 @@ def metas_app(user):
 
         # Formulario registro diario
         st.markdown("#### ➕ Registrar movimiento")
-        with st.form("form_diario", clear_on_submit=True):
-            col_t1, col_t2 = st.columns(2)
-            tipo      = col_t1.selectbox("Tipo", ["GASTO", "INGRESO"])
-            fecha_mov = col_t2.date_input("Fecha", value=date.today())
 
-            categorias = CATEGORIAS_GASTO if tipo == "GASTO" else CATEGORIAS_INGRESO
-            col_c1, col_c2 = st.columns(2)
-            categoria  = col_c1.selectbox("Categoría", categorias)
-            monto      = col_c2.number_input("Monto ($)", min_value=0.01, step=0.5, format="%.2f")
+        # El tipo va FUERA del form: así el cambio se refleja al instante
+        # (dentro de un st.form los widgets no disparan rerun hasta enviar el formulario)
+        tipo = st.selectbox("Tipo", ["GASTO", "INGRESO"], key="tipo_mov_diario")
+        categorias = CATEGORIAS_GASTO if tipo == "GASTO" else CATEGORIAS_INGRESO
+
+        with st.form("form_diario", clear_on_submit=True):
+            col_t2, col_c1 = st.columns(2)
+            fecha_mov = col_t2.date_input("Fecha", value=date.today())
+            categoria = col_c1.selectbox("Categoría", categorias)
+            monto      = st.number_input("Monto ($)", min_value=0.01, step=0.5, format="%.2f")
             descripcion = st.text_input("Descripción libre (opcional)")
 
             if st.form_submit_button(t("registrar_mov"), use_container_width=True):
