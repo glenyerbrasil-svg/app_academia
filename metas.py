@@ -312,6 +312,126 @@ def metas_app(user):
                 col3.metric("💵 Ingresos extra del mes", f"${ingresos_mes:,.2f}")
                 st.divider()
 
+        # ── ATAJOS DE UN TAP (registro rápido) ──
+        st.markdown("#### ⚡ Registro rápido")
+        st.caption("Toca un atajo para registrar al instante, sin llenar el formulario.")
+
+        # Conectar (o crear) la hoja de atajos personalizados
+        try:
+            hoja_ar = doc.worksheet("Gastos_Rapidos")
+        except Exception:
+            try:
+                hoja_ar = doc.add_worksheet(title="Gastos_Rapidos", rows=100, cols=6)
+                hoja_ar.append_row(["ID_ATAJO", "ID_USUARIO", "EMOJI", "NOMBRE", "CATEGORIA", "MONTO"])
+            except Exception:
+                hoja_ar = None
+
+        atajos_usuario = []
+        if hoja_ar is not None:
+            try:
+                df_ar = pd.DataFrame(hoja_ar.get_all_records())
+                if not df_ar.empty:
+                    df_ar["ID_USUARIO"] = df_ar["ID_USUARIO"].astype(str)
+                    atajos_usuario = df_ar[df_ar["ID_USUARIO"] == user_id].to_dict("records")
+            except Exception:
+                atajos_usuario = []
+
+        ATAJOS_DEFAULT = [
+            {"EMOJI": "☕", "NOMBRE": "Café",       "CATEGORIA": "🍔 Comida y restaurantes", "MONTO": 3.0},
+            {"EMOJI": "🍽️", "NOMBRE": "Almuerzo",   "CATEGORIA": "🍔 Comida y restaurantes", "MONTO": 6.0},
+            {"EMOJI": "🚌", "NOMBRE": "Transporte", "CATEGORIA": "🚗 Transporte",             "MONTO": 1.5},
+            {"EMOJI": "🛒", "NOMBRE": "Mandado",     "CATEGORIA": "🛒 Supermercado",           "MONTO": 10.0},
+        ]
+        lista_atajos = atajos_usuario if atajos_usuario else ATAJOS_DEFAULT
+        usando_default = not atajos_usuario
+
+        cols_atajo = st.columns(4)
+        for i, atajo in enumerate(lista_atajos):
+            col = cols_atajo[i % 4]
+            monto_a = float(atajo.get("MONTO", 0) or 0)
+            label = f"{atajo['EMOJI']} {atajo['NOMBRE']}\n${monto_a:,.2f}"
+            if col.button(label, key=f"atajo_{i}", use_container_width=True):
+                try:
+                    registros_dg = hoja_dg.get_all_records()
+                    hoy = date.today()
+                    nueva_fila = [
+                        len(registros_dg) + 1,
+                        user_id,
+                        str(hoy),
+                        "GASTO",
+                        atajo["CATEGORIA"],
+                        atajo["NOMBRE"],
+                        monto_a,
+                        hoy.strftime("%Y-%m")
+                    ]
+                    hoja_dg.append_row(nueva_fila)
+                    st.toast(f"{atajo['EMOJI']} {atajo['NOMBRE']} registrado — ${monto_a:,.2f}", icon="✅")
+                    time.sleep(0.6)
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error al registrar: {e}")
+
+        if usando_default:
+            st.caption("💡 Estos son atajos de ejemplo. Personalízalos abajo con tus propios gastos frecuentes.")
+
+        # Personalización de atajos
+        with st.expander("⚙️ Personalizar mis atajos"):
+            if atajos_usuario:
+                st.markdown("**Tus atajos actuales**")
+                for atajo in atajos_usuario:
+                    c1, c2 = st.columns([4, 1])
+                    c1.write(f"{atajo['EMOJI']} **{atajo['NOMBRE']}** — {atajo['CATEGORIA']} — ${float(atajo.get('MONTO', 0) or 0):,.2f}")
+                    if c2.button("🗑️", key=f"del_{atajo.get('ID_ATAJO')}"):
+                        try:
+                            registros_ar = hoja_ar.get_all_records()
+                            fila = next(
+                                (i + 2 for i, r in enumerate(registros_ar)
+                                 if str(r.get("ID_ATAJO")) == str(atajo.get("ID_ATAJO"))),
+                                None
+                            )
+                            if fila:
+                                hoja_ar.delete_rows(fila)
+                                st.success("Atajo eliminado.")
+                                time.sleep(0.5)
+                                st.rerun()
+                        except Exception as e:
+                            st.error(f"Error al eliminar: {e}")
+                st.divider()
+
+            st.markdown("**➕ Agregar nuevo atajo**")
+            with st.form("form_nuevo_atajo", clear_on_submit=True):
+                col_n1, col_n2 = st.columns(2)
+                emoji_nuevo = col_n1.text_input("Emoji", value="⭐", max_chars=2)
+                nombre_nuevo = col_n2.text_input("Nombre (ej: Café, Almuerzo)")
+                col_n3, col_n4 = st.columns(2)
+                categoria_nueva = col_n3.selectbox("Categoría", CATEGORIAS_GASTO)
+                monto_nuevo = col_n4.number_input("Monto habitual ($)", min_value=0.01, step=0.5, format="%.2f")
+
+                if st.form_submit_button("💾 Guardar atajo", use_container_width=True):
+                    if not nombre_nuevo.strip():
+                        st.warning("⚠️ Ponle un nombre a tu atajo.")
+                    elif hoja_ar is None:
+                        st.error("No se pudo acceder a la hoja de atajos.")
+                    else:
+                        try:
+                            registros_ar = hoja_ar.get_all_records()
+                            nuevo_atajo = [
+                                len(registros_ar) + 1,
+                                user_id,
+                                emoji_nuevo.strip() or "⭐",
+                                nombre_nuevo.strip(),
+                                categoria_nueva,
+                                float(monto_nuevo)
+                            ]
+                            hoja_ar.append_row(nuevo_atajo)
+                            st.success(f"✅ Atajo '{nombre_nuevo}' guardado.")
+                            time.sleep(1)
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Error al guardar: {e}")
+
+        st.divider()
+
         # Formulario registro diario
         st.markdown("#### ➕ Registrar movimiento")
         with st.form("form_diario", clear_on_submit=True):
