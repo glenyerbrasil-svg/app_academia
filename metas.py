@@ -399,10 +399,31 @@ def metas_app(user):
                 st.divider()
 
             st.markdown("**➕ Agregar nuevo atajo**")
+
+            # El emoji va FUERA del form: si eligen "Otro ✏️" necesitamos
+            # mostrar el campo de texto al instante, y eso no reacciona
+            # dentro de un st.form hasta que se envía.
+            EMOJIS_COMUNES = [
+                ("☕", "Café"), ("🚬", "Cigarro"), ("🍔", "Comida rápida"),
+                ("🍬", "Dulces"), ("🥤", "Refresco"), ("🍞", "Pan"),
+                ("🍕", "Pizza"), ("🌮", "Antojito"), ("🍺", "Cerveza"),
+                ("🛒", "Súper"), ("🚌", "Transporte"), ("🚕", "Taxi"),
+                ("🎬", "Cine"), ("📱", "Apps/Suscripciones"), ("💊", "Medicina"),
+                ("🐶", "Mascota"), ("✏️", "Otro"),
+            ]
+            emoji_sel = st.selectbox(
+                "Emoji",
+                EMOJIS_COMUNES,
+                format_func=lambda x: f"{x[0]}  {x[1]}",
+                key="emoji_sel_atajo"
+            )
+            if emoji_sel[1] == "Otro":
+                emoji_nuevo = st.text_input("Escribe tu emoji", value="⭐", max_chars=2, key="emoji_custom_atajo")
+            else:
+                emoji_nuevo = emoji_sel[0]
+
             with st.form("form_nuevo_atajo", clear_on_submit=True):
-                col_n1, col_n2 = st.columns(2)
-                emoji_nuevo = col_n1.text_input("Emoji", value="⭐", max_chars=2)
-                nombre_nuevo = col_n2.text_input("Nombre (ej: Café, Almuerzo)")
+                nombre_nuevo = st.text_input("Nombre (ej: Café, Almuerzo)")
                 col_n3, col_n4 = st.columns(2)
                 categoria_nueva = col_n3.selectbox("Categoría", CATEGORIAS_GASTO)
                 monto_nuevo = col_n4.number_input("Monto habitual ($)", min_value=0.01, step=0.5, format="%.2f")
@@ -429,6 +450,7 @@ def metas_app(user):
                             st.rerun()
                         except Exception as e:
                             st.error(f"Error al guardar: {e}")
+
 
         st.divider()
 
