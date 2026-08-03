@@ -41,6 +41,9 @@ def reportes_app(user):
     df = pd.DataFrame(ops)
     df["FECHA"] = pd.to_datetime(df["FECHA"], errors="coerce")
     df["RESULTADO_DINERO"] = pd.to_numeric(df["RESULTADO_DINERO"], errors="coerce").fillna(0)
+    for col_precio in ["PRECIO_ENT", "PRECIO_SL", "PRECIO_TP", "VALOR_BALA"]:
+        if col_precio in df.columns:
+            df[col_precio] = pd.to_numeric(df[col_precio], errors="coerce").fillna(0)
 
     # Solo operaciones cerradas para métricas
     df_cerradas = df[df["ESTADO_RESULTADO"].isin(["TP", "SL", "BE"])].copy()
@@ -83,6 +86,26 @@ def reportes_app(user):
     win_rate = round((ganadas / total * 100), 1) if total > 0 else 0.0
     pendientes = len(df_filtrado[df_filtrado["ESTADO_RESULTADO"] == "PENDIENTE"])
 
+    # ── Risk:Reward planeado y Expectativa (en múltiplos de R) ──
+    # R:R planeado por operación = distancia al TP / distancia al SL
+    rr_promedio = None
+    expectativa_r = None
+    tiene_datos_rr = all(c in df_cerr.columns for c in ["PRECIO_ENT", "PRECIO_SL", "PRECIO_TP", "VALOR_BALA"])
+
+    if tiene_datos_rr and total > 0:
+        riesgo = (df_cerr["PRECIO_ENT"] - df_cerr["PRECIO_SL"]).abs()
+        recompensa = (df_cerr["PRECIO_TP"] - df_cerr["PRECIO_ENT"]).abs()
+        rr_por_op = (recompensa / riesgo).replace([float("inf"), -float("inf")], pd.NA).dropna()
+        if not rr_por_op.empty:
+            rr_promedio = rr_por_op.mean()
+
+        # Expectativa en R: cuánto R gana/pierde cada operación en promedio,
+        # usando el riesgo (VALOR_BALA) como referencia de 1R
+        riesgo_op = df_cerr["VALOR_BALA"].replace(0, pd.NA)
+        r_por_op = (df_cerr["RESULTADO_DINERO"] / riesgo_op).dropna()
+        if not r_por_op.empty:
+            expectativa_r = r_por_op.mean()
+
     col1, col2, col3, col4, col5, col6 = st.columns(6)
     col1.metric("📌 Total cerradas", total)
     col2.metric("✅ TP", ganadas)
@@ -90,6 +113,39 @@ def reportes_app(user):
     col4.metric("➖ BE", be)
     col5.metric("🎯 Win Rate", f"{win_rate}%")
     col6.metric("💰 PNL", f"${pnl:,.2f}", delta=f"${pnl:,.2f}")
+
+    if rr_promedio is not None or expectativa_r is not None:
+        col7, col8, col9 = st.columns(3)
+        if rr_promedio is not None:
+            col7.metric("📐 R:R promedio", f"1 : {rr_promedio:.2f}")
+        if expectativa_r is not None:
+            col8.metric(
+                "📈 Expectativa (por op.)",
+                f"{expectativa_r:+.2f} R",
+                help="Cuánto ganas o pierdes en promedio por operación, medido en múltiplos de tu riesgo (R). Positivo = sistema rentable a largo plazo."
+            )
+        if rr_promedio is not None and rr_promedio > 0:
+            wr_breakeven = round(100 / (1 + rr_promedio), 1)
+            col9.metric(
+                "⚖️ Win Rate mínimo",
+                f"{wr_breakeven}%",
+                help="Con tu R:R promedio, este es el % de acierto mínimo para no perder dinero. Compáralo con tu Win Rate real arriba."
+            )
+
+        if rr_promedio is not None and rr_promedio > 0:
+            wr_breakeven = 100 / (1 + rr_promedio)
+            if win_rate >= wr_breakeven:
+                st.success(
+                    f"✅ Tu Win Rate ({win_rate}%) está **por encima** del mínimo necesario "
+                    f"({wr_breakeven:.1f}%) para tu R:R promedio de 1:{rr_promedio:.2f}. "
+                    f"Tu sistema es matemáticamente rentable a largo plazo."
+                )
+            else:
+                st.warning(
+                    f"⚠️ Tu Win Rate ({win_rate}%) está **por debajo** del mínimo necesario "
+                    f"({wr_breakeven:.1f}%) para tu R:R promedio de 1:{rr_promedio:.2f}. "
+                    f"Necesitas subir el win rate, mejorar el R:R, o ambos."
+                )
 
     if pendientes > 0:
         st.info(f"⏳ Tienes **{pendientes}** operación(es) aún pendiente(s) en este período.")
@@ -245,6 +301,10 @@ def reportes_app(user):
                 pdf.cell(0, 7, f"Break Even (BE): {be}", ln=True)
                 pdf.cell(0, 7, f"Win Rate: {win_rate}%", ln=True)
                 pdf.cell(0, 7, f"PNL Total: ${pnl:,.2f}", ln=True)
+                if rr_promedio is not None:
+                    pdf.cell(0, 7, f"R:R promedio: 1:{rr_promedio:.2f}", ln=True)
+                if expectativa_r is not None:
+                    pdf.cell(0, 7, f"Expectativa por operacion: {expectativa_r:+.2f} R", ln=True)
                 pdf.ln(6)
 
                 # Insertar gráficas desde memoria (sin disco)
