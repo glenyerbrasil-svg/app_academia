@@ -5,7 +5,7 @@ import cloudinary
 import cloudinary.uploader
 import time
 from datetime import datetime, date
-from utils import conectar_google
+from utils import conectar_google, obtener_stats
 
 # ============================================================
 # MAPA EXACTO DE COLUMNAS — Hoja: Bitacora
@@ -261,6 +261,7 @@ def cerrar_operacion(user, doc):
                         ])
 
                         st.success(f"✅ Operación cerrada. Resultado: ${monto_final:,.2f} | Nuevo saldo: ${nuevo_saldo:,.2f}")
+                        obtener_stats.clear()  # invalida el caché para que el dashboard muestre el saldo real
                         st.balloons()
                         time.sleep(2)
                         st.rerun()

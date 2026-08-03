@@ -2,6 +2,8 @@ import gspread
 import bcrypt
 import cloudinary
 import cloudinary.uploader
+import pandas as pd
+import streamlit as st
 from datetime import datetime
 
 # =========================================================
@@ -86,6 +88,35 @@ def ahora() -> str:
 def rol_es(user: dict, *roles: str) -> bool:
     rol_actual = str(user.get("ROL", "")).upper().strip()
     return rol_actual in [r.upper().strip() for r in roles]
+
+# =========================================================
+# STATS DEL DASHBOARD — con caché de 60s
+# Vive aquí (y no en app.py) para poder importarla desde
+# finanzas.py y cerrar.py y llamar obtener_stats.clear()
+# justo después de guardar un movimiento, sin esperar el TTL.
+# =========================================================
+@st.cache_data(ttl=60)
+def obtener_stats(_doc, uid):
+    saldo, wr, ops = 0.0, 0.0, 0
+    try:
+        df = pd.DataFrame(_doc.worksheet("Finanzas").get_all_records())
+        df["ID_USUARIO"] = df["ID_USUARIO"].astype(str)
+        du = df[df["ID_USUARIO"] == str(uid)]
+        if not du.empty:
+            saldo = float(du.iloc[-1].get("SALDO_FINAL", 0) or 0)
+    except Exception:
+        pass
+    try:
+        df = pd.DataFrame(_doc.worksheet("Bitacora").get_all_records())
+        df["ID_USUARIO"] = df["ID_USUARIO"].astype(str)
+        du = df[df["ID_USUARIO"] == str(uid)]
+        c = du[du["ESTADO_RESULTADO"].isin(["TP", "SL", "BE"])]
+        ops = len(c)
+        if ops > 0:
+            wr = len(c[c["ESTADO_RESULTADO"] == "TP"]) / ops * 100
+    except Exception:
+        pass
+    return saldo, wr, ops
 
 # =========================================================
 # CREDENCIALES DE EMAIL — desde st.secrets

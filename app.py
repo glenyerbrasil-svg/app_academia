@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import os, time, random
 from datetime import date
-from utils import conectar_google, check_pass, rol_es
+from utils import conectar_google, check_pass, rol_es, obtener_stats
 
 from bienvenida          import bienvenida_app
 from escuela             import escuela_app
@@ -223,27 +223,6 @@ def obtener_consejo(_doc):
             return random.choice(msgs)
     except: pass
     return "Cada operación es una oportunidad de aprender."
-
-@st.cache_data(ttl=60)  # Cachear 60 segundos — stats del dashboard
-def obtener_stats(_doc, uid):
-    saldo, wr, ops = 0.0, 0.0, 0
-    try:
-        df = pd.DataFrame(_doc.worksheet("Finanzas").get_all_records())
-        df["ID_USUARIO"] = df["ID_USUARIO"].astype(str)
-        du = df[df["ID_USUARIO"]==str(uid)]
-        if not du.empty:
-            saldo = float(du.iloc[-1].get("SALDO_FINAL",0) or 0)
-    except: pass
-    try:
-        df = pd.DataFrame(_doc.worksheet("Bitacora").get_all_records())
-        df["ID_USUARIO"] = df["ID_USUARIO"].astype(str)
-        du = df[df["ID_USUARIO"]==str(uid)]
-        c  = du[du["ESTADO_RESULTADO"].isin(["TP","SL","BE"])]
-        ops = len(c)
-        if ops > 0:
-            wr = len(c[c["ESTADO_RESULTADO"]=="TP"]) / ops * 100
-    except: pass
-    return saldo, wr, ops
 
 # ============================================================
 # HEADER

@@ -3,7 +3,7 @@ from idiomas import t
 import pandas as pd
 import time
 from datetime import date
-from utils import conectar_google, subir_a_cloudinary  # ← Cloudinary centralizado
+from utils import conectar_google, subir_a_cloudinary, obtener_stats  # ← Cloudinary centralizado
 
 def finanzas_app(user):
     st.header(t("finanzas_titulo"))
@@ -59,6 +59,7 @@ def finanzas_app(user):
                             saldo_actual, monto_dep, 0, saldo_final, notas_dep
                         ])
                         st.success(f"✅ Depósito registrado. Nuevo saldo: ${saldo_final:,.2f}")
+                        obtener_stats.clear()  # invalida el caché para que el dashboard muestre el saldo real
                         time.sleep(2)
                         st.rerun()
                     except Exception as e:
@@ -82,6 +83,7 @@ def finanzas_app(user):
                             saldo_actual, 0, monto_ret, saldo_final, notas_ret
                         ])
                         st.success(f"✅ Retiro registrado. Nuevo saldo: ${saldo_final:,.2f}")
+                        obtener_stats.clear()  # invalida el caché para que el dashboard muestre el saldo real
                         time.sleep(2)
                         st.rerun()
                     except Exception as e:
