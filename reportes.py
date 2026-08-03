@@ -172,6 +172,13 @@ def reportes_app(user):
     bytes_fig1 = fig_a_bytes(fig1)  # guardado en memoria
     plt.close(fig1)
 
+    st.caption("💡 **Qué muestra este gráfico:** cuántas de tus operaciones cerraron en Take Profit (ganadas), Stop Loss (perdidas) o Break Even (sin ganar ni perder).")
+    if total > 0:
+        if perdidas > ganadas + be:
+            st.info(f"📌 Cerraste más operaciones en SL ({perdidas}) que en TP y BE juntos ({ganadas + be}). Recuerda: esto no es necesariamente malo si tu R:R compensa — revisa la Expectativa (R) de arriba antes de sacar conclusiones.")
+        elif ganadas >= perdidas:
+            st.info(f"📌 Cierras más operaciones en TP ({ganadas}) que en SL ({perdidas}). Buena señal, aunque el número que realmente decide si ganas dinero es la Expectativa (R), no solo esta cantidad.")
+
     st.divider()
 
     # ─── GRÁFICA 2: PNL ACUMULADO ───
@@ -196,6 +203,16 @@ def reportes_app(user):
     st.pyplot(fig2)
     bytes_fig2 = fig_a_bytes(fig2)
     plt.close(fig2)
+
+    st.caption("💡 **Qué muestra este gráfico:** la suma de tus ganancias y pérdidas operación tras operación, en orden cronológico. Una línea que sube de forma sostenida indica consistencia; caídas bruscas indican rachas de pérdidas.")
+    if not df_cerr_sorted.empty:
+        pico_maximo = df_cerr_sorted["PNL_ACUM"].max()
+        pnl_final = df_cerr_sorted["PNL_ACUM"].iloc[-1]
+        caida_desde_pico = pico_maximo - pnl_final
+        if caida_desde_pico > 0.01:
+            st.warning(f"📉 Tu punto más alto en el período fue ${pico_maximo:,.2f}. Actualmente estás **${caida_desde_pico:,.2f} por debajo** de ese pico — eso es tu drawdown actual.")
+        else:
+            st.success(f"📈 Estás en tu punto más alto del período (${pnl_final:,.2f}). Sin drawdown pendiente por recuperar ahora mismo.")
 
     st.divider()
 
@@ -228,6 +245,8 @@ def reportes_app(user):
             bytes_fig3 = fig_a_bytes(fig3)
             plt.close(fig3)
 
+            st.caption("💡 **Qué muestra este gráfico:** en qué estado emocional registraste cada operación. Sirve para detectar si operas más seguido bajo estrés o impulso, en vez de con la mente en calma.")
+
             # Análisis emocional vs resultado
             st.markdown("**¿Cómo afecta tu estado emocional al resultado?**")
             if "ESTADO_RESULTADO" in df_filtrado.columns:
@@ -235,6 +254,19 @@ def reportes_app(user):
                 if not cruce.empty:
                     tabla = pd.crosstab(cruce["ESTADO_EMOCIONAL"], cruce["ESTADO_RESULTADO"])
                     st.dataframe(tabla, use_container_width=True)
+                    st.caption("💡 Compara fila por fila: si un estado como '😡 Venganza' o '😐 Nervioso' tiene proporcionalmente más SL que TP, es una señal clara de que ese estado te está costando dinero.")
+
+                    # Insight: promedio de resultado por estado emocional
+                    if "RESULTADO_DINERO" in cruce.columns:
+                        promedio_por_emocion = cruce.groupby("ESTADO_EMOCIONAL")["RESULTADO_DINERO"].mean().sort_values()
+                        if len(promedio_por_emocion) > 1:
+                            peor_emocion = promedio_por_emocion.index[0]
+                            peor_valor = promedio_por_emocion.iloc[0]
+                            mejor_emocion = promedio_por_emocion.index[-1]
+                            mejor_valor = promedio_por_emocion.iloc[-1]
+                            if peor_valor < 0:
+                                st.warning(f"⚠️ En promedio, tus operaciones en estado **{peor_emocion}** te dan ${peor_valor:,.2f} — el peor resultado promedio de todos tus estados emocionales. Considera no operar cuando te sientas así.")
+                            st.info(f"✨ Tu mejor resultado promedio ocurre en estado **{mejor_emocion}** (${mejor_valor:,.2f} por operación). Intenta identificar qué haces distinto cuando estás así.")
         else:
             st.info("No hay datos emocionales en el período seleccionado.")
             bytes_fig3 = None
@@ -268,6 +300,12 @@ def reportes_app(user):
         st.pyplot(fig4)
         bytes_fig4 = fig_a_bytes(fig4)
         plt.close(fig4)
+
+        st.caption("💡 **Qué muestra este gráfico:** la suma total de tus ganancias y pérdidas agrupadas por día de la semana en que cerraste la operación. Verde = día ganador en conjunto, rojo = día perdedor en conjunto.")
+        if len(rend_dia) > 1:
+            mejor_dia = rend_dia.idxmax()
+            peor_dia = rend_dia.idxmin()
+            st.info(f"📅 Tu mejor día es **{mejor_dia}** (${rend_dia[mejor_dia]:,.2f} acumulado) y tu peor día es **{peor_dia}** (${rend_dia[peor_dia]:,.2f} acumulado). Si el peor día es consistentemente malo con más operaciones, considera operar con más cautela o menos tamaño ese día.")
     else:
         bytes_fig4 = None
 
