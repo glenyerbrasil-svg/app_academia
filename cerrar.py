@@ -56,7 +56,12 @@ def cerrar_operacion(user, doc):
         df_b = pd.DataFrame(hoja_b.get_all_records())
         df_b.columns = df_b.columns.str.strip().str.upper()
         df_f = pd.DataFrame(hoja_f.get_all_records())
-        saldo_actual = float(df_f.iloc[-1].get("SALDO_FINAL", 0)) if not df_f.empty else 0.0
+        if not df_f.empty and "ID_USUARIO" in df_f.columns:
+            df_f["ID_USUARIO"] = df_f["ID_USUARIO"].astype(str)
+            df_f_user = df_f[df_f["ID_USUARIO"] == str(user["ID_USUARIO"])]
+        else:
+            df_f_user = pd.DataFrame()
+        saldo_actual = float(df_f_user.iloc[-1].get("SALDO_FINAL", 0)) if not df_f_user.empty else 0.0
     except Exception as e:
         st.error(f"Error de conexión: {e}")
         st.stop()
