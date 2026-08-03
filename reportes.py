@@ -267,7 +267,13 @@ def reportes_app(user):
                     insertar_grafico(pdf, bytes_fig4, "Rendimiento por día")
 
                 # Generar PDF en memoria
-                pdf_bytes = pdf.output(dest="S").encode("latin-1")
+                # fpdf2 (moderno) devuelve bytearray directamente;
+                # PyFPDF (vieja) devuelve str y requiere .encode("latin-1")
+                pdf_output = pdf.output(dest="S")
+                if isinstance(pdf_output, str):
+                    pdf_bytes = pdf_output.encode("latin-1")
+                else:
+                    pdf_bytes = bytes(pdf_output)
                 pdf_buf = io.BytesIO(pdf_bytes)
 
                 st.download_button(
